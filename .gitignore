@@ -2,3 +2,4 @@
 .rendered.core.cpp
 .core.cpython*.so
 __pycache__
+lib
