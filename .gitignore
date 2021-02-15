@@ -1,5 +1,5 @@
 .idea
 .rendered.core.cpp
-.core.cpython*.so
+core.cpython*.so
 __pycache__
 lib
