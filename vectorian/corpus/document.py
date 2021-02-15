@@ -70,14 +70,16 @@ class TokenTable:
 		last_idx = 0
 
 		for token in tokens:
-			self._utf8_idx += len(text[last_idx:token.idx].encode('utf8'))
-			last_idx = token.idx
+			idx = token["start"]
+			self._utf8_idx += len(text[last_idx:idx].encode('utf8'))
+			last_idx = idx
 
-			pos, tag = token.pos_, token.tag_
+			token_text = text[token["start"]:token["end"]]
 			self._token_idx.append(self._utf8_idx)
-			self._token_len.append(len(token.text.encode('utf8')))
-			self._token_pos.append(pos)
-			self._token_tag.append(tag)
+			self._token_len.append(len(token_text.encode('utf8')))
+
+			self._token_pos.append(token["pos"])
+			self._token_tag.append(token["tag"])
 
 		self._utf8_idx += len(text[last_idx:].encode('utf8'))
 
@@ -123,27 +125,26 @@ class Document:
 		for partition in partitions:
 			text = partition["text"]
 			tokens = partition["tokens"]
-			for sent, location in zip(partition["sents"], partition["locations"]):
-				p_tokens = []
+			loc = partition["loc"]
 
+			p_tokens = []
+			for sent in partition["sents"]:
 				for t0 in tokens[sent["start"]:sent["end"]]:
 					t = filter(t0)
 					if t:
 						p_tokens.append(t)
 
-				token_table.extend(text, p_tokens)
-				location_table.extend(location, p_tokens)
+			token_table.extend(text, p_tokens)
+			location_table.extend(loc, p_tokens)
 
 			texts.append(text)
-
-		location_table.to_arrow()
 
 		return core.Document(
 			index,
 			vocab,
-			"".join(texts),
-			location_table,
-			token_table,
+			"".join(texts).encode("utf8"),
+			location_table.to_arrow(),
+			token_table.to_arrow(),
 			{
 				'author': self._json['author'],
 				'title': self._json['title']

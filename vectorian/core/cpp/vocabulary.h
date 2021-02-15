@@ -138,12 +138,12 @@ public:
 		return t;
 	}
 
-	void set_idf_from_prob(token_t p_token, float p_prob) {
+	/*void set_idf_from_prob(token_t p_token, float p_prob) {
 		// spaCy uses log (nt / N), but we want log (N / nt)
 		// log N - log nt = -(log nt - log N) = -log (nt / N)
 
 		m_idf.at(p_token) = -p_prob;
-	}
+	}*/
 
 	inline std::string token_to_string_slow(token_t p_token) {
 		return m_tokens.inverse_lookup_slow(p_token);

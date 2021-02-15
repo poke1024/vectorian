@@ -11,12 +11,16 @@ from vectorian.embeddings import FastText
 if __name__ == '__main__':
     print(core)
 
-    vocab = core.Vocabulary()
     embedding = FastText("en")
+
+    vocab = core.Vocabulary()
+    vocab.add_embedding(embedding.to_core())
 
     nlp = spacy.load("en_core_web_sm")
     im = NovelImporter(nlp)
     doc = im("/Users/arbeit/A Child's Dream of a Star.txt")
-    #doc.save("/Users/arbeit/temp.json")
+    doc.save("/Users/arbeit/temp.json")
+    cdoc = doc.to_core(0, vocab)
+    print(cdoc)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

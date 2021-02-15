@@ -43,15 +43,25 @@ inline std::shared_ptr<arrow::Table> unwrap_table(const py::object &p_table) {
     return unwrap_table(p_table.ptr());
 }
 
-template<typename T, typename TV>
-const std::vector<TV> numeric_column(
+inline int get_field_index(
 	const std::shared_ptr<arrow::Table> &table,
 	const std::string &field) {
 
 	const int i = table->schema()->GetFieldIndex(field);
 	if (i < 0) {
-		throw std::runtime_error("extract_raw_values: illegal field name");
+		std::ostringstream err;
+		err << "illegal field name " << field;
+		throw std::runtime_error(err.str());
 	}
+	return i;
+}
+
+template<typename T, typename TV>
+const std::vector<TV> numeric_column(
+	const std::shared_ptr<arrow::Table> &table,
+	const std::string &field) {
+
+	const auto i = get_field_index(table, field);
 	auto data = column_data(table->column(i));
 
 	std::vector<TV> values;
@@ -107,10 +117,7 @@ void iterate_strings(
 	const std::string &field,
 	const F &f) {
 
-	const int i = table->schema()->GetFieldIndex(field);
-	if (i < 0) {
-		throw std::runtime_error("extract_raw_values: illegal field name");
-	}
+	const auto i = get_field_index(table, field);
 	auto data = column_data(table->column(i));
     StringVisitor v(f);
     for (int64_t k = 0; k < data->num_chunks(); k++) {
@@ -155,10 +162,7 @@ void iterate_floats(
 	const std::string &field,
 	const F &f) {
 
-	const int i = table->schema()->GetFieldIndex(field);
-	if (i < 0) {
-		throw std::runtime_error("extract_raw_values: illegal field name");
-	}
+	const auto i = get_field_index(table, field);
 	auto data = column_data(table->column(i));
 	FloatVisitor v(f);
     for (int64_t k = 0; k < data->num_chunks(); k++) {

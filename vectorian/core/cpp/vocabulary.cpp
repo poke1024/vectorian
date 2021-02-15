@@ -31,9 +31,8 @@ TokenVectorRef unpack_tokens(
         for (size_t i = 0; i < n; i++) {
             if (idx[i] + len[i] > p_text.length()) {
                 std::ostringstream s;
-                s << "illegal token idx @" << i << "/" << n << ": " <<
-                    idx[i] << " + " << len[i] <<
-                    " > " << p_text.length();
+                s << "illegal token[" << i << "].idx + .len = " <<
+                    size_t(idx[i]) << " + " << size_t(len[i]) << " > " << p_text.length();
                 throw std::runtime_error(s.str());
             }
 
@@ -81,11 +80,11 @@ TokenVectorRef unpack_tokens(
             tokens.at(i).tag = p_vocab->unsafe_add_tag(s);
         });
 
-        if (p_mode == MODIFY_VOCABULARY) {
+        /*if (p_mode == MODIFY_VOCABULARY) {
             iterate_floats(p_table, "prob", [&tokens, p_vocab] (size_t i, float p) {
                 p_vocab->set_idf_from_prob(tokens.at(i).id, p);
             });
-        }
+        }*/
 	}
 
 	return tokens_ref;

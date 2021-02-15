@@ -31,7 +31,7 @@ class Importer:
 		json_partitions = []
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations)):
 			doc_json = doc.to_json()
-			doc_json['locations'] = {
+			doc_json['loc'] = {
 				'bk': location[0],  	# book
 				'ch': location[1], 		# chapter
 				'sp': location[2], 		# speaker
