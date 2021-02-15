@@ -1,0 +1,6 @@
+[submodule "lib/ppk_assert"]
+	path = lib/ppk_assert
+	url = https://github.com/gpakosz/PPK_ASSERT
+[submodule "lib/eigen"]
+	path = lib/eigen
+	url = https://gitlab.com/libeigen/eigen
