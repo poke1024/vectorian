@@ -19,6 +19,7 @@ def _make_table(tokens, embeddings):
 		['token'] + vecs_name)
 
 
+'''
 class Precomputed:
 	def __init__(self, name, csv_path):
 		self._base_path = Path.home() / ".vectorian" / "embeddings" / "csv"
@@ -60,6 +61,7 @@ class Precomputed:
 		embeddings = embeddings[:len(tokens), :]
 
 		return tokens, embeddings
+'''
 
 
 class FastText:
@@ -99,5 +101,9 @@ class FastText:
 			embeddings[i] = ft.get_word_vector(w)
 		return words, embeddings
 
+	@property
+	def name(self):
+		return f"fasttext-{self._lang}"
+
 	def to_core(self):
-		return core.FastEmbedding(f"fasttext-{self._lang}", self._table)
+		return core.FastEmbedding(self.name, self._table)

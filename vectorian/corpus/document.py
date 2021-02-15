@@ -107,6 +107,11 @@ class Document:
 	def __init__(self, json):
 		self._json = json
 
+	@staticmethod
+	def load(path):
+		with open(path, "r") as f:
+			return Document(json.loads(f.read()))
+
 	def save(self, path):
 		with open(path, "w") as f:
 			f.write(json.dumps(self._json, indent=4, sort_keys=True))
