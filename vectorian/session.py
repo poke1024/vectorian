@@ -137,13 +137,13 @@ class Session:
 			self._metrics.append(embedding.as_metric())
 		self._finder = Finder(self._vocab, corpus)
 
-	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, max_matches=100, options: dict = dict()):
+	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, n=100, options: dict = dict()):
 		if metrics is None:
 			metrics = self._metrics
 
 		options = options.copy()
 		options["metrics"] = metrics
-		options["max_matches"] = max_matches
+		options["max_matches"] = n
 
 		query = Query(self._vocab, doc, options)
 		return self._finder(query)
