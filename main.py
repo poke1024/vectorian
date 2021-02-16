@@ -48,7 +48,7 @@ if __name__ == '__main__':
     #session.add_document(doc)
 
     query = nlp("company")
-    matches = rs_to_matches(session.find(query))
+    matches = session.find(query)
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
         f.write(json.dumps(matches, indent=4))
 

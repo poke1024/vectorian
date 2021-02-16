@@ -20,6 +20,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	bool m_ignore_determiners;
 	bool m_aborted;
 	size_t m_max_matches;
+	float m_min_score;
 
 	/*void init_boost(const py::kwargs &p_kwargs) {
 		m_t_boost.reserve(m_t_tokens.size());
