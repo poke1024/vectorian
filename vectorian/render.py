@@ -1,4 +1,5 @@
 import math
+import html
 
 from yattag import Doc
 
@@ -152,4 +153,5 @@ class Renderer:
 	</body>
 </html>'''
 
-		return ''.join([prolog, doc.getvalue(), epilog])
+		s = ''.join([prolog, doc.getvalue(), epilog])
+		return f'<iframe width=100% srcdoc="{html.escape(s)}"/>'
