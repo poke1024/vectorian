@@ -2,11 +2,12 @@ import vectorian.core as core
 import spacy
 import multiprocessing
 import multiprocessing.pool
+import logging
+import roman
 
 from vectorian.corpus.document import TokenTable
 from vectorian.corpus import Corpus
 from vectorian.corpus import Document
-
 
 
 class Query:
@@ -29,6 +30,67 @@ class Query:
 			self._doc.text,
 			token_table.to_arrow(),
 			**self._options)
+
+
+def get_location_desc(metadata, location):
+	if location[2] > 0:  # we have an act-scene-speakers structure.
+		speaker = metadata["speakers"].get(str(location[2]), "")
+		if location[0] >= 0:
+			act = roman.toRoman(location[0])
+			scene = location[1]
+			return speaker, "%s.%d, line %d" % (act, scene, location[3])
+		else:
+			return speaker, "line %d" % location[3]
+	elif location[1] > 0:  # book, chapter and paragraphs
+		if location[0] < 0:  # do we have a book?
+			return "", "Chapter %d, par. %d" % (location[1], location[3])
+		else:
+			return "", "Book %d, Chapter %d, par. %d" % (
+				location[0], location[1], location[3])
+	else:
+		return "", "par. %d" % location[3]
+
+
+def result_set_to_json(result_set):
+	matches = []
+	for i, m in enumerate(result_set.best_n(-1)):
+		regions = []
+
+		try:
+			for r in m.regions:
+				s = r.s.decode('utf-8', errors='ignore')
+				if r.matched:
+					t = r.t.decode('utf-8', errors='ignore')
+					regions.append(dict(
+						s=s,
+						t=t,
+						similarity=r.similarity,
+						weight=r.weight,
+						pos_s=r.pos_s.decode('utf-8', errors='ignore'),
+						pos_t=r.pos_t.decode('utf-8', errors='ignore'),
+						metric=r.metric.decode('utf-8', errors='ignore')))
+				else:
+					regions.append(dict(s=s, mismatch_penalty=r.mismatch_penalty))
+
+			metadata = m.document.metadata
+			speaker, loc_desc = get_location_desc(metadata, m.location)
+
+			matches.append(dict(
+				debug=dict(document=m.document.id, sentence=m.sentence_id),
+				score=m.score,
+				metric=m.metric,
+				location=dict(
+					speaker=speaker,
+					author=metadata["author"],
+					title=metadata["title"],
+					location=loc_desc
+				),
+				regions=regions,
+				omitted=m.omitted))
+		except UnicodeDecodeError:
+			logging.exception("unicode conversion issue")
+
+	return matches
 
 
 class Finder:
@@ -63,12 +125,7 @@ class Finder:
 				if progress:
 					progress(done / total)
 
-		return results
-
-
-class Metric:
-	def __init__(self, name):
-		pass
+		return result_set_to_json(results)
 
 
 class Session:
@@ -80,12 +137,20 @@ class Session:
 			self._metrics.append(embedding.as_metric())
 		self._finder = Finder(self._vocab, corpus)
 
-	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, options: dict = dict()):
+	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, max_matches=100, options: dict = dict()):
 		if metrics is None:
 			metrics = self._metrics
 
 		options = options.copy()
 		options["metrics"] = metrics
+		options["max_matches"] = max_matches
 
 		query = Query(self._vocab, doc, options)
 		return self._finder(query)
+
+
+class LabSession(Session):
+	def find(self, *args, return_json=False, **kwargs):
+		# show progress bar
+		# convert to jupyter HTML
+		pass

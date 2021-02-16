@@ -19,6 +19,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	bool m_bidirectional;
 	bool m_ignore_determiners;
 	bool m_aborted;
+	size_t m_max_matches;
 
 	/*void init_boost(const py::kwargs &p_kwargs) {
 		m_t_boost.reserve(m_t_tokens.size());
@@ -62,7 +63,9 @@ public:
 			"ignore_determiners",
 			"idf_weight",
 			"mismatch_length_penalty",
-			"cost_combine_function"
+			"cost_combine_function",
+			"max_matches",
+			"min_score"
 		};
 
 		if (p_kwargs) {
@@ -107,8 +110,16 @@ public:
             false;
 
 		const float idf_weight = (p_kwargs && p_kwargs.contains("idf_weight")) ?
-				p_kwargs["idf_weight"].cast<float>() :
-				0.0f;
+			p_kwargs["idf_weight"].cast<float>() :
+			0.0f;
+
+		m_max_matches = (p_kwargs && p_kwargs.contains("max_matches")) ?
+			p_kwargs["max_matches"].cast<size_t>() :
+			100;
+
+		m_min_score = (p_kwargs && p_kwargs.contains("min_score")) ?
+			p_kwargs["min_score"].cast<float>() :
+			0.2f;
 
 		std::set<std::string> needed_metrics;
 		if (p_kwargs && p_kwargs.contains("metrics")) {
@@ -278,12 +289,12 @@ public:
 		m_aborted = true;
 	}
 
-	inline int max_matches() const {
-		return 100;
+	inline size_t max_matches() const {
+		return m_max_matches;
 	}
 
 	inline float min_score() const {
-		return 0.2f;
+		return m_min_score;
 	}
 
 	inline float reference_score(

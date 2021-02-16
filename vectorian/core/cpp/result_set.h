@@ -98,7 +98,7 @@ public:
 		 PPK_ASSERT(false);
 	}
 
-	py::list best_n(size_t p_count) const;
+	py::list best_n(ssize_t p_count) const;
 
 	float precision(const GroundTruth &p_truth) const {
 		return 0.0f; // to be implemented
