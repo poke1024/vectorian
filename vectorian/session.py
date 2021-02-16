@@ -6,8 +6,7 @@ import logging
 import roman
 
 from vectorian.corpus.document import TokenTable
-from vectorian.corpus import Corpus
-from vectorian.corpus import Document
+from vectorian.render import Renderer
 
 
 class Query:
@@ -137,7 +136,11 @@ class Session:
 			self._metrics.append(embedding.as_metric())
 		self._finder = Finder(self._vocab, corpus)
 
-	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, n=100, options: dict = dict()):
+	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, n=100, progress=None, options: dict = dict()):
+
+		if not isinstance(doc, spacy.tokens.doc.Doc):
+			raise TypeError("please specify a spaCy document as query")
+
 		if metrics is None:
 			metrics = self._metrics
 
@@ -146,11 +149,31 @@ class Session:
 		options["max_matches"] = n
 
 		query = Query(self._vocab, doc, options)
-		return self._finder(query)
+		return self._finder(query, progress=progress)
 
 
 class LabSession(Session):
 	def find(self, *args, return_json=False, **kwargs):
-		# show progress bar
-		# convert to jupyter HTML
-		pass
+		import ipywidgets as widgets
+		from IPython.display import HTML, display
+
+		progress = widgets.FloatProgress(
+			value=0, min=0, max=1, description="",
+			layout=widgets.Layout(width="100%"))
+
+		display(progress)
+
+		def update_progress(t):
+			progress.value = progress.max * t
+
+		try:
+			results = super().find(
+				*args, progress=update_progress, **kwargs)
+		finally:
+			progress.close()
+
+		r = Renderer()
+		for result in results:
+			r.add_match(result)
+
+		return HTML(r.to_html())
