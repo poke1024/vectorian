@@ -117,6 +117,10 @@ class Document:
 			f.write(json.dumps(self._json, indent=4, sort_keys=True))
 
 	@property
+	def unique_id(self):
+		return self._json['unique_id']
+
+	@property
 	def title(self):
 		return self._json['title']
 

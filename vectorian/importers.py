@@ -4,7 +4,6 @@ import logging
 from tqdm import tqdm
 from pathlib import Path
 from collections import namedtuple
-from vectorian.corpus.document import Document
 
 
 def normalize_dashes(s):
@@ -18,10 +17,23 @@ Metadata = namedtuple(
 
 
 class Importer:
-	def __init__(self, nlp, batch_size=1):
+	_t = {
+		'normalize-dashes': normalize_dashes
+	}
+
+	def __init__(self, nlp, transforms=["normalize-dashes"], batch_size=1):
 		self._nlp = nlp
 		self._batch_size = batch_size
 		# batch_size == 1 needed for https://github.com/explosion/spaCy/issues/3607
+		self._transforms = transforms
+
+	def _transform_text(self, text):
+		for x in self._transforms:
+			if callable(x):
+				text = x(text)
+			else:
+				text = Importer._t[x](text)
+		return text
 
 	def _make_doc(self, md, partitions, locations):
 		pipe = self._nlp.pipe(
@@ -41,14 +53,50 @@ class Importer:
 
 		json = {
 			"version": md.version,
-			'id': md.unique_id,
+			'unique_id': md.unique_id,
 			'author': md.author,
 			'title': md.title,
 			'speakers': md.speakers,
 			'partitions': json_partitions
 		}
 
+		from vectorian.corpus import Document
+
 		return Document(json)
+
+
+class TextImporter(Importer):
+	# an importer for plain text files that does not assume any structure.
+
+	def __call__(self, path, unique_id=None, author="Anonymous", title=None):
+		path = Path(path)
+
+		if title is None:
+			title = path.stem
+
+		if unique_id is None:
+			unique_id = f"{author}/{title}"
+
+		with open(path, "r") as f:
+			text = self._transform_text(f.read())
+
+		locations = []
+
+		paragraph_sep = "\n\n"
+		paragraphs = text.split(paragraph_sep)
+		paragraphs = [x + paragraph_sep for x in paragraphs[:-1]] + paragraphs[-1:]
+
+		for j, p in enumerate(paragraphs):
+			locations.append((-1, -1, -1, j))
+
+		md = Metadata(
+			version="1.0",
+			unique_id=unique_id,
+			author=author,
+			title=title,
+			speakers={})
+
+		return self._make_doc(md, paragraphs, locations)
 
 
 class NovelImporter(Importer):
@@ -67,7 +115,7 @@ class NovelImporter(Importer):
 			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
-			text = normalize_dashes(f.read())
+			text = self._transform_text(f.read())
 
 		chapter_breaks = []
 		expected_chapter = 1

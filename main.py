@@ -7,6 +7,7 @@ import spacy
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
+from vectorian.corpus import Corpus
 
 import traceback
 import json
@@ -82,11 +83,26 @@ if __name__ == '__main__':
     embedding = FastText("en")
 
     nlp = spacy.load("en_core_web_sm")
+
+    # use case 1.
+    if False:
+        im = NovelImporter(nlp)
+        doc = im("/Users/arbeit/A Child's Dream of a Star.txt")
+
+        session = Session(
+            [doc],
+            [embedding])
+
+    # use case 2.
     im = NovelImporter(nlp)
+
+    corpus = Corpus()
     doc = im("/Users/arbeit/A Child's Dream of a Star.txt")
+    corpus.add(doc)
+    corpus.save("/Users/arbeit/Desktop/my-corpus")
 
     session = Session(
-        [doc],
+        corpus,
         [embedding])
 
     #doc.save("/Users/arbeit/temp.json")
