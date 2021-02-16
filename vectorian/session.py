@@ -3,9 +3,32 @@ import spacy
 import multiprocessing
 import multiprocessing.pool
 
-from vectorian.query import Query
-from vectorian.corpus.corpus import Corpus
-from vectorian.corpus.document import Document
+from vectorian.corpus.document import TokenTable
+from vectorian.corpus import Corpus
+from vectorian.corpus import Document
+
+
+
+class Query:
+	def __init__(self, vocab, doc, options):
+		self._vocab = vocab
+		self._doc = doc
+		self._options = options
+
+	def to_core(self):
+		tokens = self._doc.to_json()["tokens"]
+
+		if self._options.get('ignore_determiners'):
+			tokens = [t for t in tokens if t["pos"] != "DET"]
+
+		token_table = TokenTable()
+		token_table.extend(self._doc.text, tokens)
+
+		return core.Query(
+			self._vocab,
+			self._doc.text,
+			token_table.to_arrow(),
+			**self._options)
 
 
 class Finder:
@@ -43,19 +66,26 @@ class Finder:
 		return results
 
 
+class Metric:
+	def __init__(self, name):
+		pass
+
+
 class Session:
 	def __init__(self, corpus, embeddings):
 		self._vocab = core.Vocabulary()
 		self._metrics = []
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
-			self._metrics.append(embedding.name)
+			self._metrics.append(embedding.as_metric())
 		self._finder = Finder(self._vocab, corpus)
 
-	def find(self, doc: spacy.tokens.doc.Doc, options: dict = dict()):
-		if "metrics" not in options:
-			options = options.copy()
-			options["metrics"] = self._metrics
+	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, options: dict = dict()):
+		if metrics is None:
+			metrics = self._metrics
+
+		options = options.copy()
+		options["metrics"] = metrics
 
 		query = Query(self._vocab, doc, options)
 		return self._finder(query)

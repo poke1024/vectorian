@@ -3,22 +3,22 @@
 import vectorian.core as core
 import vectorian
 
-import spacy
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
 from vectorian.corpus import Corpus
 
+import spacy
 import traceback
 import json
+import roman
 
 
 def get_location_desc(metadata, location):
     if location[2] > 0:  # we have an act-scene-speakers structure.
         speaker = metadata["speakers"].get(str(location[2]), "")
         if location[0] >= 0:
-            acts = ("I", "II", "III", "IV", "V", "VI", "VII")
-            act = acts[location[0]]
+            act = roman.toRoman(location[0])
             scene = location[1]
             return speaker, "%s.%d, line %d" % (act, scene, location[3])
         else:

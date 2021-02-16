@@ -19,6 +19,14 @@ def _make_table(tokens, embeddings):
 		['token'] + vecs_name)
 
 
+class Embedding:
+	def as_metric(self):
+		return self.name
+
+	def as_mixed_metric(self, other, alpha):
+		return self.name, other.name, alpha
+
+
 '''
 class Precomputed:
 	def __init__(self, name, csv_path):
@@ -64,7 +72,7 @@ class Precomputed:
 '''
 
 
-class FastText:
+class FastText(Embedding):
 	def __init__(self, lang):
 		self._lang = lang
 		self._base_path = Path.home() / ".vectorian" / "embeddings" / "fasttext"
