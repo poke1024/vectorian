@@ -112,7 +112,7 @@ class Finder:
 		done = 0
 
 		if n_threads is None:
-			n_threads = multiprocessing.cpu_count()
+			n_threads = min(len(self._docs), multiprocessing.cpu_count())
 
 		results = None
 		with multiprocessing.pool.ThreadPool(processes=n_threads) as pool:

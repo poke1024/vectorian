@@ -7,3 +7,4 @@ fasttext>=0.9.2
 scikit-learn>=0.24.1
 awesome-slugify>=1.6.5
 roman>=3.3
+yattag>=1.14.0

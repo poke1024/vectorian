@@ -14,6 +14,17 @@ import json
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    from vectorian.render import Renderer
+    import sys
+    r = Renderer()
+    with open("/Users/arbeit/Desktop/temp.json", "r") as f:
+        data = json.loads(f.read())
+    r.add_match(data[0])
+    with open("/Users/arbeit/Desktop/temp.html", "w") as f:
+        f.write(r.to_html())
+    sys.exit(0)
+
+
     print(core)
 
     embedding = FastText("en")
