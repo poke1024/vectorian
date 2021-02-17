@@ -11,3 +11,5 @@ yattag>=1.14.0
 download>=0.3.5
 jupyterlab>=3.0.7
 ipywidgets>=7.6.3
+cached-property>=1.5.2
+matplotlib>=3.3.4

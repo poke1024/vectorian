@@ -59,7 +59,7 @@ PYBIND11_MODULE(core, m) {
 
 	fast_embedding.def("cosine_similarity", &FastEmbedding::cosine_similarity);
 	fast_embedding.def("similarity_matrix", &FastEmbedding::similarity_matrix);
-	fast_embedding.def("load_percentiles", &FastEmbedding::load_percentiles);
+	//fast_embedding.def("load_percentiles", &FastEmbedding::load_percentiles);
 
 	fast_embedding.def_property_readonly("n_tokens", &FastEmbedding::n_tokens);
 	fast_embedding.def_property_readonly("measures", &FastEmbedding::measures);
@@ -86,6 +86,7 @@ PYBIND11_MODULE(core, m) {
 	document.def_property_readonly("sentences_as_text", &Document::py_sentences_as_text);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);
 	document.def_property_readonly("n_sentences", &Document::n_sentences);
+	document.def_property_readonly("max_sentence_len", &Document::max_len_s);
 
 	py::class_<ResultSet, ResultSetRef> result_set(m, "ResultSet");
 	result_set.def_property_readonly("size", &ResultSet::size);

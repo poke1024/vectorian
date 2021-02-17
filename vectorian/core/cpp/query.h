@@ -7,6 +7,7 @@
 #include "vocabulary.h"
 
 class Query : public std::enable_shared_from_this<Query> {
+	py::dict m_alignment_algorithm;
 	std::vector<MetricRef> m_metrics;
 	const std::string m_text;
 	TokenVectorRef m_t_tokens;
@@ -21,21 +22,6 @@ class Query : public std::enable_shared_from_this<Query> {
 	size_t m_max_matches;
 	float m_min_score;
 
-	/*void init_boost(const py::kwargs &p_kwargs) {
-		m_t_boost.reserve(m_t_tokens.size());
-
-		if (p_kwargs && p_kwargs.contains("t_boost")) {
-			auto t_boost = p_kwargs["t_boost"].cast<py::list>();
-			for (size_t i = 0; i < m_t_tokens.size(); i++) {
-				m_t_boost.push_back(t_boost[i].cast<float>());
-			}
-		} else {
-			for (size_t i = 0; i < m_t_tokens.size(); i++) {
-				m_t_boost.push_back(1.0f);
-			}
-		}
-	}*/
-
 public:
 	Query(
 		VocabularyRef p_vocab,
@@ -49,19 +35,17 @@ public:
 		m_t_tokens = unpack_tokens(
 			p_vocab, DO_NOT_MODIFY_VOCABULARY, p_text, table);
 
-		//init_boost(p_kwargs);
-
 		static const std::set<std::string> valid_options = {
+			"alignment",
+			"metrics",
 			"pos_mismatch_penalty",
 			"pos_weights",
 			"similarity_falloff",
 			"similarity_threshold",
-			"metrics",
 			"similarity_measure",
 			"submatch_weight",
 			"bidirectional",
 			"ignore_determiners",
-			"mismatch_length_penalty",
 			"max_matches",
 			"min_score"
 		};
@@ -81,6 +65,9 @@ public:
 #endif
 			}
 		}
+
+		m_alignment_algorithm = (p_kwargs && p_kwargs.contains("alignment")) ?
+            p_kwargs["alignment"].cast<py::dict>() : py::dict();
 
 		const float pos_mismatch_penalty =
 			(p_kwargs && p_kwargs.contains("pos_mismatch_penalty")) ?
@@ -175,7 +162,7 @@ public:
 			m_text,
 			*m_t_tokens.get(),
 			needed_metrics,
-			similarity_measure,
+			similarity_measure, // FIXME: specify for each metric!
 			pos_mismatch_penalty,
 			similarity_falloff,
 			similarity_threshold,
@@ -243,6 +230,10 @@ public:
 
 	inline const POSWMap &pos_weights() const {
 		return m_pos_weights;
+	}
+
+	const py::dict &alignment_algorithm() const {
+		return m_alignment_algorithm;
 	}
 
 	const std::vector<MetricRef> &metrics() const {

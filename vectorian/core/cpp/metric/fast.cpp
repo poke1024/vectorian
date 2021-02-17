@@ -6,16 +6,18 @@
 template<typename Index>
 class WatermanSmithBeyer {
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
-	MismatchPenaltyRef m_gap_cost;
+	const std::vector<float> m_gap_cost;
 	const float m_smith_waterman_zero;
 
 public:
 	WatermanSmithBeyer(
-		const MismatchPenaltyRef &p_gap_cost,
+		const std::vector<float> &p_gap_cost,
 		float p_zero=0.5) :
 
 		m_gap_cost(p_gap_cost),
 		m_smith_waterman_zero(p_zero) {
+
+		PPK_ASSERT(m_gap_cost.size() >= 1);
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
@@ -29,7 +31,10 @@ public:
 
 		m_aligner->waterman_smith_beyer(
 			scores,
-			*m_gap_cost,
+			[this] (size_t i) -> float {
+				return m_gap_cost[
+					std::min(i, m_gap_cost.size() - 1)];
+			},
 			len_s,
 			len_t,
 			m_smith_waterman_zero);
@@ -57,12 +62,42 @@ MatcherRef create_matcher(
 
 	// FIXME support different alignment algorithms here.
 
-	auto gap_cost = std::make_shared<MismatchPenalty>(
-		p_query->mismatch_length_penalty(),
-		p_document->max_len_s());
+	const py::dict args = p_query->alignment_algorithm();
 
-	return std::make_shared<MatcherImpl<Scores, WatermanSmithBeyer<int16_t>>>(
-		p_query, p_document, p_metric, WatermanSmithBeyer<int16_t>(gap_cost), scores);
+	std::string algorithm;
+	if (args.contains("algorithm")) {
+		algorithm = args["algorithm"].cast<py::str>();
+	} else {
+		algorithm = "wsb"; // default
+	}
+
+	if (algorithm == "wsb") {
+		float zero = 0.5;
+		if (args.contains("zero")) {
+			zero = args["zero"].cast<float>();
+		}
+
+		std::vector<float> gap_cost;
+		if (args.contains("gap")) {
+			auto cost = args["gap"].cast<py::array_t<float>>();
+			auto r = cost.unchecked<1>();
+			const ssize_t n = r.shape(0);
+			gap_cost.resize(n);
+			for (ssize_t i = 0; i < n; i++) {
+				gap_cost[i] = r(i);
+			}
+		}
+		if (gap_cost.empty()) {
+			gap_cost.push_back(std::numeric_limits<float>::infinity());
+		}
+
+		return std::make_shared<MatcherImpl<Scores, WatermanSmithBeyer<int16_t>>>(
+			p_query, p_document, p_metric, WatermanSmithBeyer<int16_t>(gap_cost, zero), scores);
+	} else {
+		std::ostringstream err;
+		err << "illegal alignment algorithm " << algorithm;
+		throw std::runtime_error(err.str());
+	}
 }
 
 

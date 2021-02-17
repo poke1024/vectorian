@@ -15,8 +15,8 @@ public:
 		const TokenIdArray &p_b,
 		MatrixXf &r_matrix) const = 0;
 
-	virtual void load_percentiles(const std::string &p_path, const std::string &p_name) {
-	}
+	/*virtual void load_percentiles(const std::string &p_path, const std::string &p_name) {
+	}*/
 };
 
 typedef std::shared_ptr<EmbeddingSimilarity> EmbeddingSimilarityRef;

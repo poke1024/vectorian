@@ -5,6 +5,7 @@ import multiprocessing.pool
 import logging
 import roman
 
+from cached_property import cached_property
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
 
@@ -135,17 +136,25 @@ class Session:
 			self._vocab.add_embedding(embedding.to_core())
 			self._metrics.append(embedding.as_metric())
 		self._finder = Finder(self._vocab, corpus)
+		self._corpus = corpus
 
-	def find(self, doc: spacy.tokens.doc.Doc, metrics=None, n=100, progress=None, options: dict = dict()):
+	@cached_property
+	def max_sentence_len(self):
+		return max([doc.max_sentence_len for doc in self._corpus])
+
+	def find(self, doc: spacy.tokens.doc.Doc, alignment=None, metrics=None, n=100, progress=None, options: dict = dict()):
 
 		if not isinstance(doc, spacy.tokens.doc.Doc):
 			raise TypeError("please specify a spaCy document as query")
 
+		if alignment is None:
+			alignment = {'algorithm': 'wsb'}
 		if metrics is None:
 			metrics = self._metrics
 
 		options = options.copy()
 		options["metrics"] = metrics
+		options["alignment"] = alignment
 		options["max_matches"] = n
 
 		query = Query(self._vocab, doc, options)

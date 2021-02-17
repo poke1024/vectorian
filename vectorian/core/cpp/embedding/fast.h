@@ -109,11 +109,11 @@ public:
 		//m_similarity_measures["ranked-nicdm"] = std::make_shared<RankedSimilarityMeasure<NICDMSimilarity>>(m_embeddings);
 	}*/
 
-	void load_percentiles(const std::string &p_path) {
+	/*void load_percentiles(const std::string &p_path) {
 		for (auto i : m_similarity_measures) {
 			i.second->load_percentiles(p_path, i.first);
 		}
-	}
+	}*/
 
 	virtual MetricRef create_metric(
 		const TokenIdArray &p_vocabulary_to_embedding,
