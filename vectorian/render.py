@@ -1,5 +1,6 @@
 import math
 import html
+import time
 
 from yattag import Doc
 
@@ -144,7 +145,7 @@ class Renderer:
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
 	</head>
 	<body>
-		<div class="container">
+		<div class="container" height="100%">
 			<div class="section">
 '''
 		epilog = '''
@@ -153,5 +154,22 @@ class Renderer:
 	</body>
 </html>'''
 
+		# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
+
+		iframe_id = f"vectorian-iframe-{time.time_ns()}"
+
+		iframe = """
+		        <iframe
+		        	id="{id}"
+		            width="{width}"
+		            height="{height}"
+		            srcdoc="{srcdoc}"
+		            frameborder="0"
+		            allowfullscreen
+		        ></iframe>
+		        """
+
+		# iFrameID.height = iFrameID.contentWindow.document.body.scrollHeight + "px";
+
 		s = ''.join([prolog, doc.getvalue(), epilog])
-		return f'<iframe width=100% srcdoc="{html.escape(s)}"/>'
+		return iframe.format(id=iframe_id, width="100%", height="100%", srcdoc=html.escape(s))

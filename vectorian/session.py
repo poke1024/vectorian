@@ -152,10 +152,27 @@ class Session:
 		return self._finder(query, progress=progress)
 
 
+class LabResult:
+	def __init__(self, data):
+		self._data = data
+
+		# see https://github.com/ipython/ipython/blob/5da6784b690b085bd9cde88e08ab4e2def9f65ff/IPython/core/display_functions.py#L88
+		r = Renderer()
+		for result in self._data:
+			r.add_match(result)
+
+		#from IPython.display import HTML
+		#return HTML(r.to_html())
+		return r.to_html()
+
+	def to_json(self):
+		return self._data
+
+
 class LabSession(Session):
 	def find(self, *args, return_json=False, **kwargs):
 		import ipywidgets as widgets
-		from IPython.display import HTML, display
+		from IPython.display import display
 
 		progress = widgets.FloatProgress(
 			value=0, min=0, max=1, description="",
@@ -172,8 +189,4 @@ class LabSession(Session):
 		finally:
 			progress.close()
 
-		r = Renderer()
-		for result in results:
-			r.add_match(result)
-
-		return HTML(r.to_html())
+		return LabResult(results)
