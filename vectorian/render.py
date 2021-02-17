@@ -1,6 +1,7 @@
 import math
 import html
 import time
+import string
 
 from yattag import Doc
 
@@ -158,18 +159,23 @@ class Renderer:
 
 		iframe_id = f"vectorian-iframe-{time.time_ns()}"
 
-		iframe = """
+		iframe = string.Template("""
 		        <iframe
-		        	id="{id}"
-		            width="{width}"
-		            height="{height}"
-		            srcdoc="{srcdoc}"
+		        	id="$id"
+		            width="$width"
+		            height="$height"
+		            srcdoc="$srcdoc"
 		            frameborder="0"
 		            allowfullscreen
 		        ></iframe>
-		        """
-
-		# iFrameID.height = iFrameID.contentWindow.document.body.scrollHeight + "px";
+		        <script>
+		        	var f = document.getElementById("$id");
+		        	f.onload = function() {
+			        	f.height = f.contentWindow.document.body.scrollHeight + "px";
+			        };
+		        </script>
+		""")
 
 		s = ''.join([prolog, doc.getvalue(), epilog])
-		return iframe.format(id=iframe_id, width="100%", height="100%", srcdoc=html.escape(s))
+		return iframe.safe_substitute(dict(
+			id=iframe_id, width="100%", height="100%", srcdoc=html.escape(s)))

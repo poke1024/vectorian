@@ -156,17 +156,18 @@ class LabResult:
 	def __init__(self, data):
 		self._data = data
 
-		# see https://github.com/ipython/ipython/blob/5da6784b690b085bd9cde88e08ab4e2def9f65ff/IPython/core/display_functions.py#L88
+	def _repr_html_(self):
+		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
 		r = Renderer()
 		for result in self._data:
 			r.add_match(result)
-
-		#from IPython.display import HTML
-		#return HTML(r.to_html())
 		return r.to_html()
 
 	def to_json(self):
 		return self._data
+
+	def limit_to(self, n):
+		return LabResult(self._data[:n])
 
 
 class LabSession(Session):
