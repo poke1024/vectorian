@@ -8,6 +8,7 @@ import roman
 from cached_property import cached_property
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
+from vectorian.alignment import WatermanSmithBeyer
 
 
 class Query:
@@ -148,13 +149,13 @@ class Session:
 			raise TypeError("please specify a spaCy document as query")
 
 		if alignment is None:
-			alignment = {'algorithm': 'wsb'}
+			alignment = WatermanSmithBeyer()
 		if metrics is None:
 			metrics = self._metrics
 
 		options = options.copy()
 		options["metrics"] = metrics
-		options["alignment"] = alignment
+		options["alignment"] = alignment.to_args(self)
 		options["max_matches"] = n
 
 		query = Query(self._vocab, doc, options)

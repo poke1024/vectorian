@@ -69,20 +69,12 @@ class CustomGapCost:
 
 class WatermanSmithBeyer:
 	def __init__(self, gap=np.inf, zero=0.5):
-		if isinstance(gap, numbers.Number):
-			c = np.empty((1,), dtype=np.float32)
-			c[0] = gap
-		elif isinstance(gap, np.ndarray):
-			c = gap
-		else:
-			raise TypeError("gap must be number or np.array")
+		self._gap = gap
 		self._zero = zero
 
-	def to_args(self):
+	def to_args(self, session):
 		return {
 			'algorithm': 'wsb',
-			'gap': self._gap,
+			'gap': self._gap.costs(session.max_sentence_len),
 			'zero': self._zero
 		}
-
-
