@@ -6,18 +6,15 @@
 #include "document.h"
 #include "result_set.h"
 
-const float smith_waterman_zero = 0.5;
 
+template<typename Aligner>
 class MatcherBase : public Matcher {
 protected:
 	const QueryRef m_query;
 	const DocumentRef m_document;
 	const MetricRef m_metric;
-
-	const MismatchPenaltyRef m_mismatch_penalty;
+	Aligner m_aligner;
 	const MatchRef m_no_match;
-
-	Aligner<int16_t, float> m_aligner;
 
 	template<typename SCORES, typename REVERSE>
 	inline MatchRef optimal_match(
@@ -34,14 +31,7 @@ protected:
 			return m_no_match;
 		}
 
-		const auto &gap_cost = *m_mismatch_penalty.get();
-
-		m_aligner.waterman_smith_beyer(
-			scores,
-			gap_cost,
-			len_s,
-			len_t,
-			smith_waterman_zero);
+		m_aligner(scores, len_s, len_t);
 
 		float raw_score = m_aligner.score();
 
@@ -69,21 +59,24 @@ public:
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
-		const MismatchPenaltyRef &p_mismatch_penalty) :
+		const Aligner &p_aligner) :
 
 		m_query(p_query),
 		m_document(p_document),
 		m_metric(p_metric),
-		m_mismatch_penalty(p_mismatch_penalty),
+		m_aligner(p_aligner),
 		m_no_match(std::make_shared<Match>(
 			m_query,
 			m_metric,
 			-1,
 			MatchDigest(m_document, -1, std::vector<int16_t>()),
 			p_query->min_score()
-		)),
-		m_aligner(p_document->max_len_s(), m_query->len()) {
-	}
+		)) {
+
+			m_aligner.init(
+				p_document->max_len_s(),
+				m_query->len());
+		}
 
 };
 
@@ -118,8 +111,9 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	std::reverse(match.begin(), match.end());
 }
 
-template<typename Scores>
-class MatcherImpl : public MatcherBase {
+template<typename Scores, typename Aligner>
+class MatcherImpl : public MatcherBase<Aligner> {
+
 	const std::vector<Scores> m_scores;
 
 public:
@@ -127,16 +121,14 @@ public:
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
+		const Aligner &p_aligner,
 		const std::vector<Scores> &p_scores) :
 
-		MatcherBase(
+		MatcherBase<Aligner>(
 			p_query,
 			p_document,
 			p_metric,
-			std::make_shared<MismatchPenalty>(
-				p_query->mismatch_length_penalty(),
-				p_document->max_len_s())
-		),
+			p_aligner),
 		m_scores(p_scores) {
 
 	}
@@ -155,17 +147,17 @@ public:
 			return;
 		}
 
-		const int pos_filter = m_query->ignore_determiners() ?
-		    m_document->vocabulary()->det_pos() : -1;
+		const int pos_filter = this->m_query->ignore_determiners() ?
+		    this->m_document->vocabulary()->det_pos() : -1;
 
-		const auto &sentences = m_document->sentences();
+		const auto &sentences = this->m_document->sentences();
 		const size_t n_sentences = sentences.size();
 		//const size_t max_len_s = m_document->max_len_s();
 
 		size_t token_at = 0;
 
 		for (size_t sentence_id = 0;
-			sentence_id < n_sentences && !m_query->aborted();
+			sentence_id < n_sentences && !this->m_query->aborted();
 			sentence_id++) {
 
 			const Sentence &sentence = sentences[sentence_id];
@@ -175,69 +167,43 @@ public:
 				continue;
 			}
 
-			MatchRef best_sentence_match = m_no_match;
+			MatchRef best_sentence_match = this->m_no_match;
 
 			for (const auto &scores : good_scores) {
 
-					const auto sentence_scores = scores.create_sentence_scores(
-					    token_at, len_s, pos_filter);
+				const auto sentence_scores = scores.create_sentence_scores(
+				    token_at, len_s, pos_filter);
 
-					MatchRef m = optimal_match(
+				MatchRef m = this->optimal_match(
+					sentence_id,
+					sentence_scores,
+					scores.variant(),
+					p_matches->worst_score(),
+					[] (std::vector<int16_t> &match, int len_s) {});
+
+				if (this->m_query->bidirectional()) {
+					MatchRef m_reverse = this->optimal_match(
 						sentence_id,
-						sentence_scores,
+						ReversedScores(
+                            sentence_scores, this->m_query->len()),
 						scores.variant(),
 						p_matches->worst_score(),
-						[] (std::vector<int16_t> &match, int len_s) {});
+						reverse_alignment);
 
-					if (m_query->bidirectional()) {
-						MatchRef m_reverse = optimal_match(
-							sentence_id,
-							ReversedScores(
-    							sentence_scores, m_query->len()),
-							scores.variant(),
-							p_matches->worst_score(),
-							reverse_alignment);
-
-						if (m_reverse->score() > m->score()) {
-							m = m_reverse;
-						}
+					if (m_reverse->score() > m->score()) {
+						m = m_reverse;
 					}
+				}
 
-#if 0
-					if (m_document->id() == 17 && sentence_id == 287) {
-						m_matrix.print(m_query, m_document, sentence_id, m_query->len(), len_s);
-						printf("match score: %.1f\n", 100.0f * m->score());
-
-						int kk = 0;
-						for (auto m : m_matrix.match) {
-							if (m >= 0) {
-								printf("m %d / %d\n", m, kk);
-								printf("sim: %f\n", sentence_scores.similarity(m, kk));
-								printf("weight: %f\n", sentence_scores.weight(m, kk));
-								printf("combined: %f\n", sentence_scores(m, kk));
-							}
-							kk++;
-						}
-
-
-					}
-#endif
-
-					if (m->score() > best_sentence_match->score()) {
-						best_sentence_match = m;
-					}
+				if (m->score() > best_sentence_match->score()) {
+					best_sentence_match = m;
+				}
 			}
 
-			if (best_sentence_match->score() > m_no_match->score()) {
+			if (best_sentence_match->score() > this->m_no_match->score()) {
 
 				best_sentence_match->compute_scores(
 					m_scores.at(best_sentence_match->scores_variant_id()), len_s);
-
-#if 0
-				if (m_document->id() == 17 && sentence_id == 287) {
-					 best_sentence_match->print_scores();
-				}
-#endif
 
 				p_matches->add(best_sentence_match);
 			}
