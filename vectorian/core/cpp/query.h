@@ -13,7 +13,6 @@ class Query : public std::enable_shared_from_this<Query> {
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
 	float m_total_score;
-	std::string m_cost_combine_function;
 	int m_mismatch_length_penalty;
 	float m_submatch_weight;
 	bool m_bidirectional;
@@ -64,7 +63,6 @@ public:
 			"ignore_determiners",
 			"idf_weight",
 			"mismatch_length_penalty",
-			"cost_combine_function",
 			"max_matches",
 			"min_score"
 		};
@@ -219,12 +217,6 @@ public:
 			}
 		}
 
-		if (p_kwargs && p_kwargs.contains("cost_combine_function")) {
-			m_cost_combine_function = p_kwargs["cost_combine_function"].cast<std::string>();
-		} else {
-			m_cost_combine_function = "sum";
-		}
-
 		if (p_kwargs && p_kwargs.contains("mismatch_length_penalty")) {
 			auto penalty =  p_kwargs["mismatch_length_penalty"];
 			if (py::isinstance<py::str>(penalty)) {
@@ -261,10 +253,6 @@ public:
 
 	const std::vector<MetricRef> &metrics() const {
 		return m_metrics;
-	}
-
-	const std::string &cost_combine_function() const {
-		return m_cost_combine_function;
 	}
 
 	inline int mismatch_length_penalty() const {
@@ -318,16 +306,12 @@ public:
 		return reference_score;
 	}
 
-	template<typename CostCombine>
 	inline float normalized_score(
 		const float p_raw_score,
 		const std::vector<int16_t> &p_match) const {
 
-#if 0
-		return p_raw_score / m_total_score;
-
-#else
-		// FIXME: CostCombine is assumed to be sum right now.
+		// unboosted version would be:
+		// return p_raw_score / m_total_score;
 
 		// a final boosting step allowing matched content
 		// more weight than unmatched content.
@@ -349,7 +333,6 @@ public:
 		}
 
 		return p_raw_score / reference_score(matched_score, unmatched_score);
-#endif
 	}
 };
 

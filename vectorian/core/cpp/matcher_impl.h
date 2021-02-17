@@ -19,12 +19,11 @@ protected:
 
 	Aligner<int16_t, float> m_aligner;
 
-	template<typename SCORES, typename COMBINE, typename REVERSE>
+	template<typename SCORES, typename REVERSE>
 	inline MatchRef optimal_match(
 		const int32_t sentence_id,
 		const SCORES &scores,
 		const int16_t scores_variant_id,
-		const COMBINE &combine,
 		const float p_min_score,
 		const REVERSE &reverse) {
 
@@ -48,7 +47,7 @@ protected:
 
 		reverse(m_aligner.mutable_match(), len_s);
 
-		float best_final_score = m_query->normalized_score<COMBINE>(
+		float best_final_score = m_query->normalized_score(
 			raw_score, m_aligner.match());
 
 		if (best_final_score > p_min_score) {
@@ -119,10 +118,9 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	std::reverse(match.begin(), match.end());
 }
 
-template<typename Scores, typename Combine>
+template<typename Scores>
 class MatcherImpl : public MatcherBase {
 	const std::vector<Scores> m_scores;
-	const Combine m_combine;
 
 public:
 	MatcherImpl(
@@ -139,8 +137,7 @@ public:
 				p_query->mismatch_length_penalty(),
 				p_document->max_len_s())
 		),
-		m_scores(p_scores),
-		m_combine(Combine()) {
+		m_scores(p_scores) {
 
 	}
 
@@ -189,7 +186,6 @@ public:
 						sentence_id,
 						sentence_scores,
 						scores.variant(),
-						m_combine,
 						p_matches->worst_score(),
 						[] (std::vector<int16_t> &match, int len_s) {});
 
@@ -199,7 +195,6 @@ public:
 							ReversedScores(
     							sentence_scores, m_query->len()),
 							scores.variant(),
-							m_combine,
 							p_matches->worst_score(),
 							reverse_alignment);
 

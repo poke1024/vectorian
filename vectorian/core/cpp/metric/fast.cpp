@@ -28,20 +28,8 @@ MatcherRef create_matcher(
 	const MetricRef &p_metric,
 	const std::vector<Scores> &scores) {
 
-	const auto &c = p_query->cost_combine_function();
-	if (c == "min") {
-		return std::make_shared<MatcherImpl<Scores, CombineMin>>(
-			p_query, p_document, p_metric, scores);
-	} else if (c == "max") {
-		return std::make_shared<MatcherImpl<Scores, CombineMax>>(
-			p_query, p_document, p_metric, scores);
-	} else if (c == "sum") {
-		return std::make_shared<MatcherImpl<Scores, CombineSum>>(
-			p_query, p_document, p_metric, scores);
-	} else {
-		throw std::runtime_error(
-			std::string("illegal combine function " + c));
-	}
+	return std::make_shared<MatcherImpl<Scores>>(
+		p_query, p_document, p_metric, scores);
 }
 
 

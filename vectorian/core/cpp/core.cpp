@@ -57,7 +57,20 @@ else:
 # see https://github.com/pybind/pybind11/blob/master/docs/faq.rst
 cfg['compiler_args'].append('-fvisibility=hidden')
 
-# FIXME cfg['dependencies']
+cfg['dependencies'] = [
+	'aligner.h',
+	'common.h',
+	'document.h',
+	'match.h',
+	'match_impl.h',
+	'matcher.h',
+	'mismatch_penalty.h',
+	'query.h',
+	'region.h',
+	'result_set.h',
+	'utils.h',
+	'vocabulary.h'
+]
 
 cfg['sources'] = [
 	'module.cpp',
