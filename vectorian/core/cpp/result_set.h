@@ -15,9 +15,6 @@ class GroundTruth {
 };
 
 class ResultSet {
-	const size_t m_max_matches;
-	const float m_min_score;
-
 public:
 	ResultSet(
 		const size_t p_max_matches,
@@ -41,12 +38,12 @@ public:
 
 		if (p_match->score() > worst_score()) {
 
-			if (m_matches.size() > m_max_matches) {
+			if (m_matches.size() >= m_max_matches) {
 
 				std::pop_heap(
 					m_matches.begin(),
 					m_matches.end(),
-					Match::is_worse());
+					Match::is_greater());
 
 				m_matches.pop_back();
 			}
@@ -56,7 +53,7 @@ public:
 			std::push_heap(
 				m_matches.begin(),
 				m_matches.end(),
-				Match::is_worse());
+				Match::is_greater());
 		}
 	}
 
@@ -71,28 +68,28 @@ public:
 			m_matches.size() + p_set.m_matches.size());
 
 		for (const auto &a : p_set.m_matches) {
+			if (m_matches.size() >= m_max_matches) {
+				std::pop_heap(
+					m_matches.begin(),
+					m_matches.end(),
+					Match::is_greater());
+
+				m_matches.pop_back();
+			}
+
 			m_matches.push_back(a);
 
 			std::push_heap(
 				m_matches.begin(),
 				m_matches.end(),
-				Match::is_worse());
-		}
-
-		while (m_matches.size() > m_max_matches) {
-				std::pop_heap(
-					m_matches.begin(),
-					m_matches.end(),
-					Match::is_worse());
-
-				m_matches.pop_back();
+				Match::is_greater());
 		}
 	}
 
 	void extend_and_remove_duplicates(
 		const ResultSet &p_set) {
 
-		 // not yet implemented, should remove
+		// not yet implemented, should remove
 		// duplicate results on the same sentence.
 
 		 PPK_ASSERT(false);
@@ -115,7 +112,8 @@ private:
 	// match with the worst/lowest score.
 	std::vector<MatchRef> m_matches;
 
-	//std::map<MatchDigest, float> m_scores;
+	const size_t m_max_matches;
+	const float m_min_score;
 };
 
 #endif // __VECTORIAN_RESULT_SET_H__

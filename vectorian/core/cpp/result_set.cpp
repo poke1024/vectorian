@@ -11,7 +11,7 @@ py::list ResultSet::best_n(ssize_t p_count) const {
 			std::min(m_matches.size(), static_cast<size_t>(p_count));
 		std::partial_sort(
 			sorted.begin(), sorted.begin() + n, sorted.end(),
-			Match::is_worse());
+			Match::is_greater());
 		for (auto i = sorted.begin(); i != sorted.begin() + n; i++) {
 			matches.append(*i);
 		}

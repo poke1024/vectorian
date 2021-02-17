@@ -85,9 +85,9 @@ public:
 	template<template<typename> typename C>
 	struct compare_by_score;
 
-	using is_worse = compare_by_score<std::greater>;
+	using is_greater = compare_by_score<std::greater>;
 
-	using is_better = compare_by_score<std::less>;
+	using is_less = compare_by_score<std::less>;
 
 	template<typename Scores>
 	void compute_scores(const Scores &p_scores, int p_len_s);
