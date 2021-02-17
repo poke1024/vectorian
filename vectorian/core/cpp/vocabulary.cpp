@@ -79,12 +79,6 @@ TokenVectorRef unpack_tokens(
         iterate_strings(p_table, "tag", [&tokens, p_vocab] (size_t i, const std::string &s) {
             tokens.at(i).tag = p_vocab->unsafe_add_tag(s);
         });
-
-        /*if (p_mode == MODIFY_VOCABULARY) {
-            iterate_floats(p_table, "prob", [&tokens, p_vocab] (size_t i, float p) {
-                p_vocab->set_idf_from_prob(tokens.at(i).id, p);
-            });
-        }*/
 	}
 
 	return tokens_ref;

@@ -4,11 +4,6 @@
 #include "common.h"
 #include "embedding/vectors.h"
 
-struct WeightedIDF {
-	const std::vector<float> *idf;
-	float w;
-};
-
 class EmbeddingSimilarity {
 public:
 	virtual ~EmbeddingSimilarity() {
@@ -18,7 +13,6 @@ public:
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
-		const WeightedIDF *p_a_prob,
 		MatrixXf &r_matrix) const = 0;
 
 	virtual void load_percentiles(const std::string &p_path, const std::string &p_name) {
@@ -43,7 +37,6 @@ public:
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
-		const WeightedIDF *p_idf,
 		MatrixXf &r_matrix) const {
 
 		const size_t n = p_a.rows();
@@ -67,39 +60,6 @@ public:
 				}
 			}
 		}
-
-		const float prob_w = p_idf ? p_idf->w : 0.0f;
-		//std::cout << "prob_w is " << prob_w << "\n";
-
-		if (prob_w > 0.0f) {
-			float max_w_i = 1, max_w_j = 1;
-
-			/*if (i < 10) {
-				std::cout << "idf " << i << "=" << p_idf->idf->at(i) << "\n";
-			}*/
-
-			PPK_ASSERT(p_idf->idf->size() == n);
-			PPK_ASSERT(n > m);
-
-			for (size_t i = 0; i < n; i++) {
-				const float w = std::pow(
-					p_idf->idf->at(i), prob_w);
-				max_w_i = std::max(w, max_w_i);
-				r_matrix.row(i) *= w;
-			}
-
-			/*for (size_t j = 0; j < m; j++) {
-				const token_t t = p_b[j];
-				if (t >= 0) {
-					const float w = std::pow(
-						p_idf->idf->at(t), prob_w);
-					max_w_j = std::max(w, max_w_j);
-					r_matrix.col(j) *= w;
-				}
-			}*/
-
-			r_matrix /= max_w_i * max_w_j;
-		}
 	}
 
 };
@@ -118,7 +78,6 @@ public:
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
-		const WeightedIDF *p_a_prob,
 		MatrixXf &r_matrix) const {
 
 		if (m_measures.empty()) {
@@ -130,7 +89,7 @@ public:
 			for (size_t i = 0; i < m_measures.size(); i++) {
 				MatrixXf &target = (i == 0) ? r_matrix : temp_matrix;
 				m_measures[i]->build_matrix(
-					p_embeddings, p_a, p_b, p_a_prob, target);
+					p_embeddings, p_a, p_b, target);
 				if (i > 0) {
 					r_matrix = temp_matrix.array().max(r_matrix.array());
 				}

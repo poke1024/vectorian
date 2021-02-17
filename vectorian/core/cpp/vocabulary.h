@@ -74,10 +74,6 @@ public:
 class Vocabulary {
 	String2Int<token_t> m_tokens;
 
-	std::vector<float> m_idf;
-	// we use this as a form of inverse document frequency
-	// which is independent of our specific corpus documents.
-
 	struct Embedding {
 		EmbeddingRef embedding;
 		std::vector<token_t> map;
@@ -133,17 +129,9 @@ public:
 			for (Embedding &e : m_embeddings) {
 				e.map.push_back(e.embedding->lookup(p_token));
 			}
-			m_idf.push_back(0.0f);
 		}
 		return t;
 	}
-
-	/*void set_idf_from_prob(token_t p_token, float p_prob) {
-		// spaCy uses log (nt / N), but we want log (N / nt)
-		// log N - log nt = -(log nt - log N) = -log (nt / N)
-
-		m_idf.at(p_token) = -p_prob;
-	}*/
 
 	inline std::string token_to_string_slow(token_t p_token) {
 		return m_tokens.inverse_lookup_slow(p_token);
@@ -176,8 +164,7 @@ public:
 		float p_pos_mismatch_penalty,
 		float p_similarity_falloff,
 		float p_similarity_threshold,
-		const POSWMap &p_pos_weights,
-		const float p_idf_weight) {
+		const POSWMap &p_pos_weights) {
 
 		std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -193,15 +180,13 @@ public:
 
 			auto metric = embedding.embedding->create_metric(
 				vocabulary_ids,
-				m_idf,
 				p_embedding_similarity,
 				p_needle_text,
 				p_needle,
 				p_pos_mismatch_penalty,
 				p_similarity_falloff,
 				p_similarity_threshold,
-				p_pos_weights,
-				p_idf_weight);
+				p_pos_weights);
 
 			metrics[metric->name()] = metric;
 		}

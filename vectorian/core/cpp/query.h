@@ -61,7 +61,6 @@ public:
 			"submatch_weight",
 			"bidirectional",
 			"ignore_determiners",
-			"idf_weight",
 			"mismatch_length_penalty",
 			"max_matches",
 			"min_score"
@@ -107,10 +106,6 @@ public:
 		m_ignore_determiners = (p_kwargs && p_kwargs.contains("ignore_determiners")) ?
             p_kwargs["ignore_determiners"].cast<bool>() :
             false;
-
-		const float idf_weight = (p_kwargs && p_kwargs.contains("idf_weight")) ?
-			p_kwargs["idf_weight"].cast<float>() :
-			0.0f;
 
 		m_max_matches = (p_kwargs && p_kwargs.contains("max_matches")) ?
 			p_kwargs["max_matches"].cast<size_t>() :
@@ -184,8 +179,7 @@ public:
 			pos_mismatch_penalty,
 			similarity_falloff,
 			similarity_threshold,
-			m_pos_weights,
-			idf_weight);
+			m_pos_weights);
 
 		// metrics are specified as list (m1, m2, ...) were each m is
 		// either the name of a metric, e.g. "fasttext", or a 3-tuple

@@ -117,15 +117,13 @@ public:
 
 	virtual MetricRef create_metric(
 		const TokenIdArray &p_vocabulary_to_embedding,
-		const std::vector<float> &p_idf,
 		const std::string &p_embedding_similarity,
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		float p_pos_mismatch_penalty,
 		float p_similarity_falloff,
 		float p_similarity_threshold,
-		const POSWMap &p_pos_weights,
-		const float p_idf_weight) {
+		const POSWMap &p_pos_weights) {
 
 		auto m = std::make_shared<FastMetric>(
 			shared_from_this(),
@@ -140,16 +138,11 @@ public:
 				std::string("unknown similary measure ") + p_embedding_similarity);
 		}
 
-		WeightedIDF vocab_prob;
-		vocab_prob.idf = &p_idf;
-		vocab_prob.w = p_idf_weight;
-
 		build_similarity_matrix(
 			p_vocabulary_to_embedding,
 			p_needle_text,
 			p_needle,
 			s->second,
-			&vocab_prob,
 			m->w_similarity());
 
 		m->w_similarity() = m->w_similarity().array().pow(p_similarity_falloff);
@@ -180,7 +173,7 @@ public:
 		MatrixXf m;
 
 		i->second->build_matrix(
-			m_embeddings, p_s_embedding_ids, p_t_embedding_ids, nullptr, m);
+			m_embeddings, p_s_embedding_ids, p_t_embedding_ids, m);
 
 		return m;
 	}
@@ -212,7 +205,6 @@ private:
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const EmbeddingSimilarityRef &p_embedding_similarity,
-		const WeightedIDF *p_prob,
 		MatrixXf &r_matrix) const {
 
 		TokenIdArray needle_vocabulary_token_ids;
@@ -251,7 +243,6 @@ private:
 			m_embeddings,
 			p_vocabulary_to_embedding,
 			needle_embedding_token_ids,
-			p_prob,
 			r_matrix);
 
 		for (size_t j = 0; j < p_needle.size(); j++) { // for each token in needle
