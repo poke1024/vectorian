@@ -1,7 +1,6 @@
 import vectorian.core as core
 
 from tqdm import tqdm
-from sklearn.preprocessing import normalize
 from pathlib import Path
 
 import numpy as np
@@ -41,8 +40,6 @@ def _load_fasttext_txt(csv_path):
 					tokens.append(t)
 
 	embeddings = embeddings[:len(tokens), :]
-
-	embeddings = normalize(embeddings, axis=1, norm='l2')
 	embeddings = embeddings.astype(np.float32)
 
 	return tokens, embeddings
@@ -71,8 +68,6 @@ def _load_glove_txt(csv_path):
 				tokens.append(t)
 
 	embeddings = embeddings[:len(tokens), :]
-
-	embeddings = normalize(embeddings, axis=1, norm='l2')
 	embeddings = embeddings.astype(np.float32)
 
 	return tokens, embeddings
@@ -131,8 +126,6 @@ class FastText(Embedding):
 
 		if not pq_path.exists():
 			tokens, embeddings = self._load()
-
-			embeddings = normalize(embeddings, axis=1, norm='l2')
 			embeddings = embeddings.astype(np.float32)
 
 			pq.write_table(

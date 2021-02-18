@@ -3,17 +3,19 @@
 
 #include "metric/fast.h"
 
-class CompositeMetric : public FastMetric {
+class MinMaxMetric : public FastMetric {
 	const FastMetricRef m_a;
 	const FastMetricRef m_b;
 	std::string m_name;
 	Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> m_is_from_a;
 
 public:
-	CompositeMetric(
+	template<typename F>
+	MinMaxMetric(
 		const MetricRef &p_a,
 		const MetricRef &p_b,
-		float t) :
+		const F &p_f,
+		const char *p_name) :
 
 		FastMetric(
 			EmbeddingRef(),
@@ -21,26 +23,12 @@ public:
 		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
 
-		const float t2 = 2.0f * t; // [0, 2] for linear interpolation
-		const float k = 1.0f + std::abs(t2 - 1.0f); // [1, 2] for normalization
+		this->m_similarity = m_a->similarity().cwiseMax(m_b->similarity());
+		m_is_from_a = this->m_similarity.cwiseEqual(m_a->similarity());
 
-		const MatrixXf arg_a = m_a->similarity() * ((2.0f - t2) / k);
-		this->m_similarity = arg_a.cwiseMax(m_b->similarity() * (t2 / k));
-
-		m_is_from_a = this->m_similarity.cwiseEqual(arg_a);
-
-		if (t == 0.0f) {
-			m_name = m_a->name();
-		} else if (t == 1.0f) {
-			m_name = m_b->name();
-		} else {
-			char buf[32];
-			snprintf(buf, 32, "%.2f", t);
-
-			std::ostringstream s;
-			s << m_a->name() << " + " << m_b->name() << " @" << buf;
-			m_name = s.str();
-		}
+		std::ostringstream s;
+		s << p_name << "(" << m_a->name() << ", " << m_b->name() << ")";
+		m_name = s.str();
 	}
 
 	virtual const std::string &name() const {
@@ -52,6 +40,66 @@ public:
 	}
 };
 
-typedef std::shared_ptr<CompositeMetric> CompositeMetricRef;
+
+class MaxMetric : public MinMaxMetric {
+public:
+	MaxMetric(
+		const MetricRef &p_a,
+		const MetricRef &p_b) : MinMaxMetric(p_a, p_b, [] (const auto &a, const auto &b) {
+			return a.cwiseMax(b);
+		}, "max") {
+	}
+};
+
+typedef std::shared_ptr<MaxMetric> MaxMetricRef;
+
+
+class MinMetric : public MinMaxMetric {
+public:
+	MinMetric(
+		const MetricRef &p_a,
+		const MetricRef &p_b) : MinMaxMetric(p_a, p_b, [] (const auto &a, const auto &b) {
+			return a.cwiseMin(b);
+		}, "min") {
+	}
+};
+
+typedef std::shared_ptr<MinMetric> MinMetricRef;
+
+
+class LerpMetric : public FastMetric {
+	const FastMetricRef m_a;
+	const FastMetricRef m_b;
+	std::string m_name;
+
+public:
+	LerpMetric(
+		const MetricRef &p_a,
+		const MetricRef &p_b,
+		float t) :
+
+		FastMetric(
+			EmbeddingRef(),
+			std::dynamic_pointer_cast<FastMetric>(p_a)->modifiers()),
+		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
+		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
+
+		this->m_similarity = (m_a->similarity() * (1 - t)) + (m_b->similarity() * t);
+
+		std::ostringstream s;
+		s << "lerp(" << m_a->name() << ", " << m_b->name() << ", " << t << ")";
+		m_name = s.str();
+	}
+
+	virtual const std::string &name() const {
+		return m_name;
+	}
+
+	virtual const std::string &origin(int p_token_id_s, int p_query_token_index) const {
+		return m_name;
+	}
+};
+
+typedef std::shared_ptr<LerpMetric> LerpMetricRef;
 
 #endif // __VECTORIAN_COMPOSITE_METRIC_H__

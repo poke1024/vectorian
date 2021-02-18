@@ -74,43 +74,4 @@ public:
 
 };
 
-
-class MaximumSimilarityMeasure : public EmbeddingSimilarity {
-private:
-	std::vector<EmbeddingSimilarityRef> m_measures;
-
-public:
-	MaximumSimilarityMeasure(
-		const std::vector<EmbeddingSimilarityRef> &p_measures) : m_measures(p_measures) {
-	}
-
-	virtual void build_matrix(
-		const WordVectors &p_embeddings,
-		const TokenIdArray &p_a,
-		const TokenIdArray &p_b,
-		MatrixXf &r_matrix) const {
-
-		if (m_measures.empty()) {
-			r_matrix.setZero();
-		} else {
-			MatrixXf temp_matrix;
-			temp_matrix.resize(r_matrix.rows(), r_matrix.cols());
-
-			for (size_t i = 0; i < m_measures.size(); i++) {
-				MatrixXf &target = (i == 0) ? r_matrix : temp_matrix;
-				m_measures[i]->build_matrix(
-					p_embeddings, p_a, p_b, target);
-				if (i > 0) {
-					r_matrix = temp_matrix.array().max(r_matrix.array());
-				}
-			}
-		}
-	}
-};
-
-
-/*std::map<std::string, EmbeddingSimilarityRef> create_similarity_measures(
-	const std::string &p_name,
-	);*/
-
 #endif // __VECTORIAN_EMBEDDING_SIMILARITY_H__

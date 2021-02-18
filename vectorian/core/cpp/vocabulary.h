@@ -178,13 +178,25 @@ public:
 			p_metric_def["metric"].cast<py::str>(),
 			p_metric_def["options"].cast<py::dict>()};
 
-		if (metric_def.name == "mix") {
+		if (metric_def.name == "lerp") {
 
-			return std::make_shared<CompositeMetric>(
+			return std::make_shared<LerpMetric>(
 				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
 				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers),
-				metric_def.options["t"].cast<float>()
-			);
+				metric_def.options["t"].cast<float>());
+
+		} else if (metric_def.name == "min") {
+
+			return std::make_shared<MinMetric>(
+				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
+				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers));
+
+		} else if (metric_def.name == "max") {
+
+			return std::make_shared<MaxMetric>(
+				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
+				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers));
+
 		} else {
 
 			const auto it = m_embeddings_by_name.find(metric_def.embedding);

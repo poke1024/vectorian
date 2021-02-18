@@ -9,8 +9,6 @@ struct WordVectors {
 
 	V raw;
 	V normalized;
-	//R apsynp;
-	//V neighborhood;
 
 	void update_normalized() {
 		normalized.resize(raw.rows(), raw.cols());

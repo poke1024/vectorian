@@ -20,7 +20,7 @@ class SqrtCosineMetric(Metric):
 		pass
 
 
-class MixedMetric(Metric):
+class LerpMetric(Metric):
 	def __init__(self, a: Metric, b: Metric, t: float):
 		self._a = a
 		self._b = b
@@ -28,9 +28,9 @@ class MixedMetric(Metric):
 
 	def to_args(self):
 		return {
-			'name': 'mix',
+			'name': 'lerp',
 			'embedding': None,
-			'metric': 'mix',
+			'metric': 'lerp',
 			'options': {
 				'a': self._a.to_args(),
 				'b': self._b.to_args(),
@@ -38,3 +38,36 @@ class MixedMetric(Metric):
 			}
 		}
 
+
+class MinMetric(Metric):
+	def __init__(self, a: Metric, b: Metric):
+		self._a = a
+		self._b = b
+
+	def to_args(self):
+		return {
+			'name': 'min',
+			'embedding': None,
+			'metric': 'min',
+			'options': {
+				'a': self._a.to_args(),
+				'b': self._b.to_args()
+			}
+		}
+
+
+class MaxMetric(Metric):
+	def __init__(self, a: Metric, b: Metric):
+		self._a = a
+		self._b = b
+
+	def to_args(self):
+		return {
+			'name': 'max',
+			'embedding': None,
+			'metric': 'max',
+			'options': {
+				'a': self._a.to_args(),
+				'b': self._b.to_args()
+			}
+		}
