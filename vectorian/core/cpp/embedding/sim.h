@@ -4,6 +4,7 @@
 #include "common.h"
 #include "embedding/vectors.h"
 
+
 class EmbeddingSimilarity {
 public:
 	virtual ~EmbeddingSimilarity() {
@@ -14,12 +15,21 @@ public:
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
 		MatrixXf &r_matrix) const = 0;
-
-	/*virtual void load_percentiles(const std::string &p_path, const std::string &p_name) {
-	}*/
 };
 
 typedef std::shared_ptr<EmbeddingSimilarity> EmbeddingSimilarityRef;
+
+
+class MetricDef {
+public:
+	const std::string name;
+	const std::string embedding; // e.g. fasttext
+	const std::string metric; // e.g. cosine
+	const py::dict options;
+
+	EmbeddingSimilarityRef instantiate(
+		const WordVectors &p_vectors) const;
+};
 
 
 template<typename Distance>
@@ -99,8 +109,8 @@ public:
 };
 
 
-std::map<std::string, EmbeddingSimilarityRef> create_similarity_measures(
+/*std::map<std::string, EmbeddingSimilarityRef> create_similarity_measures(
 	const std::string &p_name,
-	const WordVectors &p_vectors);
+	);*/
 
 #endif // __VECTORIAN_EMBEDDING_SIMILARITY_H__

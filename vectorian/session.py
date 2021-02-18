@@ -9,6 +9,7 @@ from cached_property import cached_property
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
 from vectorian.alignment import WatermanSmithBeyer
+from vectorian.metrics import CosineMetric
 
 
 class Query:
@@ -103,6 +104,10 @@ class Finder:
 				doc.to_core(len(self._docs), self._vocab)
 			)
 
+	@cached_property
+	def max_sentence_len(self):
+		return max([doc.max_sentence_len for doc in self._docs])
+
 	def __call__(self, query, n_threads=None, progress=None):
 		c_query = query.to_core()
 
@@ -132,29 +137,32 @@ class Finder:
 class Session:
 	def __init__(self, corpus, embeddings):
 		self._vocab = core.Vocabulary()
-		self._metrics = []
+		self._default_metrics = []
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
-			self._metrics.append(embedding.as_metric())
+			self._default_metrics.append(CosineMetric(embedding))
 		self._finder = Finder(self._vocab, corpus)
-		self._corpus = corpus
 
-	@cached_property
+	@property
 	def max_sentence_len(self):
-		return max([doc.max_sentence_len for doc in self._corpus])
+		return self._finder.max_sentence_len
 
-	def find(self, doc: spacy.tokens.doc.Doc, alignment=None, metrics=None, n=100, progress=None, options: dict = dict()):
+	def find(self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None, n=100, progress=None, options: dict = dict()):
 
 		if not isinstance(doc, spacy.tokens.doc.Doc):
 			raise TypeError("please specify a spaCy document as query")
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
+
+		metrics = options.get("metrics")
+		if metrics is None and metric is not None:
+			metrics = [metric]
 		if metrics is None:
-			metrics = self._metrics
+			metrics = self._default_metrics
 
 		options = options.copy()
-		options["metrics"] = metrics
+		options["metrics"] = [m.to_args() for m in metrics]
 		options["alignment"] = alignment.to_args(self)
 		options["max_matches"] = n
 

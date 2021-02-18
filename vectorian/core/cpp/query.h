@@ -42,7 +42,6 @@ public:
 			"pos_weights",
 			"similarity_falloff",
 			"similarity_threshold",
-			"similarity_measure",
 			"submatch_weight",
 			"bidirectional",
 			"ignore_determiners",
@@ -102,29 +101,6 @@ public:
 			p_kwargs["min_score"].cast<float>() :
 			0.2f;
 
-		std::set<std::string> needed_metrics;
-		if (p_kwargs && p_kwargs.contains("metrics")) {
-			auto given_metrics = p_kwargs["metrics"].cast<py::list>();
-			for (const auto &item : given_metrics) {
-				if (py::isinstance<py::str>(item)) {
-					const std::string name = item.cast<py::str>();
-					needed_metrics.insert(name);
-				} else if (py::isinstance<py::tuple>(item)) {
-					auto tuple = item.cast<py::tuple>();
-					if (tuple.size() != 3) {
-						throw std::runtime_error("expected 3-tuple as metric");
-					}
-					const std::string a = tuple[0].cast<py::str>();
-					const std::string b = tuple[1].cast<py::str>();
-					needed_metrics.insert(a);
-					needed_metrics.insert(b);
-				} else {
-						throw std::runtime_error(
-							"expected list of 3-tuples as metrics");
-				}
-			}
-		}
-
 		std::map<std::string, float> pos_weights;
 		if (p_kwargs && p_kwargs.contains("pos_weights")) {
 			auto pws = p_kwargs["pos_weights"].cast<py::dict>();
@@ -155,64 +131,21 @@ public:
 			m_total_score += w;
 		}
 
-		const std::string similarity_measure = (p_kwargs && p_kwargs.contains("similarity_measure")) ?
-			p_kwargs["similarity_measure"].cast<py::str>() : "cosine";
-
-		auto metrics = p_vocab->create_metrics(
-			m_text,
-			*m_t_tokens.get(),
-			needed_metrics,
-			similarity_measure, // FIXME: specify for each metric!
-			pos_mismatch_penalty,
-			similarity_falloff,
-			similarity_threshold,
-			m_pos_weights);
-
-		// metrics are specified as list (m1, m2, ...) were each m is
-		// either the name of a metric, e.g. "fasttext", or a 3-tuple
-		// that specifies a mix: ("fasttext", "wn2vec", 0.2)
-
 		if (p_kwargs && p_kwargs.contains("metrics")) {
-			auto given_metrics = p_kwargs["metrics"].cast<py::list>();
-			for (const auto &item : given_metrics) {
-				if (py::isinstance<py::str>(item)) {
-					const std::string name = item.cast<py::str>();
-					m_metrics.push_back(lookup_metric(metrics, name));
-				} else if (py::isinstance<py::tuple>(item)) {
-					auto tuple = item.cast<py::tuple>();
-					if (tuple.size() != 3) {
-						throw std::runtime_error("expected 3-tuple as metric");
-					}
-					const std::string a = tuple[0].cast<py::str>();
-					const std::string b = tuple[1].cast<py::str>();
-					const float t = tuple[2].cast<float>();
-					m_metrics.push_back(std::make_shared<CompositeMetric>(
-						lookup_metric(metrics, a),
-						lookup_metric(metrics, b),
-						t
-					));
-				} else {
-						throw std::runtime_error(
-							"expected list as specification for metrics");
-				}
-			}
-		}
+			MetricModifiers modifiers;
+			modifiers.pos_mismatch_penalty = pos_mismatch_penalty;
+			modifiers.similarity_falloff = similarity_falloff;
+			modifiers.similarity_threshold = similarity_threshold;
+			modifiers.pos_weights = m_pos_weights;
 
-		if (p_kwargs && p_kwargs.contains("mismatch_length_penalty")) {
-			auto penalty =  p_kwargs["mismatch_length_penalty"];
-			if (py::isinstance<py::str>(penalty)) {
-				const std::string x = penalty.cast<py::str>();
-				if (x == "off") {
-					m_mismatch_length_penalty = -1.0f; // off
-				} else {
-					throw std::runtime_error(
-						"illegal value for mismatch_length_penalty");
-				}
-			} else {
-				m_mismatch_length_penalty = penalty.cast<float>();
+			const auto given_metric_defs = p_kwargs["metrics"].cast<py::list>();
+			for (auto metric_def : given_metric_defs) {
+				m_metrics.push_back(p_vocab->create_metric(
+					m_text,
+					*m_t_tokens.get(),
+					metric_def.cast<py::dict>(),
+					modifiers));
 			}
-		} else {
-			m_mismatch_length_penalty = 5;
 		}
 	}
 

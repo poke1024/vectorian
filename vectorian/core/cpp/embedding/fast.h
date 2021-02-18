@@ -56,7 +56,7 @@ public:
 
 		m_embeddings.update_normalized();
 
-		m_similarity_measures = create_similarity_measures(p_name, m_embeddings);
+		//m_similarity_measures = create_similarity_measures(p_name, m_embeddings);
 	}
 
 	/*void add_apsynp(py::object p_table, float apsynp_p = 0.1) {
@@ -116,36 +116,31 @@ public:
 	}*/
 
 	virtual MetricRef create_metric(
+		const MetricDef &p_metric,
 		const TokenIdArray &p_vocabulary_to_embedding,
-		const std::string &p_embedding_similarity,
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
-		float p_pos_mismatch_penalty,
-		float p_similarity_falloff,
-		float p_similarity_threshold,
-		const POSWMap &p_pos_weights) {
+		const MetricModifiers &p_modifiers) {
 
 		auto m = std::make_shared<FastMetric>(
 			shared_from_this(),
-			p_pos_mismatch_penalty,
-			p_similarity_falloff,
-			p_similarity_threshold,
-			p_pos_weights);
+			p_modifiers);
 
-		auto s = m_similarity_measures.find(p_embedding_similarity);
+		auto s = p_metric.instantiate(m_embeddings);
+		/*m_similarity_measures.find(p_embedding_similarity);
 		if (s == m_similarity_measures.end()) {
 			throw std::runtime_error(
 				std::string("unknown similary measure ") + p_embedding_similarity);
-		}
+		}*/
 
 		build_similarity_matrix(
 			p_vocabulary_to_embedding,
 			p_needle_text,
 			p_needle,
-			s->second,
+			s,
 			m->w_similarity());
 
-		m->w_similarity() = m->w_similarity().array().pow(p_similarity_falloff);
+		m->w_similarity() = m->w_similarity().array().pow(p_modifiers.similarity_falloff);
 
 		return m;
 	}

@@ -39,11 +39,14 @@ struct PNormSimilarity {
 	}
 };
 
-std::map<std::string, EmbeddingSimilarityRef> create_similarity_measures(
-	const std::string &p_name,
-	const WordVectors &p_vectors) {
+EmbeddingSimilarityRef MetricDef::instantiate(
+	const WordVectors &p_vectors) const {
 
-	std::map<std::string, EmbeddingSimilarityRef> measures;
-	measures["cosine"] = std::make_shared<SimilarityMeasure<CosineSimilarity>>(p_vectors);
-	return measures;
+	if (metric == "cosine") {
+		return std::make_shared<SimilarityMeasure<CosineSimilarity>>(p_vectors);
+	} else {
+		std::ostringstream err;
+		err << "unsupported metric " << metric;
+		throw std::runtime_error(err.str());
+	}
 }

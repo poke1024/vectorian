@@ -4,6 +4,7 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "metric/metric.h"
+#include "metric/composite.h"
 
 enum VocabularyMode {
 	MODIFY_VOCABULARY,
@@ -80,6 +81,7 @@ class Vocabulary {
 	};
 
 	std::vector<Embedding> m_embeddings;
+	std::unordered_map<std::string, size_t> m_embeddings_by_name;
 	StringLexicon<int8_t> m_pos;
 	StringLexicon<int8_t> m_tag;
 
@@ -88,18 +90,24 @@ class Vocabulary {
 public:
 	// basically a mapping from token -> int
 
-	std::mutex m_mutex;
+	std::recursive_mutex m_mutex;
 
 	Vocabulary() : m_det_pos(-1) {
 	}
 
 	int add_embedding(EmbeddingRef p_embedding) {
-		std::lock_guard<std::mutex> lock(m_mutex);
+
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 		PPK_ASSERT(m_tokens.size() == 0);
+
+		const size_t next_id = m_embeddings.size();
+		m_embeddings_by_name[p_embedding->name()] = next_id;
+
 		Embedding e;
 		e.embedding = p_embedding;
 		m_embeddings.push_back(e);
-		return m_embeddings.size() - 1;
+
+		return next_id;
 	}
 
 	inline int unsafe_add_pos(const std::string &p_name) {
@@ -156,42 +164,47 @@ public:
 		return pos_weights;
 	}
 
-	std::map<std::string, MetricRef> create_metrics(
+	MetricRef create_metric(
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
-		const std::set<std::string> p_needed_metrics,
-		const std::string &p_embedding_similarity,
-		float p_pos_mismatch_penalty,
-		float p_similarity_falloff,
-		float p_similarity_threshold,
-		const POSWMap &p_pos_weights) {
+		const py::dict &p_metric_def,
+		const MetricModifiers &p_modifiers) {
 
-		std::lock_guard<std::mutex> lock(m_mutex);
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
-		std::map<std::string, MetricRef> metrics;
+		const MetricDef metric_def{
+			p_metric_def["name"].cast<py::str>(),
+			p_metric_def["embedding"].cast<py::str>(),
+			p_metric_def["metric"].cast<py::str>(),
+			p_metric_def["options"].cast<py::dict>()};
 
-		for (const Embedding &embedding : m_embeddings) {
-			if (p_needed_metrics.find(embedding.embedding->name()) == p_needed_metrics.end()) {
-				continue;
+		if (metric_def.name == "mix") {
+
+			return std::make_shared<CompositeMetric>(
+				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
+				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers),
+				metric_def.options["t"].cast<float>()
+			);
+		} else {
+
+			const auto it = m_embeddings_by_name.find(metric_def.embedding);
+			if (it == m_embeddings_by_name.end()) {
+				std::ostringstream err;
+				err << "unknown embedding " << metric_def.embedding << " referenced in metric ";
+				throw std::runtime_error(err.str());
 			}
+			const auto &embedding = m_embeddings[it->second];
 
 			const Eigen::Map<Eigen::Array<token_t, Eigen::Dynamic, 1>> vocabulary_ids(
 				const_cast<token_t*>(embedding.map.data()), embedding.map.size());
 
-			auto metric = embedding.embedding->create_metric(
+			return embedding.embedding->create_metric(
+				metric_def,
 				vocabulary_ids,
-				p_embedding_similarity,
 				p_needle_text,
 				p_needle,
-				p_pos_mismatch_penalty,
-				p_similarity_falloff,
-				p_similarity_threshold,
-				p_pos_weights);
-
-			metrics[metric->name()] = metric;
+				p_modifiers);
 		}
-
-		return metrics;
 	}
 };
 

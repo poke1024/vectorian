@@ -15,7 +15,11 @@ ResultSetRef Query::match(
 		auto matcher = metric->create_matcher(
 			me,
 			p_document);
-		matcher->match(matches);
+
+		{
+			py::gil_scoped_release release;
+			matcher->match(matches);
+		}
 	}
 
 	return matches;

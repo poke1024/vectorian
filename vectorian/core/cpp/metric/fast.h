@@ -7,24 +7,15 @@ class FastMetric : public Metric {
 protected:
 	MatrixXf m_similarity;
 	const EmbeddingRef m_embedding;
-	const float m_pos_mismatch_penalty;
-	const float m_similarity_falloff;
-	const float m_similarity_threshold;
-	const POSWMap m_pos_weights;
+	const MetricModifiers m_modifiers;
 
 public:
 	FastMetric(
 		const EmbeddingRef &p_embedding,
-		float p_pos_mismatch_penalty,
-		float p_similarity_falloff,
-		float p_similarity_threshold,
-		const POSWMap &p_pos_weights) :
+		const MetricModifiers &p_modifiers) :
 
 		m_embedding(p_embedding),
-		m_pos_mismatch_penalty(p_pos_mismatch_penalty),
-		m_similarity_falloff(p_similarity_falloff),
-		m_similarity_threshold(p_similarity_threshold),
-		m_pos_weights(p_pos_weights) {
+		m_modifiers(p_modifiers) {
 	}
 
 	inline MatrixXf &w_similarity() {
@@ -35,25 +26,14 @@ public:
 		return m_similarity;
 	}
 
-	inline float pos_mismatch_penalty() const {
-		return m_pos_mismatch_penalty;
-	}
-
-	inline float similarity_threshold() const {
-		return m_similarity_threshold;
-	}
-
-	inline float similarity_falloff() const {
-		return m_similarity_falloff;
-	}
-
-	inline const POSWMap &pos_weights() const {
-		return m_pos_weights;
+	inline const MetricModifiers &modifiers() const {
+		return m_modifiers;
 	}
 
 	inline float pos_weight(int tag) const {
-		const auto w = m_pos_weights.find(tag);
-		if (w != m_pos_weights.end()) {
+		const auto &posw = m_modifiers.pos_weights;
+		const auto w = posw.find(tag);
+		if (w != posw.end()) {
 			return w->second;
 		} else {
 			return 1.0f;

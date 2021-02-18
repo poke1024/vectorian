@@ -21,11 +21,7 @@ def _make_table(tokens, embeddings):
 
 
 class Embedding:
-	def as_metric(self):
-		return self.name
-
-	def as_mixed_metric(self, other, alpha):
-		return self.name, other.name, alpha
+	pass
 
 
 def _load_fasttext_txt(csv_path):

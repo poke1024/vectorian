@@ -59,7 +59,12 @@ class Renderer:
 		with tag('span', klass="has-text-black has-text-weight-bold"):
 			text(s)
 
-	def add_light(self, s):
+	def add_light_tag(self, s):
+		doc, tag, text = self._html
+		with tag('span', klass="tag is-light"):
+			text(s)
+
+	def add_light_text(self, s):
 		doc, tag, text = self._html
 		with tag('span', klass="has-text-grey-light"):
 			text(s)
@@ -73,7 +78,7 @@ class Renderer:
 						self.add_bold(region['s'])
 					text(" ")
 					with tag('span', style='display:table-cell;'):
-						self.add_light(region['t'])
+						self.add_light_tag(region['t'])
 					text(" ")
 					with tag('span', style=f'display:table-cell; opacity:{region["weight"]};'):
 						with tag('span', klass=score_color_class(region['similarity'])):
@@ -86,7 +91,7 @@ class Renderer:
 			self.add_match_region(region)
 		else:
 			# FIXME annotate POS here.
-			self.add_light(region['s'])
+			self.add_light_text(region['s'])
 
 	def add_match_score(self, match):
 		doc, tag, text = self._html
@@ -95,8 +100,8 @@ class Renderer:
 
 	def add_match(self, match):
 		doc, tag, text = self._html
-		with tag('media'):
-			with tag('mediaLeft'):
+		with tag('article', klass="media"):
+			with tag('div', klass='media-left'):
 				with tag('p', klass='image is-64x64'):
 					with tag('span', klass='buttons'):
 						self.add_match_score(match)
@@ -112,7 +117,7 @@ class Renderer:
 
 					# FIXME annotateDebug
 
-			with tag('mediaContent'):
+			with tag('div', klass='media-content'):
 				with tag('span', style='font-variant: small-caps;'):
 					text(match['location']['speaker'])
 

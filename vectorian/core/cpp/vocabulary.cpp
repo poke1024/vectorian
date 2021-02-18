@@ -54,7 +54,7 @@ TokenVectorRef unpack_tokens(
     {
     	py::gil_scoped_release release;
 
-    	std::lock_guard<std::mutex> lock(p_vocab->m_mutex);
+    	std::lock_guard<std::recursive_mutex> lock(p_vocab->m_mutex);
 
         for (size_t i = 0; i < n; i++) {
             Token t;

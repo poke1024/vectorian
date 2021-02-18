@@ -1,5 +1,4 @@
 import numpy as np
-import numbers
 
 
 class GapCost:
@@ -62,13 +61,21 @@ class ExponentialGapCost(GapCost):
 		return c
 
 
-class CustomGapCost:
+class CustomGapCost(GapCost):
 	def __init__(self, costs_fn):
 		self._costs_fn = costs_fn
 
+	def costs(self, n):
+		c = np.empty((n,), dtype=np.float32)
+		c[0] = 0
+		for i in range(1, n):
+			c[i] = self._costs_fn(i)
+		c = np.clip(c, 0, 1)
+		return c
+
 
 class WatermanSmithBeyer:
-	def __init__(self, gap=np.inf, zero=0.5):
+	def __init__(self, gap: GapCost = ConstantGapCost(np.inf), zero: float = 0.5):
 		self._gap = gap
 		self._zero = zero
 

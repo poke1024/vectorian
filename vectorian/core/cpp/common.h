@@ -57,6 +57,13 @@ typedef std::shared_ptr<std::vector<Token>> TokenVectorRef;
 
 typedef std::unordered_map<int, float> POSWMap;
 
+struct MetricModifiers {
+	float pos_mismatch_penalty;
+	float similarity_falloff;
+	float similarity_threshold;
+	POSWMap pos_weights;
+};
+
 class Query;
 typedef std::shared_ptr<Query> QueryRef;
 class Document;

@@ -71,6 +71,5 @@ ResultSetRef Document::find(const QueryRef &p_query) {
 		return ResultSetRef();
 	}
 
-	py::gil_scoped_release release;
 	return p_query->match(shared_from_this());
 }

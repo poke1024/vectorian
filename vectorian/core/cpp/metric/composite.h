@@ -17,10 +17,7 @@ public:
 
 		FastMetric(
 			EmbeddingRef(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->pos_mismatch_penalty(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->similarity_falloff(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->similarity_threshold(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->pos_weights()),
+			std::dynamic_pointer_cast<FastMetric>(p_a)->modifiers()),
 		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
 
@@ -39,7 +36,10 @@ public:
 		} else {
 			char buf[32];
 			snprintf(buf, 32, "%.2f", t);
-			m_name = m_a->name() + " + " + m_b->name() + " @" + buf;
+
+			std::ostringstream s;
+			s << m_a->name() << " + " << m_b->name() << " @" << buf;
+			m_name = s.str();
 		}
 	}
 

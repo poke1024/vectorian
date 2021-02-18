@@ -62,6 +62,8 @@ MatcherRef create_matcher(
 
 	// FIXME support different alignment algorithms here.
 
+	py::gil_scoped_acquire acquire;
+
 	const py::dict args = p_query->alignment_algorithm();
 
 	std::string algorithm;

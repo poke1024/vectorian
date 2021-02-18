@@ -56,7 +56,7 @@ public:
 		// if the token is the same, but only POS is different,
 		// since often this will an error in the POS tagging.
 		if (s.pos != t.pos && s.id != t.id) {
-			weight *= 1.0f - m_metric->pos_mismatch_penalty();
+			weight *= 1.0f - m_metric->modifiers().pos_mismatch_penalty;
 		}
 
 		return weight;
@@ -66,7 +66,7 @@ public:
 
 		float score = similarity(i, j) * weight(i, j);
 
-		if (score <= m_metric->similarity_threshold()) {
+		if (score <= m_metric->modifiers().similarity_threshold) {
 			score = 0.0f;
 		}
 
