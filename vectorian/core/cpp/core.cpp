@@ -67,7 +67,6 @@ cfg['dependencies'] = [
 	'match.h',
 	'match_impl.h',
 	'matcher.h',
-	'mismatch_penalty.h',
 	'query.h',
 	'region.h',
 	'result_set.h',

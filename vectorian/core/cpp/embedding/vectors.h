@@ -5,7 +5,6 @@
 
 struct WordVectors {
 	typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor> V;
-	typedef Eigen::Matrix<float,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor> R;
 
 	V raw;
 	V normalized;
@@ -18,5 +17,15 @@ struct WordVectors {
 		}
 	}
 };
+
+inline py::array_t<float> to_py_array(const WordVectors::V &p_matrix) {
+	std::vector<ssize_t> shape(2);
+	shape[0] = p_matrix.rows();
+	shape[1] = p_matrix.cols();
+	return py::array_t<float>(
+        shape,                                      // shape
+        {shape[1] * sizeof(float), sizeof(float)},  // strides (row-major)
+        p_matrix.data());
+}
 
 #endif // __VECTORIAN_WORD_VECTORS_H__

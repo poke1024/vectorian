@@ -19,6 +19,37 @@ void init_pyarrow() {
 	}
 }
 
+void run_sanity_checks() {
+	{
+		TokenIdArray a;
+		a.resize(4);
+		for (int i = 0; i < a.rows(); i++) {
+			a(i) = 2.5 * i;
+		}
+
+		auto array = to_py_array(a);
+		for (int i = 0; i < a.rows(); i++) {
+			PPK_ASSERT(array(i).cast<float>() == a(i));
+		}
+	}
+
+	{
+		WordVectors::V v;
+		v.resize(3, 10);
+		for (int i = 0; i < v.rows(); i++) {
+			for (int j = 0; j < v.cols(); j++) {
+				v(i, j) = 7.5 * i + j * 2.25;
+			}
+		}
+		auto array = to_py_array(v);
+		for (int i = 0; i < v.rows(); i++) {
+			for (int j = 0; j < v.cols(); j++) {
+				PPK_ASSERT(array(i, j).cast<float>() == v(i, j));
+			}
+		}
+	}
+}
+
 py::str backend_build_time() {
 	return __TIMESTAMP__;
 }
@@ -28,6 +59,7 @@ py::str backend_build_time() {
 // !!!
 PYBIND11_MODULE(core, m) {
 	m.def("init_pyarrow", &init_pyarrow);
+	m.def("run_sanity_checks", &run_sanity_checks);
 	m.def("backend_build_time", &backend_build_time);
 
 	py::class_<Region, RegionRef> region(m, "Region");

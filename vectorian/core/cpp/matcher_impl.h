@@ -1,5 +1,4 @@
 #include "matcher.h"
-#include "mismatch_penalty.h"
 #include "aligner.h"
 #include "match.h"
 #include "query.h"

@@ -33,12 +33,12 @@ public:
 
 
 template<typename Distance>
-class SimilarityMeasure : public EmbeddingSimilarity {
+class BuiltinSimilarityMeasure : public EmbeddingSimilarity {
 protected:
 	Distance m_distance;
 
 public:
-	SimilarityMeasure(
+	BuiltinSimilarityMeasure(
 		const WordVectors &p_vectors,
 		const Distance p_distance = Distance()) : m_distance(p_distance) {
 	}
@@ -65,13 +65,84 @@ public:
 
 			} else { // token in Vocabulary, but not in Embedding
 
-				for (size_t j = 0; j < m; j++) {
-					r_matrix(i, j) = 0.0f;
-				}
+				r_matrix.row(i).setZero();
 			}
 		}
 	}
-
 };
+
+inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
+	const size_t n = p_a.rows();
+	TokenIdArray filtered_a;
+	filtered_a.resize(n);
+	size_t k = 0;
+	for (size_t i = 0; i < n; i++) {
+		const token_t s = p_a[i];
+		if (s >= 0) {
+			filtered_a[k++] = s;
+		}
+	}
+	filtered_a.resize(k);
+	return filtered_a;
+}
+
+class CustomSimilarityMeasure : public EmbeddingSimilarity {
+	const py::object m_callback;
+
+public:
+	CustomSimilarityMeasure(
+		const WordVectors &p_vectors,
+		const py::object p_callback) : m_callback(p_callback) {
+	}
+
+	virtual void build_matrix(
+		const WordVectors &p_embeddings,
+		const TokenIdArray &p_a,
+		const TokenIdArray &p_b,
+		MatrixXf &r_matrix) const {
+
+		TokenIdArray filtered_a = filter_token_ids(p_a);
+		TokenIdArray filtered_b = filter_token_ids(p_b);
+
+		py::dict vectors;
+		vectors[py::str("raw")] = to_py_array(p_embeddings.raw);
+		vectors[py::str("normalized")] = to_py_array(p_embeddings.normalized);
+
+		py::array_t<float> output;
+		output.resize({filtered_a.rows(), filtered_b.rows()});
+
+		m_callback(
+			vectors,
+			to_py_array(filtered_a),
+			to_py_array(filtered_b),
+			output);
+
+		const auto r_output = output.unchecked<2>();
+
+		const size_t n = p_a.rows();
+		const size_t m = p_b.rows();
+		r_matrix.resize(n, m);
+		r_matrix.setZero();
+
+		size_t u = 0;
+		for (size_t i = 0; i < n; i++) {
+
+			const token_t s = p_a[i];
+			if (s >= 0) {
+				size_t v = 0;
+				for (size_t j = 0; j < m; j++) {
+
+					const token_t t = p_b[j];
+					if (t >= 0) {
+						r_matrix(i, j) = r_output(u, v++);
+					}
+				}
+
+				u++;
+			}
+		}
+	}
+};
+
 
 #endif // __VECTORIAN_EMBEDDING_SIMILARITY_H__

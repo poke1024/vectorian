@@ -1,6 +1,5 @@
 #include "match.h"
 #include "utils.h"
-#include "mismatch_penalty.h"
 #include "region.h"
 #include "document.h"
 #include "match_impl.h"
@@ -87,21 +86,9 @@ py::list Match::regions() const {
 		}
 	}
 
-#if 0
-	if (document()->id() == 17 && sentence_id() == 287) {
-		printf("Match::regions\n");
-		for (auto x : match) {
-			printf("%d\n", x);
-		}
-	}
-#endif
-
 	constexpr int window_size = 10;
 	int32_t last_anchor = std::max(0, token_at + match_0 - window_size);
 	bool last_matched = false;
-
-	const MismatchPenaltyRef mismatch_penalty = std::make_shared<MismatchPenalty>(
-		m_query->mismatch_length_penalty(), document()->max_len_s());
 
 	py::list regions;
 	const int32_t n = static_cast<int32_t>(match.size());
@@ -141,7 +128,9 @@ py::list Match::regions() const {
 			float p;
 
 			if (last_matched) {
-				p = (*mismatch_penalty.get())(token_at + match_at_i - last_anchor);
+				//FIXME
+				p = 0.0f;
+				//p = (*mismatch_penalty.get())(token_at + match_at_i - last_anchor);
 			} else {
 				p = 0.0f;
 			}
@@ -149,13 +138,6 @@ py::list Match::regions() const {
 			regions.append(std::make_shared<Region>(
 				s_text.substr(idx0, s.idx - idx0), p));
 		}
-
-#if 0
-		if (document()->id() == 17 && sentence_id() == 287) {
-			printf("?? %d %d\n", (int)idx0, (int)s.idx);
-		}
-#endif
-
 
 		regions.append(std::make_shared<MatchedRegion>(
 			scores[i],
@@ -166,13 +148,6 @@ py::list Match::regions() const {
 			TokenRef{t_tokens_ref, i},
 			m_metric->origin(s.id, i)
 		));
-
-#if 0
-		if (document()->id() == 17 && sentence_id() == 287) {
-			printf("%f %f\n", scores[i].similarity, scores[i].weight);
-			printf("match %s %s\n", s_text.substr(s.idx, s.len).c_str(), t_text.substr(t.idx, t.len).c_str());
-		}
-#endif
 
 		last_anchor = token_at + match_at_i + 1;
 		last_matched = true;

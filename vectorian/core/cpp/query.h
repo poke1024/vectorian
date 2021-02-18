@@ -14,7 +14,6 @@ class Query : public std::enable_shared_from_this<Query> {
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
 	float m_total_score;
-	int m_mismatch_length_penalty;
 	float m_submatch_weight;
 	bool m_bidirectional;
 	bool m_ignore_determiners;
@@ -171,10 +170,6 @@ public:
 
 	const std::vector<MetricRef> &metrics() const {
 		return m_metrics;
-	}
-
-	inline int mismatch_length_penalty() const {
-		return m_mismatch_length_penalty;
 	}
 
 	inline bool bidirectional() const {

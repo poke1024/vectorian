@@ -56,13 +56,13 @@ EmbeddingSimilarityRef MetricDef::instantiate(
 	const WordVectors &p_vectors) const {
 
 	if (metric == "cosine") {
-		return std::make_shared<SimilarityMeasure<Cosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMeasure<Cosine>>(p_vectors);
 	} if (metric == "zhu-cosine") {
-		return std::make_shared<SimilarityMeasure<ZhuCosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMeasure<ZhuCosine>>(p_vectors);
 	} if (metric == "sohangir-cosine") {
-		return std::make_shared<SimilarityMeasure<SohangirCosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMeasure<SohangirCosine>>(p_vectors);
 	} else if (metric == "p-norm") {
-		return std::make_shared<SimilarityMeasure<PNorm>>(
+		return std::make_shared<BuiltinSimilarityMeasure<PNorm>>(
 			p_vectors, PNorm(
 				options["p"].cast<float>(),
 				options["scale"].cast<float>()));
