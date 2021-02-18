@@ -15,9 +15,48 @@ class CosineMetric(Metric):
 		}
 
 
-class SqrtCosineMetric(Metric):
+class ZhuCosineMetric(Metric):
 	def __init__(self, embedding):
-		pass
+		self._embedding = embedding
+
+	def to_args(self):
+		return {
+			'name': self._embedding.name + "-zhu-cosine",
+			'embedding': self._embedding.name,
+			'metric': 'zhu-cosine',
+			'options': {}
+		}
+
+
+class SohangirCosineMetric(Metric):
+	def __init__(self, embedding):
+		self._embedding = embedding
+
+	def to_args(self):
+		return {
+			'name': self._embedding.name + "-sohangir-cosine",
+			'embedding': self._embedding.name,
+			'metric': 'sohangir-cosine',
+			'options': {}
+		}
+
+
+class PNormMetric(Metric):
+	def __init__(self, embedding, p=2, scale=1):
+		self._embedding = embedding
+		self._p = p
+		self._scale = scale
+
+	def to_args(self):
+		return {
+			'name': self._embedding.name + "-p-norm",
+			'embedding': self._embedding.name,
+			'metric': 'p-norm',
+			'options': {
+				'p': self._p,
+				'scale': self._scale
+			}
+		}
 
 
 class LerpMetric(Metric):
