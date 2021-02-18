@@ -101,6 +101,8 @@ public:
 		const TokenIdArray &p_b,
 		MatrixXf &r_matrix) const {
 
+		py::gil_scoped_acquire acquire;
+
 		TokenIdArray filtered_a = filter_token_ids(p_a);
 		TokenIdArray filtered_b = filter_token_ids(p_b);
 

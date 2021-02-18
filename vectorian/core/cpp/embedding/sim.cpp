@@ -66,6 +66,10 @@ EmbeddingSimilarityRef MetricDef::instantiate(
 			p_vectors, PNorm(
 				options["p"].cast<float>(),
 				options["scale"].cast<float>()));
+
+	} else if (metric == "custom") {
+		return std::make_shared<CustomSimilarityMeasure>(
+			p_vectors, options["fn"]);
 	} else {
 		std::ostringstream err;
 		err << "unsupported metric " << metric;
