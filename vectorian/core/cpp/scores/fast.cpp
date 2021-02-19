@@ -14,7 +14,7 @@ FastScores::FastScores(
     m_filtered.resize(p_document->max_len_s());
 }
 
-FastSentenceScores FastScores::create_sentence_scores(
+FastSlice FastScores::create_slice(
 	const size_t p_s_offset,
 	const size_t p_s_len,
 	const int p_pos_filter) const {
@@ -34,14 +34,14 @@ FastSentenceScores FastScores::create_sentence_scores(
             }
         }
 
-        return FastSentenceScores(
+        return FastSlice(
             m_metric,
             new_s,
             new_s_len,
             t_tokens);
 	}
     else {
-        return FastSentenceScores(
+        return FastSlice(
             m_metric,
             s_tokens + p_s_offset,
             p_s_len,

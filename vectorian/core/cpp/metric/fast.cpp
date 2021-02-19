@@ -25,20 +25,21 @@ public:
 			max_len_s, max_len_t);
 	}
 
-	float gap_cost(size_t len) const {
+	inline float gap_cost(size_t len) const {
 		return m_gap_cost[
 			std::min(len, m_gap_cost.size() - 1)];
 	}
 
-	template<typename SentenceScores>
+	template<typename Slice>
 	inline void operator()(
-		const SentenceScores &scores, int len_s, int len_t) const {
+		const Slice &slice, int len_s, int len_t) const {
 
 		m_aligner->waterman_smith_beyer(
-			scores,
-			[this] (size_t i) -> float {
-				return m_gap_cost[
-					std::min(i, m_gap_cost.size() - 1)];
+			[&slice] (int i, int j) -> float {
+				return slice.score(i, j);
+			},
+			[this] (size_t len) -> float {
+				return this->gap_cost(len);
 			},
 			len_s,
 			len_t,
@@ -55,6 +56,98 @@ public:
 
 	inline std::vector<Index> &mutable_match() {
 		return m_aligner->mutable_match();
+	}
+};
+
+template<typename Index>
+class RelaxedWordMoversDistance {
+	//EMDRelaxedCache m_cache;
+	float m_score;
+	std::vector<Index> m_match;
+
+public:
+	RelaxedWordMoversDistance() {
+	}
+
+	void init(Index max_len_s, Index max_len_t) {
+		//m_cache.allocate(std::max(max_len_s, max_len_t));
+	}
+
+	inline float gap_cost(size_t len) const {
+		return 0;
+	}
+
+	template<typename Slice>
+	inline void operator()(
+		const Slice &slice, int len_s, int len_t) const {
+
+		/*
+		s are the corpus tokens, t are the query tokens.
+
+		we build a new vocab that corresponds to w[i]
+		sv[i] maps vocab item i to global token id (or -1 if not in s)
+		tv[i] maps vocab item i to query token pos (or -1 if not in t)
+
+		def sim(i, j):
+			u = sv[i]
+			v = tv[j]
+			if (u >= 0 && v >= 0)
+				slice.score(u, v)
+			else:
+				sim(j, i)
+
+		those tokens in t that also occur in s:
+			have distance 0 and share the same id.
+		those tokens in t that do not occur in s:
+			get new ids. for score lookup, we map those ids to the query token pos.
+		*/
+
+		// sort tuples (token_id, s_or_t, index)
+		//std::sort();
+
+		// w1: normalized bow for s
+		// w2: normalized bow for t
+
+		// size: size of vocabulary needed for this problem
+
+		// dist: word distances in vocabulary
+
+		//emd_relaxed(w1, w2, dist, size, cache);
+
+		/*for (int i = 0; i < len_s; i++) {
+			boilerplate[i] = i;
+		}
+
+		for (size_t i = 0; i < len_s; i++) {
+			std::sort(
+				boilerplate,
+				boilerplate + len_s,
+				[&] (const int a, const int b) {
+					return scores(i, a) < scores(i, b);
+				});
+
+		m_score = emd_relaxed();
+
+		m_aligner->waterman_smith_beyer(
+			scores,
+			[this] (size_t len) -> float {
+				return this->gap_cost(len);
+			},
+			len_s,
+			len_t,
+			m_smith_waterman_zero);*/
+	}
+
+	inline float score() const {
+		return m_score;
+	}
+
+	inline const std::vector<Index> &match() const {
+		return m_match;
+	}
+
+	inline std::vector<Index> &mutable_match() {
+		return m_match;
 	}
 };
 

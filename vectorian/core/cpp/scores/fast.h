@@ -4,7 +4,7 @@
 #include "common.h"
 #include "metric/fast.h"
 
-class FastSentenceScores {
+class FastSlice {
 private:
 	const FastMetricRef m_metric;
 	const Token * const s_tokens;
@@ -12,7 +12,7 @@ private:
 	const Token * const t_tokens;
 
 public:
-	inline FastSentenceScores(
+	inline FastSlice(
 		const FastMetricRef &metric,
 		const Token * const s_tokens,
 		const int32_t s_len,
@@ -24,24 +24,22 @@ public:
 		t_tokens(t_tokens) {
 	}
 
+	inline const Token &s(int i) const {
+		return s_tokens[i];
+	}
+
+	inline const Token &t(int i) const {
+		return t_tokens[i];
+	}
+
 	inline int32_t s_len() const {
 	    return _s_len;
 	}
 
 	inline float similarity(int i, int j) const {
-
 		const Token &s = s_tokens[i];
-		const Token &t = t_tokens[j];
-		float score;
-
-		if (s.id == t.id) {
-			score = 1.0f;
-		} else {
-			const auto &sim = m_metric->similarity();
-			score = sim(s.id, j);
-		}
-
-		return score;
+		const auto &sim = m_metric->similarity();
+		return sim(s.id, j);
 	}
 
 	inline float weight(int i, int j) const {
@@ -62,15 +60,15 @@ public:
 		return weight;
 	}
 
-	inline float operator()(int i, int j) const {
+	inline float score(int i, int j) const {
 
-		float score = similarity(i, j) * weight(i, j);
+		const float score = similarity(i, j) * weight(i, j);
 
 		if (score <= m_metric->modifiers().similarity_threshold) {
-			score = 0.0f;
+			return 0.0f;
+		} else {
+			return score;
 		}
-
-		return score;
 	}
 };
 
@@ -87,7 +85,7 @@ public:
 		const DocumentRef &p_document,
 		const FastMetricRef &p_metric);
 
-	FastSentenceScores create_sentence_scores(
+	FastSlice create_slice(
 		size_t p_s_offset,
 		size_t p_s_len,
 		int p_pos_filter) const;

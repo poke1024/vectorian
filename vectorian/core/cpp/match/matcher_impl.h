@@ -77,23 +77,23 @@ public:
 	}
 };
 
-template<typename Scores>
-class ReversedScores {
-	const Scores &m_scores;
+template<typename Slice>
+class ReversedSlice {
+	const Slice &m_slice;
 	const int m_len_s;
 	const int m_len_t;
 
 public:
-	inline ReversedScores(const Scores &scores, int len_t) :
-		m_scores(scores), m_len_s(scores.s_len()), m_len_t(len_t) {
+	inline ReversedSlice(const Slice &slice, int len_t) :
+		m_slice(slice), m_len_s(slice.s_len()), m_len_t(len_t) {
 	}
 
 	inline int s_len() const {
 	    return m_len_s;
 	}
 
-	inline float operator()(int u, int v) const {
-		return m_scores(m_len_s - 1 - u, m_len_t - 1 - v);
+	inline float score(int u, int v) const {
+		return m_slice.score(m_len_s - 1 - u, m_len_t - 1 - v);
 	}
 };
 
@@ -168,12 +168,12 @@ public:
 
 			for (const auto &scores : good_scores) {
 
-				const auto sentence_scores = scores.create_sentence_scores(
+				const auto slice = scores.create_slice(
 				    token_at, len_s, pos_filter);
 
 				MatchRef m = this->optimal_match(
 					sentence_id,
-					sentence_scores,
+					slice,
 					scores.variant(),
 					p_matches->worst_score(),
 					[] (std::vector<int16_t> &match, int len_s) {});
@@ -181,8 +181,8 @@ public:
 				if (this->m_query->bidirectional()) {
 					MatchRef m_reverse = this->optimal_match(
 						sentence_id,
-						ReversedScores(
-                            sentence_scores, this->m_query->len()),
+						ReversedSlice(
+                            slice, this->m_query->len()),
 						scores.variant(),
 						p_matches->worst_score(),
 						reverse_alignment);

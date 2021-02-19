@@ -60,7 +60,17 @@ public:
 				for (size_t j = 0; j < m; j++) { // e.g. for each token in needle
 
 					const token_t t = p_b[j];
-					r_matrix(i, j) = (t >= 0) ? m_distance(p_embeddings, s, t) : 0.0f;
+					float score;
+
+					if (s == t) {
+						score = 1.0f;
+					} else if (t >= 0) {
+						score = m_distance(p_embeddings, s, t);
+					} else {
+						score = 0.0f;
+					}
+
+					r_matrix(i, j) = score;
 				}
 
 			} else { // token in Vocabulary, but not in Embedding

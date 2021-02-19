@@ -21,18 +21,19 @@ void Match::compute_scores(const Scores &p_scores, int p_len_s) {
             end = std::max(end, int(m));
         }
 
-        const auto sentence_scores = p_scores.create_sentence_scores(
+        const auto slice = p_scores.create_slice(
             token_at, p_len_s, _pos_filter());
         m_scores.reserve(match.size());
 
         int i = 0;
         for (auto m : match) {
             if (m >= 0) {
-                m_scores.push_back(TokenScore{
-                    sentence_scores.similarity(m, i),
-                    sentence_scores.weight(m, i)});
+                m_scores.emplace_back(TokenScore{
+                    slice.similarity(m, i),
+                    slice.weight(m, i)});
             } else {
-                m_scores.push_back(TokenScore{0.0f, 0.0f});
+                m_scores.emplace_back(
+                    TokenScore{0.0f, 0.0f});
             }
             i++;
         }
