@@ -78,11 +78,10 @@ PYBIND11_MODULE(core, m) {
 	py::class_<Match, MatchRef> match(m, "Match");
 	match.def_property_readonly("query", &Match::query);
 	match.def_property_readonly("document", &Match::document);
-	match.def_property_readonly("match", &Match::py_match);
+	match.def_property_readonly("assignment", &Match::py_assignment);
 	match.def_property_readonly("score", &Match::score);
 	match.def_property_readonly("metric", &Match::metric_name);
 	match.def_property_readonly("sentence", &Match::sentence_id);
-	match.def_property_readonly("location", &Match::location);
 	match.def_property_readonly("regions", &Match::regions);
 	match.def_property_readonly("omitted", &Match::omitted);
 

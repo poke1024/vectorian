@@ -43,19 +43,35 @@ Match::Match(
 	m_score(p_score) {
 }
 
-const Sentence &Match::sentence() const {
-	return  document()->sentence(sentence_id());
+py::dict Match::py_assignment() const {
+	py::dict d;
+
+	// "idx" is index into aligned doc sentence token for each query token.
+	{
+		const std::vector<ssize_t> shape = {
+			static_cast<ssize_t>(m_digest.match.size())};
+		d["idx"] = py::array_t<int16_t>(
+	        shape,                  // shape
+	        {sizeof(int16_t)},      // strides
+	        m_digest.match.data()); // data pointer
+	}
+
+	{
+		const std::vector<ssize_t> shape = {
+			static_cast<ssize_t>(m_scores.size())};
+		const uint8_t* const data =
+			reinterpret_cast<const uint8_t*>(m_scores.data());
+
+		d["sim"] = PY_ARRAY_MEMBER(TokenScore, similarity);
+		d["w"] = PY_ARRAY_MEMBER(TokenScore, weight);
+	}
+
+	return d;
 }
 
-py::tuple Match::location() const {
-	const auto &s = sentence();
 
-	return py::make_tuple(
-		s.book,
-		s.chapter,
-		s.speaker,
-		s.paragraph
-	);
+const Sentence &Match::sentence() const {
+	return  document()->sentence(sentence_id());
 }
 
 py::list Match::regions() const {

@@ -6,6 +6,8 @@ import logging
 import roman
 
 from cached_property import cached_property
+from functools import lru_cache
+
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
 from vectorian.alignment import WatermanSmithBeyer
@@ -35,28 +37,35 @@ class Query:
 
 
 def get_location_desc(metadata, location):
-	if location[2] > 0:  # we have an act-scene-speakers structure.
-		speaker = metadata["speakers"].get(str(location[2]), "")
-		if location[0] >= 0:
-			act = roman.toRoman(location[0])
-			scene = location[1]
-			return speaker, "%s.%d, line %d" % (act, scene, location[3])
+	book = location["book"]
+	chapter = location["chapter"]
+	speaker = location["speaker"]
+	paragraph = location["paragraph"]
+
+	if speaker > 0:  # we have an act-scene-speakers structure.
+		speaker = metadata["speakers"].get(str(speaker), "")
+		if book >= 0:
+			act = roman.toRoman(book)
+			scene = chapter
+			return speaker, "%s.%d, line %d" % (act, scene, paragraph)
 		else:
-			return speaker, "line %d" % location[3]
-	elif location[1] > 0:  # book, chapter and paragraphs
-		if location[0] < 0:  # do we have a book?
-			return "", "Chapter %d, par. %d" % (location[1], location[3])
+			return speaker, "line %d" % paragraph
+	elif chapter > 0:  # book, chapter and paragraphs
+		if book < 0:  # do we have a book?
+			return "", "Chapter %d, par. %d" % (chapter, paragraph)
 		else:
 			return "", "Book %d, Chapter %d, par. %d" % (
-				location[0], location[1], location[3])
+				book, chapter, paragraph)
 	else:
-		return "", "par. %d" % location[3]
+		return "", "par. %d" % paragraph
 
 
 def result_set_to_json(items):
 	matches = []
 	for i, m in enumerate(items):
 		regions = []
+		doc = m.document
+		sentence = doc.sentence(m.sentence)
 
 		try:
 			for r in m.regions:
@@ -75,10 +84,10 @@ def result_set_to_json(items):
 					regions.append(dict(s=s, mismatch_penalty=r.mismatch_penalty))
 
 			metadata = m.document.metadata
-			speaker, loc_desc = get_location_desc(metadata, m.location)
+			speaker, loc_desc = get_location_desc(metadata, sentence)
 
 			matches.append(dict(
-				debug=dict(document=m.document.id, sentence=m.sentence_id),
+				debug=dict(document=m.document.id, sentence=m.sentence),
 				score=m.score,
 				metric=m.metric,
 				location=dict(
@@ -105,6 +114,7 @@ class Result:
 	def __getitem__(self, i):
 		return self._matches[i]
 
+	@lru_cache(1)
 	def to_json(self):
 		return result_set_to_json(self._matches)
 
@@ -193,7 +203,7 @@ class LabResult(Result):
 	def _repr_html_(self):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
 		r = Renderer()
-		for match in self._matches:
+		for match in self.to_json():
 			r.add_match(match)
 		return r.to_html()
 

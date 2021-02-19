@@ -85,4 +85,11 @@ py::array_t<float, py::array::f_style> to_py_array(MatrixXf &p_matrix);
 py::array_t<token_t> to_py_array(const TokenIdArray &p_array);
 py::dict to_py_array(const TokenVectorRef &p_array);
 
+#define PY_ARRAY_MEMBER(STRUCT, MEMBER)                      \
+	py::array_t<decltype(STRUCT::MEMBER)>(                   \
+        shape,              /* shape */                      \
+        {sizeof(STRUCT)},   /* strides */                    \
+        reinterpret_cast<const decltype(STRUCT::MEMBER)*>(   \
+            data + offsetof(STRUCT, MEMBER)))
+
 #endif // __VECTORIAN_COMMON_H__

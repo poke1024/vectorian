@@ -19,13 +19,6 @@ py::array_t<token_t> to_py_array(const TokenIdArray &p_array) {
         p_array.data());    // data pointer
 }
 
-#define TOKEN_ARRAY(MEMBER)                                 \
-	py::array_t<decltype(Token::MEMBER)>(                   \
-        shape,              /* shape */                     \
-        {sizeof(Token)},    /* strides */                   \
-        reinterpret_cast<const decltype(Token::MEMBER)*>(   \
-            data + offsetof(Token, MEMBER)))
-
 py::dict to_py_array(const TokenVectorRef &p_array) {
 
 	const std::vector<ssize_t> shape = {
@@ -35,11 +28,11 @@ py::dict to_py_array(const TokenVectorRef &p_array) {
 
 	py::dict d;
 
-	d["id"] = TOKEN_ARRAY(id);
-	d["idx"] = TOKEN_ARRAY(idx);
-	d["len"] = TOKEN_ARRAY(len);
-	d["pos"] = TOKEN_ARRAY(pos);
-	d["tag"] = TOKEN_ARRAY(tag);
+	d["id"] = PY_ARRAY_MEMBER(Token, id);
+	d["idx"] = PY_ARRAY_MEMBER(Token, idx);
+	d["len"] = PY_ARRAY_MEMBER(Token, len);
+	d["pos"] = PY_ARRAY_MEMBER(Token, pos);
+	d["tag"] = PY_ARRAY_MEMBER(Token, tag);
 
 	return d;
 }
