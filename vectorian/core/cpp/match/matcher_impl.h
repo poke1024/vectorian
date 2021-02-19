@@ -6,12 +6,10 @@
 #include "result_set.h"
 
 template<typename Aligner>
-class MatcherBase :
-	public Matcher,
-	public std::enable_shared_from_this<MatcherBase<Aligner>> {
+class MatcherBase : public Matcher {
 protected:
 	Aligner m_aligner;
-	const MatchRef m_no_match;
+	MatchRef m_no_match;
 
 	template<typename SCORES, typename REVERSE>
 	inline MatchRef optimal_match(
@@ -58,17 +56,20 @@ public:
 		const Aligner &p_aligner) :
 
 		Matcher(p_query, p_document, p_metric),
-		m_aligner(p_aligner),
-		m_no_match(std::make_shared<Match>(
-			this->shared_from_this(),
-			-1,
-			MatchDigest(m_document, -1, std::vector<int16_t>()),
-			p_query->min_score()
-		)) {
+		m_aligner(p_aligner) {
 
 		m_aligner.init(
 			p_document->max_len_s(),
 			m_query->len());
+	}
+
+	virtual void initialize() {
+		m_no_match = std::make_shared<Match>(
+			this->shared_from_this(),
+			-1,
+			MatchDigest(m_document, -1, std::vector<int16_t>()),
+			m_query->min_score()
+		);
 	}
 
 	virtual float gap_cost(size_t len) const {

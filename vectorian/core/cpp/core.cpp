@@ -80,6 +80,7 @@ cfg['sources'] = [
 	'document.cpp',
 	'query.cpp',
 	'match/match.cpp',
+	'match/matcher.cpp',
 	'vocabulary.cpp',
 	'metric/fast.cpp',
 	'scores/fast.cpp',

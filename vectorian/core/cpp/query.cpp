@@ -12,9 +12,11 @@ ResultSetRef Query::match(
 	const auto me = shared_from_this();
 
 	for (const auto &metric : m_metrics) {
-		auto matcher = metric->create_matcher(
+		const auto matcher = metric->create_matcher(
 			me,
 			p_document);
+
+		matcher->initialize();
 
 		{
 			py::gil_scoped_release release;
