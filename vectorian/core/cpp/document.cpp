@@ -58,6 +58,11 @@ Document::Document(
 
 	add_dummy_token(*m_tokens.get());
 
+	{
+		py::gil_scoped_acquire acquire;
+		m_py_tokens = to_py_array(m_tokens);
+	}
+
 	size_t max_len = 0;
 	for (const auto &s : m_sentences) {
 		max_len = std::max(max_len, size_t(s.n_tokens));

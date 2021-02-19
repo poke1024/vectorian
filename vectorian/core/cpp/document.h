@@ -25,6 +25,7 @@ private:
 	const std::string m_text;
 
 	TokenVectorRef m_tokens;
+	py::dict m_py_tokens;
 	std::vector<Sentence> m_sentences;
 	size_t m_max_len_s;
 
@@ -70,11 +71,15 @@ public:
 		return m_metadata;
 	}
 
+	inline py::dict py_tokens() const {
+		return m_py_tokens;
+	}
+
 	inline const TokenVectorRef &tokens() const {
 		return m_tokens;
 	}
 
-	size_t n_tokens() const {
+	inline size_t n_tokens() const {
 		return m_tokens->size();
 	}
 

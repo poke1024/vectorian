@@ -79,23 +79,8 @@ typedef std::shared_ptr<Match> MatchRef;
 class ResultSet;
 typedef std::shared_ptr<ResultSet> ResultSetRef;
 
-inline py::array_t<float, py::array::f_style> to_py_array(MatrixXf &p_matrix) {
-	std::vector<ssize_t> shape(2);
-	shape[0] = p_matrix.rows();
-	shape[1] = p_matrix.cols();
-	return py::array_t<float, py::array::f_style>(
-        shape,                                      // shape
-        {shape[0] * sizeof(float), sizeof(float)},  // strides (col-major)
-        p_matrix.data());
-}
-
-inline py::array_t<token_t> to_py_array(TokenIdArray &p_array) {
-	std::vector<ssize_t> shape(1);
-	shape[0] = p_array.rows();
-	return py::array_t<token_t>(
-        shape,              // shape
-        {sizeof(token_t)},  // strides
-        p_array.data());    // data pointer
-}
+py::array_t<float, py::array::f_style> to_py_array(MatrixXf &p_matrix);
+py::array_t<token_t> to_py_array(const TokenIdArray &p_array);
+py::dict to_py_array(const TokenVectorRef &p_array);
 
 #endif // __VECTORIAN_COMMON_H__

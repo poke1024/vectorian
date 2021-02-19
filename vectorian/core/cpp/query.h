@@ -11,6 +11,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	std::vector<MetricRef> m_metrics;
 	const std::string m_text;
 	TokenVectorRef m_t_tokens;
+	py::dict m_py_t_tokens;
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
 	float m_total_score;
@@ -33,6 +34,8 @@ public:
 
 		m_t_tokens = unpack_tokens(
 			p_vocab, DO_NOT_MODIFY_VOCABULARY, p_text, table);
+
+		m_py_t_tokens = to_py_array(m_t_tokens);
 
 		static const std::set<std::string> valid_options = {
 			"alignment",
@@ -154,6 +157,10 @@ public:
 
 	inline const TokenVectorRef &tokens() const {
 		return m_t_tokens;
+	}
+
+	inline py::dict py_tokens() const {
+		return to_py_array(m_t_tokens);
 	}
 
 	inline int len() const {

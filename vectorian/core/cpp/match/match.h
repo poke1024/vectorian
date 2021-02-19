@@ -73,6 +73,15 @@ public:
 		return m_digest.match;
 	}
 
+	inline py::array_t<int16_t> py_match() const {
+		const std::vector<ssize_t> shape = {
+			static_cast<ssize_t>(m_digest.match.size())};
+		return py::array_t<int16_t>(
+	        shape,                  // shape
+	        {sizeof(int16_t)},      // strides
+	        m_digest.match.data()); // data pointer
+	}
+
 	const Sentence &sentence() const;
 
 	py::tuple location() const;

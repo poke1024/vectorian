@@ -76,6 +76,7 @@ cfg['dependencies'] = [
 
 cfg['sources'] = [
 	'module.cpp',
+	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',
 	'query.cpp',
