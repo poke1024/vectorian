@@ -5,13 +5,11 @@
 #include "document.h"
 #include "result_set.h"
 
-
 template<typename Aligner>
-class MatcherBase : public Matcher {
+class MatcherBase :
+	public Matcher,
+	public std::enable_shared_from_this<MatcherBase<Aligner>> {
 protected:
-	const QueryRef m_query;
-	const DocumentRef m_document;
-	const MetricRef m_metric;
 	Aligner m_aligner;
 	const MatchRef m_no_match;
 
@@ -42,8 +40,7 @@ protected:
 		if (best_final_score > p_min_score) {
 
 			return std::make_shared<Match>(
-				m_query,
-				m_metric,
+				this->shared_from_this(),
 				scores_variant_id,
 				MatchDigest(m_document, sentence_id, m_aligner.match()),
 				best_final_score);
@@ -60,23 +57,23 @@ public:
 		const MetricRef &p_metric,
 		const Aligner &p_aligner) :
 
-		m_query(p_query),
-		m_document(p_document),
-		m_metric(p_metric),
+		Matcher(p_query, p_document, p_metric),
 		m_aligner(p_aligner),
 		m_no_match(std::make_shared<Match>(
-			m_query,
-			m_metric,
+			this->shared_from_this(),
 			-1,
 			MatchDigest(m_document, -1, std::vector<int16_t>()),
 			p_query->min_score()
 		)) {
 
-			m_aligner.init(
-				p_document->max_len_s(),
-				m_query->len());
-		}
+		m_aligner.init(
+			p_document->max_len_s(),
+			m_query->len());
+	}
 
+	virtual float gap_cost(size_t len) const {
+		return m_aligner.gap_cost(len);
+	}
 };
 
 template<typename Scores>

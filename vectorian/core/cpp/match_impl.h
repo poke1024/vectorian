@@ -5,7 +5,7 @@
 #include "document.h"
 
 inline int Match::_pos_filter() const {
-    return m_query->ignore_determiners() ?
+    return query()->ignore_determiners() ?
         document()->vocabulary()->det_pos() : -1;
 }
 

@@ -77,7 +77,7 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<Match, MatchRef> match(m, "Match");
 	match.def_property_readonly("score", &Match::score);
-	match.def_property_readonly("metric", &Match::metric);
+	match.def_property_readonly("metric", &Match::metric_name);
 	match.def_property_readonly("document", &Match::document);
 	match.def_property_readonly("sentence_id", &Match::sentence_id);
 	match.def_property_readonly("location", &Match::location);

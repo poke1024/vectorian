@@ -4,6 +4,7 @@
 #include "common.h"
 #include "metric/metric.h"
 #include "query.h"
+#include "matcher.h"
 
 class MatchDigest {
 public:
@@ -32,8 +33,7 @@ struct TokenScore {
 
 class Match {
 private:
-	const QueryRef m_query;
-	const MetricRef m_metric;
+	MatcherRef m_matcher;
 	const int16_t m_scores_id;
 
 	const MatchDigest m_digest;
@@ -44,11 +44,22 @@ private:
 
 public:
 	Match(
-		const QueryRef &p_query,
-		const MetricRef &p_metric,
+		const MatcherRef &p_matcher,
 		const int p_scores_id,
 		MatchDigest &&p_digest,
 		float p_score);
+
+	inline const QueryRef &query() const {
+		return m_matcher->query();
+	}
+
+	inline const MetricRef &metric() const {
+		return m_matcher->metric();
+	}
+
+	inline const std::string &metric_name() const {
+		return metric()->name();
+	}
 
 	inline float score() const {
 		return m_score;
@@ -69,10 +80,6 @@ public:
 	py::list regions() const;
 
 	py::list omitted() const;
-
-	const std::string &metric() const {
-		return m_metric->name();
-	}
 
 	inline const int scores_variant_id() const {
 		return m_scores_id;

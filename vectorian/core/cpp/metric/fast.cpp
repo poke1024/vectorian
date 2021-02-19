@@ -25,6 +25,11 @@ public:
 			max_len_s, max_len_t);
 	}
 
+	float gap_cost(size_t len) const {
+		return m_gap_cost[
+			std::min(len, m_gap_cost.size() - 1)];
+	}
+
 	template<typename SentenceScores>
 	inline void operator()(
 		const SentenceScores &scores, int len_s, int len_t) const {

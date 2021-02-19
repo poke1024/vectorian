@@ -32,14 +32,12 @@ struct MatchDigest::compare {
 };
 
 Match::Match(
-	const QueryRef &p_query,
-	const MetricRef &p_metric,
+	const MatcherRef &p_matcher,
 	const int p_scores_id,
 	MatchDigest &&p_digest,
-	float p_score) :
+	const float p_score) :
 
-	m_query(p_query),
-	m_metric(p_metric),
+	m_matcher(p_matcher),
 	m_scores_id(p_scores_id),
 	m_digest(p_digest),
 	m_score(p_score) {
@@ -64,9 +62,9 @@ py::list Match::regions() const {
 	PPK_ASSERT(document().get() != nullptr);
 
 	const std::string &s_text = document()->text();
-	const std::string &t_text = m_query->text();
+	const std::string &t_text = query()->text();
 	const auto &s_tokens_ref = document()->tokens();
-	const auto &t_tokens_ref = m_query->tokens();
+	const auto &t_tokens_ref = query()->tokens();
 	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
 
@@ -128,9 +126,7 @@ py::list Match::regions() const {
 			float p;
 
 			if (last_matched) {
-				//FIXME
-				p = 0.0f;
-				//p = (*mismatch_penalty.get())(token_at + match_at_i - last_anchor);
+				p = m_matcher->gap_cost(token_at + match_at_i - last_anchor);
 			} else {
 				p = 0.0f;
 			}
@@ -146,7 +142,7 @@ py::list Match::regions() const {
 			document()->vocabulary(),
 			TokenRef{s_tokens_ref, token_at + match_at_i},
 			TokenRef{t_tokens_ref, i},
-			m_metric->origin(s.id, i)
+			metric()->origin(s.id, i)
 		));
 
 		last_anchor = token_at + match_at_i + 1;
@@ -165,9 +161,9 @@ py::list Match::regions() const {
 
 py::list Match::omitted() const {
 
-	const auto &t_tokens_ref = m_query->tokens();
+	const auto &t_tokens_ref = query()->tokens();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
-	const std::string &t_text = m_query->text();
+	const std::string &t_text = query()->text();
 
 	py::list not_used;
 
