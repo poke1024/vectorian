@@ -53,9 +53,9 @@ def get_location_desc(metadata, location):
 		return "", "par. %d" % location[3]
 
 
-def result_set_to_json(result_set):
+def result_set_to_json(items):
 	matches = []
-	for i, m in enumerate(result_set.best_n(-1)):
+	for i, m in enumerate(items):
 		regions = []
 
 		try:
@@ -95,6 +95,23 @@ def result_set_to_json(result_set):
 	return matches
 
 
+class Result:
+	def __init__(self, result_set):
+		self._matches = result_set.best_n(-1)
+
+	def __iter__(self):
+		return self._matches
+
+	def __getitem__(self, i):
+		return self._matches[i]
+
+	def to_json(self):
+		return result_set_to_json(self._matches)
+
+	def limit_to(self, n):
+		return type(self)(self._matches[:n])
+
+
 class Finder:
 	def __init__(self, vocab, corpus):
 		self._vocab = vocab
@@ -131,7 +148,7 @@ class Finder:
 				if progress:
 					progress(done / total)
 
-		return result_set_to_json(results)
+		return results
 
 
 class Session:
@@ -147,7 +164,9 @@ class Session:
 	def max_sentence_len(self):
 		return self._finder.max_sentence_len
 
-	def find(self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None, n=100, progress=None, options: dict = dict()):
+	def find(
+		self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None,
+		n=100, progress=None, ret_class=Result, options: dict = dict()):
 
 		if not isinstance(doc, spacy.tokens.doc.Doc):
 			raise TypeError("please specify a spaCy document as query")
@@ -167,25 +186,16 @@ class Session:
 		options["max_matches"] = n
 
 		query = Query(self._vocab, doc, options)
-		return self._finder(query, progress=progress)
+		return ret_class(self._finder(query, progress=progress))
 
 
-class LabResult:
-	def __init__(self, data):
-		self._data = data
-
+class LabResult(Result):
 	def _repr_html_(self):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
 		r = Renderer()
-		for result in self._data:
-			r.add_match(result)
+		for match in self._matches:
+			r.add_match(match)
 		return r.to_html()
-
-	def to_json(self):
-		return self._data
-
-	def limit_to(self, n):
-		return LabResult(self._data[:n])
 
 
 class LabSession(Session):
@@ -203,9 +213,12 @@ class LabSession(Session):
 			progress.value = progress.max * t
 
 		try:
-			results = super().find(
-				*args, progress=update_progress, **kwargs)
+			result = super().find(
+				*args,
+				progress=update_progress,
+				ret_class=LabResult,
+				**kwargs)
 		finally:
 			progress.close()
 
-		return LabResult(results)
+		return result

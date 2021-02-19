@@ -29,21 +29,20 @@ static_assert(
 		std::make_tuple<int, int, int>(3, 3, 90),
 	"Vectorian requires Eigen >= 3.3.90"); // this is a dev version as of 2021-02-15
 
+typedef int32_t token_t;
+
+#pragma pack(push, 1)
 struct Location {
+	int16_t paragraph;
 	int8_t book;
 	int8_t chapter;
 	int8_t speaker;
-	int16_t paragraph;
 };
 
 struct Sentence : public Location {
-	int16_t n_tokens;
 	int32_t token_at;
+	int16_t n_tokens;
 };
-
-typedef int32_t token_t;
-
-typedef Eigen::Array<token_t, Eigen::Dynamic, 1> TokenIdArray;
 
 struct Token {
 	token_t id;
@@ -52,6 +51,9 @@ struct Token {
 	int8_t pos; // universal POS tags
 	int8_t tag; // Penn TreeBank style POS tags
 };
+#pragma pack(pop)
+
+typedef Eigen::Array<token_t, Eigen::Dynamic, 1> TokenIdArray;
 
 typedef std::shared_ptr<std::vector<Token>> TokenVectorRef;
 

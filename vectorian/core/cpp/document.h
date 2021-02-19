@@ -67,6 +67,10 @@ public:
 		return m_text;
 	}
 
+	std::string substr(ssize_t p_start, ssize_t p_end) const {
+		return m_text.substr(p_start, std::max(ssize_t(0), p_end - p_start));
+	}
+
 	const py::dict &metadata() const {
 		return m_metadata;
 	}
@@ -97,6 +101,18 @@ public:
 
 	inline const Sentence &sentence(size_t p_index) const {
 		return m_sentences.at(p_index);
+	}
+
+	py::dict py_sentence(size_t p_index) const {
+		const Sentence &s = m_sentences.at(p_index);
+		py::dict d;
+		d["book"] = s.book;
+		d["chapter"] = s.chapter;
+		d["speaker"] = s.speaker;
+		d["paragraph"] = s.paragraph;
+		d["token_at"] = s.token_at;
+		d["n_tokens"] = s.n_tokens;
+		return d;
 	}
 
 	py::list py_sentences_as_tokens() const {

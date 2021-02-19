@@ -81,7 +81,7 @@ PYBIND11_MODULE(core, m) {
 	match.def_property_readonly("match", &Match::py_match);
 	match.def_property_readonly("score", &Match::score);
 	match.def_property_readonly("metric", &Match::metric_name);
-	match.def_property_readonly("sentence_id", &Match::sentence_id);
+	match.def_property_readonly("sentence", &Match::sentence_id);
 	match.def_property_readonly("location", &Match::location);
 	match.def_property_readonly("regions", &Match::regions);
 	match.def_property_readonly("omitted", &Match::omitted);
@@ -105,6 +105,7 @@ PYBIND11_MODULE(core, m) {
 	py::class_<Query, QueryRef> query(m, "Query");
 	query.def(py::init<VocabularyRef, const std::string &, py::handle, py::kwargs>());
 	query.def_property_readonly("text", &Query::text);
+	query.def("substr", &Query::substr);
 	query.def_property_readonly("tokens", &Query::py_tokens);
 	query.def("abort", &Query::abort);
 
@@ -117,9 +118,11 @@ PYBIND11_MODULE(core, m) {
 	document.def("__repr__", &Document::__str__);
 	document.def_property_readonly("id", &Document::id);
 	document.def_property_readonly("text", &Document::text);
+	document.def("substr", &Document::substr);
 	document.def_property_readonly("tokens", &Document::py_tokens);
 	document.def_property_readonly("path", &Document::path);
 	document.def_property_readonly("metadata", &Document::metadata);
+	document.def("sentence", &Document::py_sentence);
 	document.def_property_readonly("sentences", &Document::py_sentences_as_tokens);
 	document.def_property_readonly("sentences_as_text", &Document::py_sentences_as_text);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);

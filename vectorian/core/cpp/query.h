@@ -155,6 +155,10 @@ public:
 		return m_text;
 	}
 
+	std::string substr(ssize_t p_start, ssize_t p_end) const {
+		return m_text.substr(p_start, std::max(ssize_t(0), p_end - p_start));
+	}
+
 	inline const TokenVectorRef &tokens() const {
 		return m_t_tokens;
 	}
