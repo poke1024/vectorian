@@ -1,6 +1,6 @@
 #include "common.h"
 #include "query.h"
-#include "matcher.h"
+#include "match/matcher.h"
 #include "result_set.h"
 
 ResultSetRef Query::match(

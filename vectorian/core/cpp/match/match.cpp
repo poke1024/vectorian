@@ -1,8 +1,8 @@
-#include "match.h"
 #include "utils.h"
-#include "region.h"
 #include "document.h"
-#include "match_impl.h"
+#include "match/match.h"
+#include "match/match_impl.h"
+#include "match/region.h"
 
 template<template<typename> typename C>
 struct MatchDigest::compare {

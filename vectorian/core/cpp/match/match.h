@@ -4,7 +4,7 @@
 #include "common.h"
 #include "metric/metric.h"
 #include "query.h"
-#include "matcher.h"
+#include "match/matcher.h"
 
 class MatchDigest {
 public:

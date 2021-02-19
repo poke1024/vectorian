@@ -1,7 +1,7 @@
 #include "metric/fast.h"
 #include "scores/fast.h"
 #include "query.h"
-#include "matcher_impl.h"
+#include "match/matcher_impl.h"
 
 template<typename Index>
 class WatermanSmithBeyer {

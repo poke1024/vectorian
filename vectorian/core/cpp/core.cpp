@@ -61,14 +61,14 @@ else:
 cfg['compiler_args'].append('-fvisibility=hidden')
 
 cfg['dependencies'] = [
-	'aligner.h',
+	'alignment/aligner.h',
 	'common.h',
 	'document.h',
-	'match.h',
-	'match_impl.h',
-	'matcher.h',
+	'match/match.h',
+	'match/match_impl.h',
+	'match/matcher.h',
+	'match/region.h',
 	'query.h',
-	'region.h',
 	'result_set.h',
 	'utils.h',
 	'vocabulary.h'
@@ -79,7 +79,7 @@ cfg['sources'] = [
 	'result_set.cpp',
 	'document.cpp',
 	'query.cpp',
-	'match.cpp',
+	'match/match.cpp',
 	'vocabulary.cpp',
 	'metric/fast.cpp',
 	'scores/fast.cpp',

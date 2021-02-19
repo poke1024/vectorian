@@ -2,8 +2,8 @@
 #define __VECTORIAN_RESULT_SET_H__
 
 #include "common.h"
-#include "match.h"
-#include "match_impl.h"
+#include "match/match.h"
+#include "match/match_impl.h"
 
 class GroundTruth {
 	struct Item {

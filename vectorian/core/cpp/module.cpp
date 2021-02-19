@@ -1,14 +1,14 @@
 #include <iostream>
 
 #include "common.h"
-#include "region.h"
-#include "match.h"
+#include "match/region.h"
+#include "match/match.h"
+#include "match/match_impl.h"
 #include "embedding/embedding.h"
 #include "embedding/fast.h"
 #include "vocabulary.h"
 #include "query.h"
 #include "document.h"
-#include "match_impl.h"
 #include "result_set.h"
 
 namespace py = pybind11;

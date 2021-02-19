@@ -1,7 +1,6 @@
 #include "common.h"
 #include "vocabulary.h"
-#include "match.h"
-
+#include "match/match.h"
 
 class Region {
 	const std::string m_s;
