@@ -65,12 +65,20 @@ class RelaxedWordMoversDistance {
 	float m_score;
 	std::vector<Index> m_match;
 
+	struct Item {
+		token_t token_id;
+		int16_t index;
+		int8_t s_or_t;
+	};
+	std::vector<Item> m_scratch;
+
 public:
 	RelaxedWordMoversDistance() {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
 		//m_cache.allocate(std::max(max_len_s, max_len_t));
+		m_scratch.resize(max_len_s + max_len_t);
 	}
 
 	inline float gap_cost(size_t len) const {
@@ -80,6 +88,20 @@ public:
 	template<typename Slice>
 	inline void operator()(
 		const Slice &slice, int len_s, int len_t) const {
+
+		/*int k = 0;
+		std::vector<Item> z = m_scratch;
+
+		for (int i = 0; i < len_s; i++) {
+			z[k++] = Item{slice.s(i).id, i, 0};
+		}
+		for (int i = 0; i < len_t; i++) {
+			z[k++] = Item{slice.t(i).id, i, 1};
+		}
+		std::sort(z.begin(), z.begin() + k, [] (const Item &a, const Item &b) {
+			return a.token_id < b.token_id;
+		});*/
+
 
 		/*
 		s are the corpus tokens, t are the query tokens.
@@ -101,9 +123,6 @@ public:
 		those tokens in t that do not occur in s:
 			get new ids. for score lookup, we map those ids to the query token pos.
 		*/
-
-		// sort tuples (token_id, s_or_t, index)
-		//std::sort();
 
 		// w1: normalized bow for s
 		// w2: normalized bow for t
@@ -151,6 +170,23 @@ public:
 	}
 };
 
+template<typename Scores, typename Aligner>
+MatcherRef make_matcher(
+	const QueryRef &p_query,
+	const DocumentRef &p_document,
+	const MetricRef &p_metric,
+	const std::vector<Scores> &scores,
+	const Aligner &p_aligner) {
+
+	if (p_query->bidirectional()) {
+		return std::make_shared<MatcherImpl<Scores, Aligner, TokenIdEncoder, true>>(
+			p_query, p_document, p_metric, p_aligner, scores);
+	} else {
+		return std::make_shared<MatcherImpl<Scores, Aligner, TokenIdEncoder, false>>(
+			p_query, p_document, p_metric, p_aligner, scores);
+	}
+}
+
 template<typename Scores>
 MatcherRef create_matcher(
 	const QueryRef &p_query,
@@ -191,9 +227,11 @@ MatcherRef create_matcher(
 			gap_cost.push_back(std::numeric_limits<float>::infinity());
 		}
 
-		return std::make_shared<MatcherImpl<Scores, WatermanSmithBeyer<int16_t>>>(
-			p_query, p_document, p_metric, WatermanSmithBeyer<int16_t>(gap_cost, zero), scores);
+		return make_matcher(
+			p_query, p_document, p_metric, scores,
+			WatermanSmithBeyer<int16_t>(gap_cost, zero));
 	} else {
+
 		std::ostringstream err;
 		err << "illegal alignment algorithm " << algorithm;
 		throw std::runtime_error(err.str());

@@ -59,62 +59,6 @@ public:
 		//m_similarity_measures = create_similarity_measures(p_name, m_embeddings);
 	}
 
-	/*void add_apsynp(py::object p_table, float apsynp_p = 0.1) {
-		const std::shared_ptr<arrow::Table> table = unwrap_table(p_table);
-
-		if (size_t(table->num_rows()) != m_tokens.size()) {
-			fprintf(stderr, "apsynp table: token size %ld != %ld\n",
-				long(table->num_rows()), long(m_tokens.size()));
-			throw std::runtime_error("broken table");
-		}
-		m_embeddings.apsynp.resize(m_tokens.size(), table->num_columns());
-
-		try {
-			for_each_column<arrow::UInt16Type, uint16_t>(table, [this, apsynp_p] (int i, auto v, auto offset) {
-				m_embeddings.apsynp.col(i)(Eigen::seqN(offset, v.size())) = v.template cast<float>().pow(apsynp_p);
-			});
-		} catch(...) {
-			printf("failed to load apsynp parquet table.");
-			throw;
-		}
-
-		m_similarity_measures["apsynp"] = std::make_shared<SimilarityMeasure<APSynPSimilarity>>(
-			m_embeddings, APSynPSimilarity(m_embeddings.raw.cols(), apsynp_p));
-
-		//m_similarity_measures["ranked-apsynp"] = std::make_shared<RankedSimilarityMeasure<APSynPSimilarity>>(
-		//	m_embeddings, APSynPSimilarity(m_embeddings.raw.cols(), apsynp_p));
-	}
-
-	void add_nicdm(py::object p_table) {
-		const std::shared_ptr<arrow::Table> table = unwrap_table(p_table);
-
-		if (size_t(table->num_rows()) != m_tokens.size()) {
-			fprintf(stderr, "nicdm table: token size %ld != %ld\n",
-				long(table->num_rows()), long(m_tokens.size()));
-			throw std::runtime_error("broken table");
-		}
-		m_embeddings.neighborhood.resize(m_tokens.size(), table->num_columns());
-
-		try {
-			for_each_column<arrow::FloatType, float>(table, [this] (int i, auto v, auto offset) {
-				m_embeddings.neighborhood.col(i)(Eigen::seqN(offset, v.size())) = v;
-			});
-		} catch(...) {
-			printf("failed to load neighborhood parquet table.\n");
-			throw;
-		}
-
-		m_similarity_measures["nicdm"] = std::make_shared<SimilarityMeasure<NICDMSimilarity>>(m_embeddings);
-
-		//m_similarity_measures["ranked-nicdm"] = std::make_shared<RankedSimilarityMeasure<NICDMSimilarity>>(m_embeddings);
-	}*/
-
-	/*void load_percentiles(const std::string &p_path) {
-		for (auto i : m_similarity_measures) {
-			i.second->load_percentiles(p_path, i.first);
-		}
-	}*/
-
 	virtual MetricRef create_metric(
 		const MetricDef &p_metric,
 		const TokenIdArray &p_vocabulary_to_embedding,

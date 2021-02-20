@@ -2,26 +2,67 @@
 #define __VECTORIAN_FAST_SCORES_H__
 
 #include "common.h"
+#include "document.h"
+#include "query.h"
 #include "metric/fast.h"
 
+class TokenIdEncoder {
+public:
+	inline size_t to_embedding(const Token &p_token) const {
+		return p_token.id;
+	}
+};
+
+class TokenIdPosEncoder {
+	const size_t m_npos;
+
+public:
+	TokenIdPosEncoder(const size_t p_npos) : m_npos(p_npos) {
+	}
+
+	inline size_t to_embedding(const Token &p_token) const {
+		return p_token.id * m_npos + p_token.pos;
+	}
+};
+
+class TokenIdTagEncoder {
+	const size_t m_ntag;
+
+public:
+	TokenIdTagEncoder(const size_t p_ntag) : m_ntag(p_ntag) {
+	}
+
+	inline size_t to_embedding(const Token &p_token) const {
+		return p_token.id * m_ntag + p_token.tag;
+	}
+};
+
+template<typename EmbeddingEncoder>
 class FastSlice {
 private:
 	const FastMetricRef m_metric;
 	const Token * const s_tokens;
 	const int32_t _s_len;
 	const Token * const t_tokens;
+	const EmbeddingEncoder m_encoder;
 
 public:
 	inline FastSlice(
 		const FastMetricRef &metric,
 		const Token * const s_tokens,
 		const int32_t s_len,
-		const Token * const t_tokens) :
+		const Token * const t_tokens,
+		const EmbeddingEncoder &p_encoder) :
 
 		m_metric(metric),
 		s_tokens(s_tokens),
 		_s_len(s_len),
-		t_tokens(t_tokens) {
+		t_tokens(t_tokens),
+		m_encoder(p_encoder) {
+	}
+
+	inline const EmbeddingEncoder &encoder() const {
+		return m_encoder;
 	}
 
 	inline const Token &s(int i) const {
@@ -39,21 +80,18 @@ public:
 	inline float similarity(int i, int j) const {
 		const Token &s = s_tokens[i];
 		const auto &sim = m_metric->similarity();
-		return sim(s.id, j);
+		return sim(m_encoder.to_embedding(s), j);
 	}
 
 	inline float weight(int i, int j) const {
-
 		const Token &s = s_tokens[i];
 		const Token &t = t_tokens[j];
 
 		// weight based on PennTree POS tag.
 		float weight = m_metric->pos_weight(t.tag);
 
-		// difference based on universal POS tag. do not apply
-		// if the token is the same, but only POS is different,
-		// since often this will an error in the POS tagging.
-		if (s.pos != t.pos && s.id != t.id) {
+		// difference based on universal POS tag.
+		if (s.pos != t.pos) {
 			weight *= 1.0f - m_metric->modifiers().pos_mismatch_penalty;
 		}
 
@@ -85,10 +123,44 @@ public:
 		const DocumentRef &p_document,
 		const FastMetricRef &p_metric);
 
-	FastSlice create_slice(
-		size_t p_s_offset,
-		size_t p_s_len,
-		int p_pos_filter) const;
+	template<typename EmbeddingEncoder>
+	FastSlice<EmbeddingEncoder> create_slice(
+		const size_t p_s_offset,
+		const size_t p_s_len,
+		const int p_pos_filter,
+		const EmbeddingEncoder &p_encoder) const {
+
+		const Token *s_tokens = m_document->tokens()->data();
+		const Token *t_tokens = m_query->tokens()->data();
+
+		if (p_pos_filter > -1) {
+		    const Token *s = s_tokens + p_s_offset;
+		    Token *new_s = m_filtered.data();
+	        PPK_ASSERT(p_s_len <= m_filtered.size());
+
+		    size_t new_s_len = 0;
+	        for (size_t i = 0; i < p_s_len; i++) {
+	            if (s[i].pos != p_pos_filter) {
+	                new_s[new_s_len++] = s[i];
+	            }
+	        }
+
+	        return FastSlice<EmbeddingEncoder>(
+	            m_metric,
+	            new_s,
+	            new_s_len,
+	            t_tokens,
+	            p_encoder);
+		}
+	    else {
+	        return FastSlice<EmbeddingEncoder>(
+	            m_metric,
+	            s_tokens + p_s_offset,
+	            p_s_len,
+	            t_tokens,
+	            p_encoder);
+	    }
+	}
 
 	inline bool good() const {
 		return true;

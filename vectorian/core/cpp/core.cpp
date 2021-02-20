@@ -75,6 +75,8 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'metric/fast.cpp',
+	'scores/fast.cpp',
 	'module.cpp',
 	'common.cpp',
 	'result_set.cpp',
@@ -83,8 +85,6 @@ cfg['sources'] = [
 	'match/match.cpp',
 	'match/matcher.cpp',
 	'vocabulary.cpp',
-	'metric/fast.cpp',
-	'scores/fast.cpp',
 	'embedding/sim.cpp',
 	'../../../lib/ppk_assert/src/ppk_assert.cpp']
 

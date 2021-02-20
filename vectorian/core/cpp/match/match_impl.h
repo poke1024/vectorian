@@ -3,6 +3,7 @@
 
 #include "query.h"
 #include "document.h"
+#include "scores/fast.h"
 
 inline int Match::_pos_filter() const {
     return query()->ignore_determiners() ?
@@ -21,8 +22,8 @@ void Match::compute_scores(const Scores &p_scores, int p_len_s) {
             end = std::max(end, int(m));
         }
 
-        const auto slice = p_scores.create_slice(
-            token_at, p_len_s, _pos_filter());
+        const auto slice = p_scores.template create_slice<TokenIdEncoder>(
+            token_at, p_len_s, _pos_filter(), TokenIdEncoder());
         m_scores.reserve(match.size());
 
         int i = 0;

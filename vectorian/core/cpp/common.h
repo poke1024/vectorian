@@ -92,4 +92,6 @@ py::dict to_py_array(const TokenVectorRef &p_array);
         reinterpret_cast<const decltype(STRUCT::MEMBER)*>(   \
             data + offsetof(STRUCT, MEMBER)))
 
+#define ALIGNER_SLIM 1
+
 #endif // __VECTORIAN_COMMON_H__

@@ -1,3 +1,4 @@
+#include "common.h"
 #include "match/matcher.h"
 #include "match/match.h"
 #include "alignment/aligner.h"
@@ -108,7 +109,7 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	std::reverse(match.begin(), match.end());
 }
 
-template<typename Scores, typename Aligner>
+template<typename Scores, typename Aligner, typename EmbeddingEncoder, bool Bidirectional>
 class MatcherImpl : public MatcherBase<Aligner> {
 
 	const std::vector<Scores> m_scores;
@@ -168,8 +169,8 @@ public:
 
 			for (const auto &scores : good_scores) {
 
-				const auto slice = scores.create_slice(
-				    token_at, len_s, pos_filter);
+				const auto slice = scores.template create_slice<EmbeddingEncoder>(
+				    token_at, len_s, pos_filter, EmbeddingEncoder());
 
 				MatchRef m = this->optimal_match(
 					sentence_id,
@@ -178,7 +179,7 @@ public:
 					p_matches->worst_score(),
 					[] (std::vector<int16_t> &match, int len_s) {});
 
-				if (this->m_query->bidirectional()) {
+				if (Bidirectional) {
 					MatchRef m_reverse = this->optimal_match(
 						sentence_id,
 						ReversedSlice(
