@@ -59,18 +59,176 @@ public:
 	}
 };
 
+// from: https://github.com/src-d/wmd-relax/blob/master/emd_relaxed.h
+template <typename T>
+T emd_relaxed(const T *__restrict__ w1, const T *__restrict__ w2,
+              const T *__restrict__ dist, uint32_t size,
+              int32_t *boilerplate) {
+
+  for (size_t i = 0; i < size; i++) {
+    boilerplate[i] = i;
+  }
+
+  T cost = std::numeric_limit<T>::max();
+  for (size_t c = 0; c < 1; c++) { // do not flip problem.
+    T acc = 0;
+    for (size_t i = 0; i < size; i++) {
+      if (w1[i] != 0) {
+        // FIXME use a heap.
+
+        std::sort(
+          boilerplate,
+          boilerplate + size,
+          [&](const int a, const int b) {
+            return dist[i * size + a] < dist[i * size + b];
+          });
+
+        T remaining = w1[i];
+        for (size_t j = 0; j < size; j++) {
+          int w = boilerplate[j];
+          if (remaining < w2[w]) {
+            acc += remaining * dist[i * size + w];
+            break;
+          } else {
+            remaining -= w2[w];
+            acc += w2[w] * dist[i * size + w];
+          }
+        }
+      }
+    }
+    cost = std::min(cost, acc);
+    std::swap(w1, w2);
+  }
+  return cost;
+}
+
 template<typename Index>
 class RelaxedWordMoversDistance {
-	//EMDRelaxedCache m_cache;
 	float m_score;
 	std::vector<Index> m_match;
 
-	struct Item {
-		token_t token_id;
-		int16_t index;
-		int8_t s_or_t;
+	struct RefToken {
+		wvec_t word_id;
+		Index i; // index in s or t
+		int8_t j; // 0 for s, 1 for t
 	};
-	std::vector<Item> m_scratch;
+
+	struct Scratch {
+		size_t size;
+
+		std::vector<RefToken> tokens;
+		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
+		//Eigen::Array<float, Eigen::Dynamic, 1> w2;
+		std::vector<float> w1;
+		std::vector<float> w2;
+		std::vector<token_t> back_s;
+		std::vector<token_t> back_t;
+		std::vector<float> dist;
+		std::vector<int32_t> match;
+
+		void resize(const size_t p_size) {
+			size = p_size;
+			tokens.resize(p_size);
+			w1.resize(p_size);
+			w2.resize(p_size);
+			back_s.resize(p_size);
+			back_t.resize(p_size);
+			dist.resize(p_size * p_size);
+			match.resize(p_size);
+		}
+
+		inline void reset(const int k) {
+			for (int i = 0; i < k; i++) {
+				w1[i] = 0.0f;
+				w2[i] = 0.0f;
+				back_s[i] = -1;
+				back_t[i] = -1;
+			}
+		}
+
+		inline int init_for_k(const int k) {
+			reset(k);
+
+			float * const ws[2] = {
+				w1.data(),
+				w2.data()
+			};
+
+			Index wsum[2] = {
+				0, 0
+			};
+
+			token_t * const back[2] = {
+				back_s.data(),
+				back_t.data()
+			};
+
+			int cur_word_id = tokens[0].word_id;
+			int vocab = 0;
+
+			for (int i = 0; i < k; i++) {
+				const auto &token = tokens[i];
+				const int new_word_id = token.word_id;
+
+				if (new_word_id != cur_word_id) {
+					cur_word_id = new_word_id;
+					vocab += 1;
+				}
+
+				const int j = token.j;
+				ws[j][vocab] += 1.0f;
+				wsum[j] += 1;
+				back[j][vocab] = token.i;
+			}
+
+			const float n1 = wsum[0];
+			const float n2 = wsum[1];
+			for (int i = 0; i < k; i++) {
+				w1[i] /= n1;
+				w2[i] /= n2;
+			}
+
+			return vocab + 1;
+		}
+
+		template<typename Similarity>
+		inline void compute_dist(const int p_size, const Similarity &sim) {
+			for (int i = 0; i < p_size; i++) {
+				for (int j = 0; j < p_size; j++) {
+					if (i == j) {
+						dist[i * p_size + j] = 0.0f;
+						continue;
+					}
+
+					{
+						const int u = back_s[i];
+						if (u >= 0) {
+							const int v = back_t[j];
+							if (v >= 0) {
+								dist[i * p_size + j] = 1.0f - std::max(0.0f, sim(u, v));
+								continue;
+							}
+						}
+					}
+
+					{
+						const int u = back_s[j];
+						if (u >= 0) {
+							const int v = back_t[i];
+							if (v >= 0) {
+								dist[i * p_size + j] = 1.0f - std::max(0.0f, sim(u, v));
+								continue;
+							}
+						}
+					}
+
+					dist[i * p_size + j] = 1.0f;
+				}
+			}
+		}
+	};
+
+	Scratch m_scratch;
 
 public:
 	RelaxedWordMoversDistance() {
@@ -87,74 +245,42 @@ public:
 
 	template<typename Slice>
 	inline void operator()(
-		const Slice &slice, int len_s, int len_t) const {
+		const Slice &slice, int len_s, int len_t) {
 
-		/*int k = 0;
-		std::vector<Item> z = m_scratch;
+		int k = 0;
+		std::vector<RefToken> &z = m_scratch.tokens;
+		const auto &enc = slice.encoder();
 
 		for (int i = 0; i < len_s; i++) {
-			z[k++] = Item{slice.s(i).id, i, 0};
+			z[k++] = RefToken{
+				enc.to_embedding(slice.s(i)), static_cast<Index>(i), 0};
 		}
 		for (int i = 0; i < len_t; i++) {
-			z[k++] = Item{slice.t(i).id, i, 1};
-		}
-		std::sort(z.begin(), z.begin() + k, [] (const Item &a, const Item &b) {
-			return a.token_id < b.token_id;
-		});*/
-
-
-		/*
-		s are the corpus tokens, t are the query tokens.
-
-		we build a new vocab that corresponds to w[i]
-		sv[i] maps vocab item i to global token id (or -1 if not in s)
-		tv[i] maps vocab item i to query token pos (or -1 if not in t)
-
-		def sim(i, j):
-			u = sv[i]
-			v = tv[j]
-			if (u >= 0 && v >= 0)
-				slice.score(u, v)
-			else:
-				sim(j, i)
-
-		those tokens in t that also occur in s:
-			have distance 0 and share the same id.
-		those tokens in t that do not occur in s:
-			get new ids. for score lookup, we map those ids to the query token pos.
-		*/
-
-		// w1: normalized bow for s
-		// w2: normalized bow for t
-
-		// size: size of vocabulary needed for this problem
-
-		// dist: word distances in vocabulary
-
-		//emd_relaxed(w1, w2, dist, size, cache);
-
-		/*for (int i = 0; i < len_s; i++) {
-			boilerplate[i] = i;
+			z[k++] = RefToken{
+				enc.to_embedding(slice.t(i)), static_cast<Index>(i), 1};
 		}
 
-		for (size_t i = 0; i < len_s; i++) {
-			std::sort(
-				boilerplate,
-				boilerplate + len_s,
-				[&] (const int a, const int b) {
-					return scores(i, a) < scores(i, b);
-				});
+		if (k < 1) {
+			m_score = 0;
+			return;
+		}
 
-		m_score = emd_relaxed();
+		std::sort(z.begin(), z.begin() + k, [] (const RefToken &a, const RefToken &b) {
+			return a.word_id < b.word_id;
+		});
 
-		m_aligner->waterman_smith_beyer(
-			scores,
-			[this] (size_t len) -> float {
-				return this->gap_cost(len);
-			},
-			len_s,
-			len_t,
-			m_smith_waterman_zero);*/
+		const int problem_size = m_scratch.init_for_k(k);
+
+		m_scratch.compute_dist(problem_size, [&slice] (int i, int j) -> float {
+			return slice.similarity(i, j);
+		});
+
+		m_score = 1.0f - emd_relaxed<float>(
+			m_scratch.w2.data(), // t
+			m_scratch.w1.data(), // s
+			m_scratch.dist.data(),
+			problem_size,
+			m_scratch.match.data());
 	}
 
 	inline float score() const {
@@ -230,6 +356,13 @@ MatcherRef create_matcher(
 		return make_matcher(
 			p_query, p_document, p_metric, scores,
 			WatermanSmithBeyer<int16_t>(gap_cost, zero));
+
+	} else if (algorithm == "relaxed-wmd") {
+
+		return make_matcher(
+			p_query, p_document, p_metric, scores,
+			RelaxedWordMoversDistance<int16_t>());
+
 	} else {
 
 		std::ostringstream err;

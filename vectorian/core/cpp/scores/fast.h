@@ -8,7 +8,7 @@
 
 class TokenIdEncoder {
 public:
-	inline size_t to_embedding(const Token &p_token) const {
+	inline wvec_t to_embedding(const Token &p_token) const {
 		return p_token.id;
 	}
 };
@@ -20,7 +20,7 @@ public:
 	TokenIdPosEncoder(const size_t p_npos) : m_npos(p_npos) {
 	}
 
-	inline size_t to_embedding(const Token &p_token) const {
+	inline wvec_t to_embedding(const Token &p_token) const {
 		return p_token.id * m_npos + p_token.pos;
 	}
 };
@@ -32,7 +32,7 @@ public:
 	TokenIdTagEncoder(const size_t p_ntag) : m_ntag(p_ntag) {
 	}
 
-	inline size_t to_embedding(const Token &p_token) const {
+	inline wvec_t to_embedding(const Token &p_token) const {
 		return p_token.id * m_ntag + p_token.tag;
 	}
 };
@@ -47,6 +47,8 @@ private:
 	const EmbeddingEncoder m_encoder;
 
 public:
+	typedef EmbeddingEncoder Encoder;
+
 	inline FastSlice(
 		const FastMetricRef &metric,
 		const Token * const s_tokens,

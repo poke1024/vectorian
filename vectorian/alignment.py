@@ -85,3 +85,10 @@ class WatermanSmithBeyer:
 			'gap': self._gap.costs(session.max_sentence_len),
 			'zero': self._zero
 		}
+
+
+class RelaxedWordMoversDistance:
+	def to_args(self, session):
+		return {
+			'algorithm': 'relaxed-wmd'
+		}

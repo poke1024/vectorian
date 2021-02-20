@@ -89,12 +89,28 @@ public:
 		m_slice(slice), m_len_s(slice.s_len()), m_len_t(len_t) {
 	}
 
+	inline const Token &s(int i) const {
+		return m_slice.s(m_len_s - 1 - i);
+	}
+
+	inline const Token &t(int i) const {
+		return m_slice.t(m_len_t - 1 - i);
+	}
+
 	inline int s_len() const {
 	    return m_len_s;
 	}
 
+	inline float similarity(int u, int v) const {
+		return m_slice.similarity(m_len_s - 1 - u, m_len_t - 1 - v);
+	}
+
 	inline float score(int u, int v) const {
 		return m_slice.score(m_len_s - 1 - u, m_len_t - 1 - v);
+	}
+
+	inline typename Slice::Encoder encoder() const {
+		return m_slice.encoder();
 	}
 };
 

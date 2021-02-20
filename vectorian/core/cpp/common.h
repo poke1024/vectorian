@@ -30,6 +30,7 @@ static_assert(
 	"Vectorian requires Eigen >= 3.3.90"); // this is a dev version as of 2021-02-15
 
 typedef int32_t token_t;
+typedef int32_t wvec_t;
 
 #pragma pack(push, 1)
 struct Location {
