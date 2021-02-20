@@ -145,35 +145,34 @@ public:
 			return;
 		}
 
-		const int pos_filter = this->m_query->ignore_determiners() ?
-		    this->m_document->vocabulary()->det_pos() : -1;
+		const auto &token_filter = this->m_query->token_filter();
 
-		const auto &sentences = this->m_document->sentences();
-		const size_t n_sentences = sentences.size();
+		const auto &slices = this->m_document->sentences();
+		const size_t n_slices = slices.size();
 		//const size_t max_len_s = m_document->max_len_s();
 
 		size_t token_at = 0;
 
-		for (size_t sentence_id = 0;
-			sentence_id < n_sentences && !this->m_query->aborted();
-			sentence_id++) {
+		for (size_t slice_id = 0;
+			slice_id < n_slices && !this->m_query->aborted();
+			slice_id++) {
 
-			const Sentence &sentence = sentences[sentence_id];
-			const int len_s = sentence.n_tokens;
+			const auto &slice = slices[slice_id];
+			const int len_s = slice.n_tokens;
 
 			if (len_s < 1) {
 				continue;
 			}
 
-			MatchRef best_sentence_match = this->m_no_match;
+			MatchRef best_slice_match = this->m_no_match;
 
 			for (const auto &scores : good_scores) {
 
 				const auto slice = scores.template create_slice<EmbeddingEncoder>(
-				    token_at, len_s, pos_filter, EmbeddingEncoder());
+				    token_at, len_s, token_filter, EmbeddingEncoder());
 
 				MatchRef m = this->optimal_match(
-					sentence_id,
+					slice_id,
 					slice,
 					scores.variant(),
 					p_matches->worst_score(),
@@ -181,7 +180,7 @@ public:
 
 				if (Bidirectional) {
 					MatchRef m_reverse = this->optimal_match(
-						sentence_id,
+						slice_id,
 						ReversedSlice(
                             slice, this->m_query->len()),
 						scores.variant(),
@@ -193,17 +192,17 @@ public:
 					}
 				}
 
-				if (m->score() > best_sentence_match->score()) {
-					best_sentence_match = m;
+				if (m->score() > best_slice_match->score()) {
+					best_slice_match = m;
 				}
 			}
 
-			if (best_sentence_match->score() > this->m_no_match->score()) {
+			if (best_slice_match->score() > this->m_no_match->score()) {
 
-				best_sentence_match->compute_scores(
-					m_scores.at(best_sentence_match->scores_variant_id()), len_s);
+				best_slice_match->compute_scores(
+					m_scores.at(best_slice_match->scores_variant_id()), len_s);
 
-				p_matches->add(best_sentence_match);
+				p_matches->add(best_slice_match);
 			}
 
 			token_at += len_s;

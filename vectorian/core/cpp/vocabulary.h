@@ -85,14 +85,12 @@ class Vocabulary {
 	StringLexicon<int8_t> m_pos;
 	StringLexicon<int8_t> m_tag;
 
-	int m_det_pos;
-
 public:
 	// basically a mapping from token -> int
 
 	std::recursive_mutex m_mutex;
 
-	Vocabulary() : m_det_pos(-1) {
+	Vocabulary() {
 	}
 
 	int add_embedding(EmbeddingRef p_embedding) {
@@ -112,18 +110,19 @@ public:
 
 	inline int unsafe_add_pos(const std::string &p_name) {
 		const int i = m_pos.add(p_name);
-	    if (p_name == "DET") {
-	        m_det_pos = i;
-	    }
 	    return i;
 	}
 
-	inline int det_pos() const {
-	    return m_det_pos;
+	inline int unsafe_pos_id(const std::string &p_name) const {
+		return m_pos.lookup(p_name);
 	}
 
 	inline int unsafe_add_tag(const std::string &p_name) {
 		return m_tag.add(p_name);
+	}
+
+	inline int unsafe_tag_id(const std::string &p_name) const {
+		return m_tag.lookup(p_name);
 	}
 
 	inline token_t unsafe_lookup(const std::string &p_token) const {

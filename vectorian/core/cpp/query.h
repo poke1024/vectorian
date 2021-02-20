@@ -6,6 +6,41 @@
 #include "metric/composite.h"
 #include "vocabulary.h"
 
+struct TokenFilter {
+	uint64_t pos;
+	uint64_t tag;
+
+	inline bool all() const {
+		return !(pos || tag);
+	}
+
+	inline bool operator()(const Token &t) const {
+		return !(((pos >> t.pos) & 1) || ((tag >> t.tag) & 1));
+	}
+};
+
+template<typename Lookup>
+uint64_t parse_filter_mask(
+	const py::kwargs &p_kwargs,
+	const char *p_filter_name,
+	Lookup lookup) {
+
+	uint64_t filter = 0;
+	if (p_kwargs && p_kwargs.contains(p_filter_name)) {
+		for (auto x : p_kwargs[p_filter_name].cast<py::list>()) {
+			const std::string s = x.cast<py::str>();
+			const int i = lookup(s);
+			if (i < 0) {
+				std::ostringstream err;
+				err << "illegal value " << s << " for " << p_filter_name;
+				throw std::runtime_error(err.str());
+			}
+			filter |= static_cast<uint64_t>(1) << i;
+		}
+	}
+	return filter;
+}
+
 class Query : public std::enable_shared_from_this<Query> {
 	py::dict m_alignment_algorithm;
 	std::vector<MetricRef> m_metrics;
@@ -17,7 +52,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	float m_total_score;
 	float m_submatch_weight;
 	bool m_bidirectional;
-	bool m_ignore_determiners;
+	TokenFilter m_token_filter;
 	bool m_aborted;
 	size_t m_max_matches;
 	float m_min_score;
@@ -42,11 +77,12 @@ public:
 			"metrics",
 			"pos_mismatch_penalty",
 			"pos_weights",
+			"pos_filter",
+			"tag_filter",
 			"similarity_falloff",
 			"similarity_threshold",
 			"submatch_weight",
 			"bidirectional",
-			"ignore_determiners",
 			"max_matches",
 			"min_score"
 		};
@@ -91,9 +127,14 @@ public:
             p_kwargs["bidirectional"].cast<bool>() :
             false;
 
-		m_ignore_determiners = (p_kwargs && p_kwargs.contains("ignore_determiners")) ?
-            p_kwargs["ignore_determiners"].cast<bool>() :
-            false;
+		m_token_filter.pos = parse_filter_mask(p_kwargs, "pos_filter",
+			[&p_vocab] (const std::string &s) -> int {
+				return p_vocab->unsafe_pos_id(s);
+			});
+		m_token_filter.tag = parse_filter_mask(p_kwargs, "tag_filter",
+			[&p_vocab] (const std::string &s) -> int {
+				return p_vocab->unsafe_tag_id(s);
+			});
 
 		m_max_matches = (p_kwargs && p_kwargs.contains("max_matches")) ?
 			p_kwargs["max_matches"].cast<size_t>() :
@@ -187,8 +228,8 @@ public:
 		return m_bidirectional;
 	}
 
-	inline bool ignore_determiners() const {
-	    return m_ignore_determiners;
+	inline const TokenFilter &token_filter() const {
+	    return m_token_filter;
 	}
 
 	ResultSetRef match(

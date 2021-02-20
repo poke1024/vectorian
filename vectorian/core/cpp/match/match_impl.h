@@ -5,11 +5,6 @@
 #include "document.h"
 #include "scores/fast.h"
 
-inline int Match::_pos_filter() const {
-    return query()->ignore_determiners() ?
-        document()->vocabulary()->det_pos() : -1;
-}
-
 template<typename Scores>
 void Match::compute_scores(const Scores &p_scores, int p_len_s) {
     const auto &match = m_digest.match;
@@ -23,7 +18,9 @@ void Match::compute_scores(const Scores &p_scores, int p_len_s) {
         }
 
         const auto slice = p_scores.template create_slice<TokenIdEncoder>(
-            token_at, p_len_s, _pos_filter(), TokenIdEncoder());
+            token_at, p_len_s,
+            query()->token_filter(),
+            TokenIdEncoder());
         m_scores.reserve(match.size());
 
         int i = 0;

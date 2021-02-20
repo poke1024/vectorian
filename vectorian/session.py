@@ -20,11 +20,18 @@ class Query:
 		self._doc = doc
 		self._options = options
 
+	def _filter(self, tokens, name, k):
+		f = self._options.get(name, None)
+		if f:
+			s = set(f)
+			return [t for t in tokens if t[k] not in s]
+		else:
+			return tokens
+
 	def to_core(self):
 		tokens = self._doc.to_json()["tokens"]
-
-		if self._options.get('ignore_determiners'):
-			tokens = [t for t in tokens if t["pos"] != "DET"]
+		tokens = self._filter(tokens, 'pos_filter', 'pos')
+		tokens = self._filter(tokens, 'tag_filter', 'tag')
 
 		token_table = TokenTable()
 		token_table.extend(self._doc.text, tokens)

@@ -40,8 +40,6 @@ private:
 	float m_score; // overall score
 	std::vector<TokenScore> m_scores;
 
-	int _pos_filter() const;
-
 public:
 	Match(
 		const MatcherRef &p_matcher,

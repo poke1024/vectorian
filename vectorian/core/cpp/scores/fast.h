@@ -127,20 +127,20 @@ public:
 	FastSlice<EmbeddingEncoder> create_slice(
 		const size_t p_s_offset,
 		const size_t p_s_len,
-		const int p_pos_filter,
+		const TokenFilter &p_filter,
 		const EmbeddingEncoder &p_encoder) const {
 
 		const Token *s_tokens = m_document->tokens()->data();
 		const Token *t_tokens = m_query->tokens()->data();
 
-		if (p_pos_filter > -1) {
+		if (!p_filter.all()) {
 		    const Token *s = s_tokens + p_s_offset;
 		    Token *new_s = m_filtered.data();
 	        PPK_ASSERT(p_s_len <= m_filtered.size());
 
 		    size_t new_s_len = 0;
 	        for (size_t i = 0; i < p_s_len; i++) {
-	            if (s[i].pos != p_pos_filter) {
+	            if (p_filter(s[i])) {
 	                new_s[new_s_len++] = s[i];
 	            }
 	        }

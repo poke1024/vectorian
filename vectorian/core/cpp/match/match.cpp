@@ -107,14 +107,14 @@ py::list Match::regions() const {
 	py::list regions;
 	const int32_t n = static_cast<int32_t>(match.size());
 
-	const int pos_filter = _pos_filter();
+	const TokenFilter &token_filter = query()->token_filter();
 	std::vector<int16_t> index_map;
-	if (pos_filter >= 0) {
+	if (!token_filter.all()) {
 		int16_t k = 0;
 		index_map.resize(sentence().n_tokens);
 		for (int32_t i = 0; i < sentence().n_tokens; i++) {
 			index_map[k] = i;
-			if (s_tokens.at(token_at + i).pos != pos_filter) {
+			if (token_filter(s_tokens.at(token_at + i))) {
 				k++;
 			}
 		}
