@@ -22,7 +22,7 @@ public:
 
 	virtual MetricRef create_metric(
 		const MetricDef &p_metric,
-		const TokenIdArray &p_vocabulary_to_embedding,
+		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const MetricModifiers &p_modifiers) = 0;

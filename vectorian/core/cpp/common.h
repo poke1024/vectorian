@@ -55,6 +55,7 @@ struct Token {
 #pragma pack(pop)
 
 typedef Eigen::Array<token_t, Eigen::Dynamic, 1> TokenIdArray;
+typedef Eigen::Map<Eigen::Array<token_t, Eigen::Dynamic, 1>> MappedTokenIdArray;
 
 typedef std::shared_ptr<std::vector<Token>> TokenVectorRef;
 

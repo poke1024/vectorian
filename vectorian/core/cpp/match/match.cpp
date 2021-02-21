@@ -155,7 +155,7 @@ py::list Match::regions() const {
 			scores[i],
 			s_text.substr(s.idx, s.len),
 			t_text.substr(t.idx, t.len),
-			document()->vocabulary(),
+			query()->vocabulary(),
 			TokenRef{s_tokens_ref, token_at + match_at_i},
 			TokenRef{t_tokens_ref, i},
 			metric()->origin(s.id, i)

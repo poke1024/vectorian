@@ -47,7 +47,7 @@ class MatchedRegion : public Region {
 	const TokenScore m_score; // score between s and t
 	const std::string m_t;
 
-	const VocabularyRef m_vocab;
+	const QueryVocabularyRef m_vocab;
 	const TokenRef m_s_token;
 	const TokenRef m_t_token;
 
@@ -58,7 +58,7 @@ public:
 		const TokenScore &p_score,
 		std::string &&s,
 		std::string &&t,
-		const VocabularyRef &p_vocab,
+		const QueryVocabularyRef &p_vocab,
 		const TokenRef &p_s_token,
 		const TokenRef &p_t_token,
 		const std::string &p_metric) :

@@ -15,6 +15,7 @@ vectorian.compile_for_debugging()
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
+from vectorian.alignment import WordMoversDistance
 
 embedding = FastText("en")
 
@@ -25,5 +26,8 @@ session = Session(
     [doc],
     [embedding])
 
-query = nlp("literal")
-r = session.find(query, n=3)
+#query = nlp("literal")
+#r = session.find(query, n=3)
+
+query = nlp("large")
+r = session.find(query, n=5, alignment=WordMoversDistance(relaxed=True))

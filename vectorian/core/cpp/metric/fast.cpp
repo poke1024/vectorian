@@ -238,7 +238,7 @@ class RelaxedWordMoversDistance {
 		const int len_s, const int len_t, const int vocabulary_size,
 		std::ostream &os) {
 
-		VocabularyRef vocab = p_query->vocabulary();
+		const QueryVocabularyRef vocab = p_query->vocabulary();
 
 		os << "s: ";
 		for (int i = 0; i < len_s; i++) {

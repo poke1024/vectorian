@@ -72,7 +72,7 @@ public:
 
 	virtual MetricRef create_metric(
 		const MetricDef &p_metric,
-		const TokenIdArray &p_vocabulary_to_embedding,
+		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const MetricModifiers &p_modifiers) {
@@ -110,7 +110,7 @@ public:
 		}
 	}*/
 
-	MatrixXf similarity_matrix(
+	/*MatrixXf similarity_matrix(
 		const std::string &p_measure,
 		TokenIdArray p_s_embedding_ids,
 		TokenIdArray p_t_embedding_ids) const {
@@ -126,7 +126,7 @@ public:
 			m_embeddings, p_s_embedding_ids, p_t_embedding_ids, m);
 
 		return m;
-	}
+	}*/
 
 	token_t lookup(const std::string &p_token) const {
 		const auto i = m_tokens.find(p_token);
@@ -151,7 +151,7 @@ public:
 
 private:
 	void build_similarity_matrix(
-		const TokenIdArray &p_vocabulary_to_embedding,
+		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const EmbeddingSimilarityRef &p_embedding_similarity,
@@ -175,9 +175,18 @@ private:
 		for (size_t i = 0; i < p_needle.size(); i++) {
 			const token_t t = needle_vocabulary_token_ids[i];
 			if (t >= 0) {
-				PPK_ASSERT(t < p_vocabulary_to_embedding.rows());
-				needle_embedding_token_ids[i] =
-					p_vocabulary_to_embedding[t]; // map to Embedding token ids
+				token_t mapped = -1;
+				token_t r = t;
+				for (const auto &x : p_vocabulary_to_embedding) {
+					if (r < x.rows()) {
+						mapped = x[r];
+						break;
+					} else {
+						r -= x.rows();
+					}
+				}
+				PPK_ASSERT(mapped >= 0);
+				needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
 			} else {
 				// that word is not in our Vocabulary, it might be in the Embedding though.
 				const auto word = p_needle_text.substr(p_needle.at(i).idx, p_needle.at(i).len);
@@ -189,11 +198,24 @@ private:
 
 		py::gil_scoped_release release;
 
-		p_embedding_similarity->build_matrix(
-			m_embeddings,
-			p_vocabulary_to_embedding,
-			needle_embedding_token_ids,
-			r_matrix);
+		size_t vocab_size = 0;
+		for (const auto &x : p_vocabulary_to_embedding) {
+			vocab_size += x.rows();
+		}
+		//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
+		r_matrix.resize(vocab_size, needle_embedding_token_ids.rows());
+
+		size_t offset = 0;
+		for (const auto &x : p_vocabulary_to_embedding) {
+			p_embedding_similarity->fill_matrix(
+				m_embeddings,
+				x,
+				needle_embedding_token_ids,
+				0,
+				offset,
+				r_matrix);
+			offset += x.rows();
+		}
 
 		for (size_t j = 0; j < p_needle.size(); j++) { // for each token in needle
 

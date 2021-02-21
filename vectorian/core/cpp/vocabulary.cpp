@@ -1,10 +1,9 @@
 #include "vocabulary.h"
 #include "utils.h"
 
-
-TokenVectorRef unpack_tokens(
+template<typename VocabularyRef>
+TokenVectorRef _unpack_tokens(
 	VocabularyRef p_vocab,
-	VocabularyMode p_mode,
 	const std::string p_text,
 	const std::shared_ptr<arrow::Table> &p_table) {
 
@@ -54,16 +53,14 @@ TokenVectorRef unpack_tokens(
     {
     	py::gil_scoped_release release;
 
-    	std::lock_guard<std::recursive_mutex> lock(p_vocab->m_mutex);
+    	//std::lock_guard<std::recursive_mutex> lock(p_vocab->m_mutex);
 
         for (size_t i = 0; i < n; i++) {
             Token t;
             const std::string &token_text = token_texts[i];
 
             // std::cout << "token: " << token_text << " " << int(len[i]) << std::endl;
-            t.id = (p_mode == MODIFY_VOCABULARY) ?
-                p_vocab->unsafe_add(token_text) :
-                p_vocab->unsafe_lookup(token_text);
+            t.id = p_vocab->add(token_text);
 
             t.idx = idx[i];
             t.len = len[i];
@@ -73,13 +70,27 @@ TokenVectorRef unpack_tokens(
         }
 
         iterate_strings(p_table, "pos", [&tokens, p_vocab] (size_t i, const std::string &s) {
-            tokens.at(i).pos = p_vocab->unsafe_add_pos(s);
+            tokens.at(i).pos = p_vocab->add_pos(s);
         });
 
         iterate_strings(p_table, "tag", [&tokens, p_vocab] (size_t i, const std::string &s) {
-            tokens.at(i).tag = p_vocab->unsafe_add_tag(s);
+            tokens.at(i).tag = p_vocab->add_tag(s);
         });
 	}
 
 	return tokens_ref;
+}
+
+TokenVectorRef unpack_tokens(
+	const VocabularyRef &p_vocab,
+	const std::string p_text,
+	const std::shared_ptr<arrow::Table> &p_table) {
+	return _unpack_tokens(p_vocab, p_text, p_table);
+}
+
+TokenVectorRef unpack_tokens(
+	const QueryVocabularyRef &p_vocab,
+	const std::string p_text,
+	const std::shared_ptr<arrow::Table> &p_table) {
+	return _unpack_tokens(p_vocab, p_text, p_table);
 }

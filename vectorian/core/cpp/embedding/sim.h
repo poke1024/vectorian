@@ -10,10 +10,12 @@ public:
 	virtual ~EmbeddingSimilarity() {
 	}
 
-	virtual void build_matrix(
+	virtual void fill_matrix(
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
+		const size_t i0,
+		const size_t j0,
 		MatrixXf &r_matrix) const = 0;
 };
 
@@ -43,18 +45,23 @@ public:
 		const Distance p_distance = Distance()) : m_distance(p_distance) {
 	}
 
-	virtual void build_matrix(
+	virtual void fill_matrix(
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
+		const size_t i0,
+		const size_t j0,
 		MatrixXf &r_matrix) const {
 
 		const size_t n = p_a.rows();
 		const size_t m = p_b.rows();
-		r_matrix.resize(n, m);
+
+		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.rows()));
+		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.cols()));
 
 		for (size_t i = 0; i < n; i++) { // e.g. for each token in Vocabulary
 			const token_t s = p_a[i];
+			auto row = r_matrix.row(i + i0);
 
 			if (s >= 0) {
 				for (size_t j = 0; j < m; j++) { // e.g. for each token in needle
@@ -70,12 +77,12 @@ public:
 						score = 0.0f;
 					}
 
-					r_matrix(i, j) = score;
+					row(j + j0) = score;
 				}
 
 			} else { // token in Vocabulary, but not in Embedding
 
-				r_matrix.row(i).setZero();
+				row.setZero();
 			}
 		}
 	}
@@ -105,10 +112,12 @@ public:
 		const py::object p_callback) : m_callback(p_callback) {
 	}
 
-	virtual void build_matrix(
+	virtual void fill_matrix(
 		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
+		const size_t i0,
+		const size_t j0,
 		MatrixXf &r_matrix) const {
 
 		py::gil_scoped_acquire acquire;
@@ -133,24 +142,29 @@ public:
 
 		const size_t n = p_a.rows();
 		const size_t m = p_b.rows();
-		r_matrix.resize(n, m);
-		r_matrix.setZero();
+
+		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.rows()));
+		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.cols()));
 
 		size_t u = 0;
 		for (size_t i = 0; i < n; i++) {
-
+			auto row = r_matrix.row(i + i0);
 			const token_t s = p_a[i];
+
 			if (s >= 0) {
 				size_t v = 0;
 				for (size_t j = 0; j < m; j++) {
-
 					const token_t t = p_b[j];
 					if (t >= 0) {
-						r_matrix(i, j) = r_output(u, v++);
+						row(j + j0) = r_output(u, v++);
+					} else {
+						row(j + j0) = 0.0f;
 					}
 				}
 
 				u++;
+			} else {
+				row.setZero();
 			}
 		}
 	}

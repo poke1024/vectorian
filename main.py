@@ -14,13 +14,6 @@ import json
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    from vectorian.embeddings import Glove
-    import sys
-    Glove()
-    sys.exit(0)
-
-
-    print(core)
 
     embedding = FastText("en")
 

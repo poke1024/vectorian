@@ -6,12 +6,7 @@
 #include "metric/metric.h"
 #include "metric/composite.h"
 
-enum VocabularyMode {
-	MODIFY_VOCABULARY,
-	DO_NOT_MODIFY_VOCABULARY
-};
-
-template<typename T>
+/*template<typename T>
 class StringLexicon {
 	std::unordered_map<std::string, T> m_to_int;
 	std::vector<std::string> m_to_str;
@@ -45,10 +40,104 @@ public:
 	inline size_t size() const {
 		return m_to_int.size();
 	}
+};*/
+
+template<typename T>
+class LexiconBase {
+public:
+	inline constexpr T to_id(const std::string &p_s) const {
+		return -1;
+	}
+
+	inline const std::string &to_str(T p_id) const {
+		std::ostringstream err;
+		err << "illegal call to LexiconBase::to_str() with id " << p_id;
+		throw std::runtime_error(err.str());
+	}
+
+	inline constexpr size_t size() const {
+		return 0;
+	}
 };
 
+template<typename T, typename Base>
+class LexiconImpl {
+	const Base m_base;
+	const std::string m_unknown;
+	std::unordered_map<std::string, T> m_to_int;
+	std::vector<std::string> m_to_str;
+
+public:
+	LexiconImpl(const Base p_base) : m_base(p_base), m_unknown("<unk>") {
+	}
+
+	inline T add(const std::string &p_s) {
+		const T i = m_base.to_id(p_s);
+		if (i >= 0) {
+			return i;
+		}
+		const auto r = m_to_int.insert({
+			p_s, m_to_str.size() + m_base.size()});
+		if (r.second) {
+			m_to_str.push_back(p_s);
+		}
+		return r.first->second;
+	}
+
+	inline T to_id(const std::string &p_s) const {
+		const auto i = m_to_int.find(p_s);
+		if (i != m_to_int.end()) {
+			return i->second;
+		} else {
+			return m_base.to_id(p_s);
+		}
+	}
+
+	inline const std::string &to_str(T p_id) const {
+		if (p_id < 0) {
+			return m_unknown;
+		} if (static_cast<size_t>(p_id) < m_base.size()) {
+			return m_base.to_str(p_id);
+		} else {
+			return m_to_str.at(p_id - m_base.size());
+		}
+	}
+
+	inline void reserve(const size_t p_size) {
+		m_to_str.reserve(std::max(
+			ssize_t(0),
+			ssize_t(p_size) - ssize_t(m_base.size())));
+	}
+
+	inline size_t size() const {
+		return m_base.size() + m_to_int.size();
+	}
+};
+
+template<typename T>
+class Lexicon : public LexiconImpl<T, LexiconBase<T>> {
+public:
+	Lexicon() : LexiconImpl<T, LexiconBase<T>>(LexiconBase<T>()) {
+	}
+};
+
+template<typename T, typename X>
+class IncrementalLexicon : public LexiconImpl<T, const LexiconImpl<T, X>&> {
+public:
+	IncrementalLexicon(const LexiconImpl<T, X> &p_lexicon) :
+		LexiconImpl<T, const LexiconImpl<T, X>&>(p_lexicon) {
+	}
+};
+
+class QueryVocabulary;
+
 class Vocabulary {
-	StringLexicon<token_t> m_tokens;
+protected:
+	friend class QueryVocabulary;
+
+	Lexicon<token_t> m_tokens;
+	Lexicon<int8_t> m_pos;
+	Lexicon<int8_t> m_tag;
 
 	struct Embedding {
 		EmbeddingRef embedding;
@@ -60,10 +149,8 @@ class Vocabulary {
 		token_t token;
 	};
 
-	std::vector<Embedding> m_embeddings;
 	std::unordered_map<std::string, size_t> m_embeddings_by_name;
-	StringLexicon<int8_t> m_pos;
-	StringLexicon<int8_t> m_tag;
+	std::vector<Embedding> m_embeddings;
 
 	/*void init_with_embedding_tokens() {
 		PPK_ASSERT(m_tokens.size() == 0);
@@ -162,16 +249,15 @@ public:
 		return next_id;
 	}
 
-	inline int unsafe_add_pos(const std::string &p_name) {
-		const int i = m_pos.add(p_name);
-	    return i;
+	inline int add_pos(const std::string &p_name) {
+		return m_pos.add(p_name);
 	}
 
 	inline int unsafe_pos_id(const std::string &p_name) const {
 		return m_pos.to_id(p_name);
 	}
 
-	inline int unsafe_add_tag(const std::string &p_name) {
+	inline int add_tag(const std::string &p_name) {
 		return m_tag.add(p_name);
 	}
 
@@ -179,11 +265,11 @@ public:
 		return m_tag.to_id(p_name);
 	}
 
-	inline token_t unsafe_lookup(const std::string &p_token) const {
+	inline token_t token_to_id(const std::string &p_token) const {
 		return m_tokens.to_id(p_token);
 	}
 
-	inline token_t unsafe_add(const std::string &p_token) {
+	inline token_t add(const std::string &p_token) {
 		const size_t old_size = m_tokens.size();
 		/*if (old_size == 0) {
 			init_with_embedding_tokens();
@@ -221,14 +307,78 @@ public:
 		}
 		return pos_weights;
 	}
+};
+
+typedef std::shared_ptr<Vocabulary> VocabularyRef;
+
+class QueryVocabulary {
+	const VocabularyRef m_vocab;
+
+	IncrementalLexicon<token_t, Lexicon<token_t>> m_tokens;
+	IncrementalLexicon<token_t, Lexicon<int8_t>> m_pos;
+	IncrementalLexicon<token_t, Lexicon<int8_t>> m_tag;
+
+	struct Embedding {
+		EmbeddingRef embedding;
+		std::vector<token_t> extra_map;
+	};
+
+	std::vector<Embedding> m_embeddings;
+
+public:
+	QueryVocabulary(const VocabularyRef &p_vocab) :
+		m_vocab(p_vocab),
+		m_tokens(m_vocab->m_tokens),
+		m_pos(m_vocab->m_pos),
+		m_tag(m_vocab->m_tag) {
+
+		for (const auto &e : m_vocab->m_embeddings) {
+			m_embeddings.push_back(Embedding{e.embedding});
+		}
+	}
+
+	inline size_t size() const {
+		return m_tokens.size();
+	}
+
+	inline const std::string &id_to_token(const token_t p_token) const {
+		return m_tokens.to_str(p_token);
+	}
+
+	inline token_t add(const std::string &p_token) {
+		const token_t t = m_tokens.to_id(p_token);
+		if (t >= 0) {
+			return t;
+		} else {
+			const token_t t_new = m_tokens.add(p_token);
+			for (Embedding &e : m_embeddings) {
+				e.extra_map.push_back(e.embedding->lookup(p_token));
+			}
+			return t_new;
+		}
+	}
+
+	inline int add_pos(const std::string &p_name) {
+		return m_pos.add(p_name);
+	}
+
+	inline int add_tag(const std::string &p_name) {
+		return m_tag.add(p_name);
+	}
+
+	inline const std::string &pos_str(int8_t p_pos_id) {
+		return m_pos.to_str(p_pos_id);
+	}
+
+	inline const std::string &tag_str(int8_t p_tag_id) {
+		return m_tag.to_str(p_tag_id);
+	}
 
 	MetricRef create_metric(
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const py::dict &p_metric_def,
 		const MetricModifiers &p_modifiers) {
-
-		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
 		const MetricDef metric_def{
 			p_metric_def["name"].cast<py::str>(),
@@ -257,18 +407,21 @@ public:
 
 		} else {
 
-			const auto it = m_embeddings_by_name.find(metric_def.embedding);
-			if (it == m_embeddings_by_name.end()) {
+			const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
+			if (it == m_vocab->m_embeddings_by_name.end()) {
 				std::ostringstream err;
-				err << "unknown embedding " << metric_def.embedding << " referenced in metric ";
+				err << "unknown embedding " << metric_def.embedding << " referenced in metric " << metric_def.name;
 				throw std::runtime_error(err.str());
 			}
-			const auto &embedding = m_embeddings[it->second];
 
-			const Eigen::Map<Eigen::Array<token_t, Eigen::Dynamic, 1>> vocabulary_ids(
-				const_cast<token_t*>(embedding.map.data()), embedding.map.size());
+			const auto &map0 = m_vocab->m_embeddings[it->second].map;
+			const auto &map1 = m_embeddings[it->second].extra_map;
+			const std::vector<MappedTokenIdArray> vocabulary_ids = {
+				MappedTokenIdArray(const_cast<token_t*>(map0.data()), map0.size()),
+				MappedTokenIdArray(const_cast<token_t*>(map1.data()), map1.size())
+			};
 
-			return embedding.embedding->create_metric(
+			return m_embeddings[it->second].embedding->create_metric(
 				metric_def,
 				vocabulary_ids,
 				p_needle_text,
@@ -278,11 +431,15 @@ public:
 	}
 };
 
-typedef std::shared_ptr<Vocabulary> VocabularyRef;
+typedef std::shared_ptr<QueryVocabulary> QueryVocabularyRef;
 
 TokenVectorRef unpack_tokens(
-	VocabularyRef p_vocab,
-	VocabularyMode p_mode,
+	const VocabularyRef &p_vocab,
+	const std::string p_text,
+	const std::shared_ptr<arrow::Table> &p_table);
+
+TokenVectorRef unpack_tokens(
+	const QueryVocabularyRef &p_vocab,
 	const std::string p_text,
 	const std::shared_ptr<arrow::Table> &p_table);
 

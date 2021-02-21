@@ -54,7 +54,7 @@ Document::Document(
 
 	const auto tokens_table = unwrap_table(p_tokens);
 	m_tokens = unpack_tokens(
-		p_vocab, MODIFY_VOCABULARY, m_text, tokens_table);
+		p_vocab, m_text, tokens_table);
 
 	add_dummy_token(*m_tokens.get());
 
