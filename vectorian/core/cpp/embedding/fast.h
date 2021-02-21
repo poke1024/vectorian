@@ -6,7 +6,8 @@
 #include "embedding/sim.h"
 
 class FastEmbedding : public Embedding {
-	std::unordered_map<std::string, long> m_tokens;
+	//std::vector<std::string> m_tokens;
+	std::unordered_map<std::string, token_t> m_tokens;
 	WordVectors m_embeddings;
 	std::map<std::string, EmbeddingSimilarityRef> m_similarity_measures;
 
@@ -16,6 +17,12 @@ public:
 		py::object p_table) : Embedding(p_name) {
 
 		const std::shared_ptr<arrow::Table> table = unwrap_table(p_table);
+
+		/*m_tokens.reserve(table->num_rows());
+		iterate_strings(table, "token", [this] (size_t i, const std::string &s) {
+			PPK_ASSERT(i == m_tokens.size());
+			m_tokens.push_back(s);
+		});*/
 
 		iterate_strings(table, "token", [this] (size_t i, const std::string &s) {
 			m_tokens[s] = static_cast<long>(i);
@@ -59,6 +66,10 @@ public:
 		//m_similarity_measures = create_similarity_measures(p_name, m_embeddings);
 	}
 
+	/*virtual const std::vector<std::string> &tokens() const {
+		return m_tokens;
+	}*/
+
 	virtual MetricRef create_metric(
 		const MetricDef &p_metric,
 		const TokenIdArray &p_vocabulary_to_embedding,
@@ -89,7 +100,7 @@ public:
 		return m;
 	}
 
-	float cosine_similarity(const std::string &p_a, const std::string &p_b) const {
+	/*float cosine_similarity(const std::string &p_a, const std::string &p_b) const {
 		const auto a = m_tokens.find(p_a);
 		const auto b = m_tokens.find(p_b);
 		if (a != m_tokens.end() && b != m_tokens.end()) {
@@ -97,7 +108,7 @@ public:
 		} else {
 			return 0.0f;
 		}
-	}
+	}*/
 
 	MatrixXf similarity_matrix(
 		const std::string &p_measure,

@@ -18,6 +18,8 @@ public:
 		return -1;
 	}
 
+	//virtual const std::vector<std::string> &tokens() const = 0;
+
 	virtual MetricRef create_metric(
 		const MetricDef &p_metric,
 		const TokenIdArray &p_vocabulary_to_embedding,
