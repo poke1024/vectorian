@@ -2,6 +2,7 @@ import vectorian.core as core
 
 from tqdm import tqdm
 from pathlib import Path
+from functools import lru_cache
 
 import numpy as np
 import pyarrow as pa
@@ -108,8 +109,11 @@ class Glove(Embedding):
 	def name(self):
 		return f"glove-{self._name}"
 
+	@lru_cache(1)
 	def to_core(self):
-		return core.FastEmbedding(self.name, self._table)
+		embedding = core.FastEmbedding(self.name, self._table)
+		self._table = None  # free up memory
+		return embedding
 
 
 class FastText(Embedding):
@@ -155,5 +159,8 @@ class FastText(Embedding):
 	def name(self):
 		return f"fasttext-{self._lang}"
 
+	@lru_cache(1)
 	def to_core(self):
-		return core.FastEmbedding(self.name, self._table)
+		embedding = core.FastEmbedding(self.name, self._table)
+		self._table = None  # free up memory
+		return embedding
