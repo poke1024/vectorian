@@ -27,7 +27,7 @@ protected:
 			return m_no_match;
 		}
 
-		m_aligner(scores, len_s, len_t);
+		m_aligner(m_query, scores, len_s, len_t);
 
 		float raw_score = m_aligner.score();
 

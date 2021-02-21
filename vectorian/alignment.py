@@ -87,8 +87,13 @@ class WatermanSmithBeyer:
 		}
 
 
-class RelaxedWordMoversDistance:
+class WordMoversDistance:
+	def __init__(self, relaxed=True):
+		self._relaxed = relaxed
+
 	def to_args(self, session):
+		if not self._relaxed:
+			raise NotImplementedError("full wmd is not yet implemented")
 		return {
-			'algorithm': 'relaxed-wmd'
+			'algorithm': 'rwmd'
 		}

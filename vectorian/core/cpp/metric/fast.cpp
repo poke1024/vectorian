@@ -3,6 +3,8 @@
 #include "query.h"
 #include "match/matcher_impl.h"
 
+#include <fstream>
+
 template<typename Index>
 class WatermanSmithBeyer {
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
@@ -32,7 +34,7 @@ public:
 
 	template<typename Slice>
 	inline void operator()(
-		const Slice &slice, int len_s, int len_t) const {
+		const QueryRef &, const Slice &slice, const int len_s, const int len_t) const {
 
 		m_aligner->waterman_smith_beyer(
 			[&slice] (int i, int j) -> float {
@@ -69,7 +71,7 @@ T emd_relaxed(const T *__restrict__ w1, const T *__restrict__ w2,
     boilerplate[i] = i;
   }
 
-  T cost = std::numeric_limit<T>::max();
+  T cost = std::numeric_limits<T>::max();
   for (size_t c = 0; c < 1; c++) { // do not flip problem.
     T acc = 0;
     for (size_t i = 0; i < size; i++) {
@@ -86,7 +88,7 @@ T emd_relaxed(const T *__restrict__ w1, const T *__restrict__ w2,
         T remaining = w1[i];
         for (size_t j = 0; j < size; j++) {
           int w = boilerplate[j];
-          if (remaining < w2[w]) {
+          if (remaining <= w2[w]) {
             acc += remaining * dist[i * size + w];
             break;
           } else {
@@ -113,16 +115,21 @@ class RelaxedWordMoversDistance {
 		int8_t j; // 0 for s, 1 for t
 	};
 
+	struct VocabPair {
+		Index vocab;
+		Index i;
+	};
+
 	struct Scratch {
 		size_t size;
 
 		std::vector<RefToken> tokens;
 		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
 		//Eigen::Array<float, Eigen::Dynamic, 1> w2;
-		std::vector<float> w1;
-		std::vector<float> w2;
-		std::vector<token_t> back_s;
-		std::vector<token_t> back_t;
+		std::vector<float> w1; // nbow for s
+		std::vector<float> w2; // nbow for t
+		std::vector<VocabPair> vocab_s;
+		std::vector<VocabPair> vocab_t;
 		std::vector<float> dist;
 		std::vector<int32_t> match;
 
@@ -131,8 +138,8 @@ class RelaxedWordMoversDistance {
 			tokens.resize(p_size);
 			w1.resize(p_size);
 			w2.resize(p_size);
-			back_s.resize(p_size);
-			back_t.resize(p_size);
+			vocab_s.reserve(p_size);
+			vocab_t.reserve(p_size);
 			dist.resize(p_size * p_size);
 			match.resize(p_size);
 		}
@@ -141,8 +148,6 @@ class RelaxedWordMoversDistance {
 			for (int i = 0; i < k; i++) {
 				w1[i] = 0.0f;
 				w2[i] = 0.0f;
-				back_s[i] = -1;
-				back_t[i] = -1;
 			}
 		}
 
@@ -154,17 +159,21 @@ class RelaxedWordMoversDistance {
 				w2.data()
 			};
 
-			Index wsum[2] = {
+			Index w_sum[2] = {
 				0, 0
 			};
 
-			token_t * const back[2] = {
-				back_s.data(),
-				back_t.data()
+			vocab_s.clear();
+			vocab_t.clear();
+
+			std::vector<VocabPair> * const vocab_x[2] = {
+				&vocab_s,
+				&vocab_t
 			};
 
 			int cur_word_id = tokens[0].word_id;
 			int vocab = 0;
+			int vocab_mask = 0;
 
 			for (int i = 0; i < k; i++) {
 				const auto &token = tokens[i];
@@ -173,56 +182,49 @@ class RelaxedWordMoversDistance {
 				if (new_word_id != cur_word_id) {
 					cur_word_id = new_word_id;
 					vocab += 1;
+					vocab_mask = 0;
 				}
 
 				const int j = token.j;
 				ws[j][vocab] += 1.0f;
-				wsum[j] += 1;
-				back[j][vocab] = token.i;
+				w_sum[j] += 1;
+
+				if ((vocab_mask & (1 << j)) == 0) {
+					vocab_x[j]->emplace_back(
+						VocabPair{
+							static_cast<Index>(vocab),
+							token.i});
+				}
+				vocab_mask |= 1 << j;
 			}
 
-			const float n1 = wsum[0];
-			const float n2 = wsum[1];
-			for (int i = 0; i < k; i++) {
-				w1[i] /= n1;
-				w2[i] /= n2;
+			for (int c = 0; c < 2; c++) {
+				float *w = ws[c];
+				const float s = w_sum[c];
+				for (const auto &u : *vocab_x[c]) {
+					w[u.vocab] /= s;
+				}
 			}
 
 			return vocab + 1;
 		}
 
 		template<typename Similarity>
-		inline void compute_dist(const int p_size, const Similarity &sim) {
+		inline void compute_dist(
+			const int len_s, const int len_t,
+			const int p_size, const Similarity &sim) {
+
 			for (int i = 0; i < p_size; i++) {
 				for (int j = 0; j < p_size; j++) {
-					if (i == j) {
-						dist[i * p_size + j] = 0.0f;
-						continue;
-					}
-
-					{
-						const int u = back_s[i];
-						if (u >= 0) {
-							const int v = back_t[j];
-							if (v >= 0) {
-								dist[i * p_size + j] = 1.0f - std::max(0.0f, sim(u, v));
-								continue;
-							}
-						}
-					}
-
-					{
-						const int u = back_s[j];
-						if (u >= 0) {
-							const int v = back_t[i];
-							if (v >= 0) {
-								dist[i * p_size + j] = 1.0f - std::max(0.0f, sim(u, v));
-								continue;
-							}
-						}
-					}
-
 					dist[i * p_size + j] = 1.0f;
+				}
+			}
+
+			for (const auto &u : vocab_s) {
+				for (const auto &v : vocab_t) {
+					const float d = 1.0f - sim(u.i, v.i);
+					dist[u.vocab * p_size + v.vocab] = d;
+					dist[v.vocab * p_size + u.vocab] = d;
 				}
 			}
 		}
@@ -230,12 +232,66 @@ class RelaxedWordMoversDistance {
 
 	Scratch m_scratch;
 
+	template<typename Slice>
+	inline void print_debug(
+		const QueryRef &p_query, const Slice &slice,
+		const int len_s, const int len_t, const int vocabulary_size,
+		std::ostream &os) {
+
+		VocabularyRef vocab = p_query->vocabulary();
+
+		os << "s: ";
+		for (int i = 0; i < len_s; i++) {
+			os << vocab->id_to_token(slice.s(i).id) << " [" << slice.s(i).id << "]" <<  " ";
+		}
+		os << "\n";
+
+		os << "t: ";
+		for (int i = 0; i < len_t; i++) {
+			os << vocab->id_to_token(slice.t(i).id) << " [" << slice.t(i).id << "]" <<  " ";
+		}
+		os << "\n";
+
+		os << "vocab s: ";
+		for (const auto &u : m_scratch.vocab_s) {
+			os << vocab->id_to_token(slice.s(u.i).id) << " [" << u.vocab << "]" << " ";
+		}
+		os << "\n";
+
+		os << "vocab t: ";
+		for (const auto &u : m_scratch.vocab_t) {
+			os << vocab->id_to_token(slice.t(u.i).id) << " [" << u.vocab << "]" << " ";
+		}
+		os << "\n";
+
+		os << "w1: ";
+		for (int i = 0; i < vocabulary_size; i++) {
+			os << m_scratch.w1[i] << " ";
+		}
+		os << "\n";
+
+		os << "w2: ";
+		for (int i = 0; i < vocabulary_size; i++) {
+			os << m_scratch.w2[i] << " ";
+		}
+		os << "\n";
+
+		os << "dist: \n";
+		for (int i = 0; i < vocabulary_size; i++) {
+			for (int j = 0; j < vocabulary_size; j++) {
+				os << m_scratch.dist[i * vocabulary_size + j] << " ";
+			}
+			os << "\n";
+		}
+
+		os << "\n";
+	}
+
 public:
 	RelaxedWordMoversDistance() {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
-		//m_cache.allocate(std::max(max_len_s, max_len_t));
 		m_scratch.resize(max_len_s + max_len_t);
 	}
 
@@ -245,7 +301,7 @@ public:
 
 	template<typename Slice>
 	inline void operator()(
-		const Slice &slice, int len_s, int len_t) {
+		const QueryRef &p_query, const Slice &slice, const int len_s, const int len_t) {
 
 		int k = 0;
 		std::vector<RefToken> &z = m_scratch.tokens;
@@ -269,17 +325,21 @@ public:
 			return a.word_id < b.word_id;
 		});
 
-		const int problem_size = m_scratch.init_for_k(k);
+		const int vocabulary_size = m_scratch.init_for_k(k);
 
-		m_scratch.compute_dist(problem_size, [&slice] (int i, int j) -> float {
+		m_scratch.compute_dist(len_s, len_t, vocabulary_size, [&slice] (int i, int j) -> float {
 			return slice.similarity(i, j);
 		});
+
+		std::ofstream outfile;
+		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
+		print_debug(p_query, slice, len_s, len_t, vocabulary_size, outfile);
 
 		m_score = 1.0f - emd_relaxed<float>(
 			m_scratch.w2.data(), // t
 			m_scratch.w1.data(), // s
 			m_scratch.dist.data(),
-			problem_size,
+			vocabulary_size,
 			m_scratch.match.data());
 	}
 
@@ -357,7 +417,7 @@ MatcherRef create_matcher(
 			p_query, p_document, p_metric, scores,
 			WatermanSmithBeyer<int16_t>(gap_cost, zero));
 
-	} else if (algorithm == "relaxed-wmd") {
+	} else if (algorithm == "rwmd") {
 
 		return make_matcher(
 			p_query, p_document, p_metric, scores,

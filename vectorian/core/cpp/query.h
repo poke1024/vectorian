@@ -42,6 +42,7 @@ uint64_t parse_filter_mask(
 }
 
 class Query : public std::enable_shared_from_this<Query> {
+	const VocabularyRef m_vocab;
 	py::dict m_alignment_algorithm;
 	std::vector<MetricRef> m_metrics;
 	const std::string m_text;
@@ -62,7 +63,11 @@ public:
 		VocabularyRef p_vocab,
 		const std::string &p_text,
 		py::handle p_tokens_table,
-		py::kwargs p_kwargs) : m_text(p_text), m_aborted(false) {
+		py::kwargs p_kwargs) :
+
+		m_vocab(p_vocab),
+		m_text(p_text),
+		m_aborted(false) {
 
 		const std::shared_ptr<arrow::Table> table(
 		    unwrap_table(p_tokens_table.ptr()));
@@ -190,6 +195,10 @@ public:
 					modifiers));
 			}
 		}
+	}
+
+	const VocabularyRef &vocabulary() const {
+		return m_vocab;
 	}
 
 	const std::string &text() const {

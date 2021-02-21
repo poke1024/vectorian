@@ -89,16 +89,17 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<FastEmbedding, Embedding, FastEmbeddingRef> fast_embedding(m, "FastEmbedding");
 	fast_embedding.def(py::init<const std::string &, py::object>());
-
-	fast_embedding.def("cosine_similarity", &FastEmbedding::cosine_similarity);
+	//fast_embedding.def("cosine_similarity", &FastEmbedding::cosine_similarity);
 	fast_embedding.def("similarity_matrix", &FastEmbedding::similarity_matrix);
 	//fast_embedding.def("load_percentiles", &FastEmbedding::load_percentiles);
-
 	fast_embedding.def_property_readonly("n_tokens", &FastEmbedding::n_tokens);
 	fast_embedding.def_property_readonly("measures", &FastEmbedding::measures);
 
 	py::class_<Vocabulary, VocabularyRef> vocabulary(m, "Vocabulary");
 	vocabulary.def(py::init());
+	vocabulary.def_property_readonly("size", &Vocabulary::size);
+	vocabulary.def("token_to_id", &Vocabulary::unsafe_lookup);
+	vocabulary.def("id_to_token", &Vocabulary::id_to_token);
 	vocabulary.def("add_embedding", &Vocabulary::add_embedding);
 
 	py::class_<Query, QueryRef> query(m, "Query");

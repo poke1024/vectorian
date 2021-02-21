@@ -4,6 +4,7 @@ import multiprocessing
 import multiprocessing.pool
 import logging
 import roman
+import time
 
 from cached_property import cached_property
 from functools import lru_cache
@@ -112,8 +113,9 @@ def result_set_to_json(items):
 
 
 class Result:
-	def __init__(self, result_set):
+	def __init__(self, result_set, duration):
 		self._matches = result_set.best_n(-1)
+		self._duration = duration
 
 	def __iter__(self):
 		return self._matches
@@ -127,6 +129,10 @@ class Result:
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])
+
+	@property
+	def duration(self):
+		return self._duration
 
 
 class Finder:
@@ -202,8 +208,12 @@ class Session:
 		options["alignment"] = alignment.to_args(self)
 		options["max_matches"] = n
 
+		start_time = time.time()
+
 		query = Query(self._vocab, doc, options)
-		return ret_class(self._finder(query, progress=progress))
+		r = self._finder(query, progress=progress)
+
+		return ret_class(r, duration=time.time() - start_time)
 
 
 class LabResult(Result):
