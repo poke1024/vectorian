@@ -197,6 +197,10 @@ public:
 		}
 	}
 
+	virtual ~Query() {
+		//std::cout << "destroying query at " << this << "\n";
+	}
+
 	const QueryVocabularyRef &vocabulary() const {
 		return m_vocab;
 	}

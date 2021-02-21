@@ -5,6 +5,7 @@
 #include "embedding/embedding.h"
 #include "metric/metric.h"
 #include "metric/composite.h"
+#include <iostream>
 
 /*template<typename T>
 class StringLexicon {
@@ -60,24 +61,33 @@ public:
 	}
 };
 
-template<typename T, typename Base>
+template<typename T>
+using LexiconBaseRef = std::shared_ptr<LexiconBase<T>>;
+
+template<typename T, typename BaseRef>
 class LexiconImpl {
-	const Base m_base;
+	const BaseRef m_base;
 	const std::string m_unknown;
 	std::unordered_map<std::string, T> m_to_int;
 	std::vector<std::string> m_to_str;
 
 public:
-	LexiconImpl(const Base p_base) : m_base(p_base), m_unknown("<unk>") {
+	LexiconImpl(const BaseRef p_base) : m_base(p_base), m_unknown("<unk>") {
+		//std::cout << "creating lexicon " << this << " base is at " << &m_base << "\n";
+		//std::cout << "base has " << m_base->size() << " items\n";
+	}
+
+	virtual ~LexiconImpl() {
+		//std::cout << "destroying lexicon " << this << "\n";
 	}
 
 	inline T add(const std::string &p_s) {
-		const T i = m_base.to_id(p_s);
+		const T i = m_base->to_id(p_s);
 		if (i >= 0) {
 			return i;
 		}
 		const auto r = m_to_int.insert({
-			p_s, m_to_str.size() + m_base.size()});
+			p_s, m_to_str.size() + m_base->size()});
 		if (r.second) {
 			m_to_str.push_back(p_s);
 		}
@@ -89,45 +99,63 @@ public:
 		if (i != m_to_int.end()) {
 			return i->second;
 		} else {
-			return m_base.to_id(p_s);
+			return m_base->to_id(p_s);
 		}
 	}
 
 	inline const std::string &to_str(T p_id) const {
 		if (p_id < 0) {
 			return m_unknown;
-		} if (static_cast<size_t>(p_id) < m_base.size()) {
-			return m_base.to_str(p_id);
+		} if (static_cast<size_t>(p_id) < m_base->size()) {
+			return m_base->to_str(p_id);
 		} else {
-			return m_to_str.at(p_id - m_base.size());
+			return m_to_str.at(p_id - m_base->size());
 		}
 	}
 
 	inline void reserve(const size_t p_size) {
 		m_to_str.reserve(std::max(
 			ssize_t(0),
-			ssize_t(p_size) - ssize_t(m_base.size())));
+			ssize_t(p_size) - ssize_t(m_base->size())));
 	}
 
 	inline size_t size() const {
-		return m_base.size() + m_to_int.size();
+		return m_base->size() + m_to_int.size();
 	}
 };
 
 template<typename T>
-class Lexicon : public LexiconImpl<T, LexiconBase<T>> {
+class Lexicon;
+
+template<typename T>
+using LexiconRef = std::shared_ptr<Lexicon<T>>;
+
+template<typename T>
+class IncrementalLexicon : public LexiconImpl<T, LexiconRef<T>> {
 public:
-	Lexicon() : LexiconImpl<T, LexiconBase<T>>(LexiconBase<T>()) {
+	IncrementalLexicon(const LexiconRef<T> &p_lexicon) :
+		LexiconImpl<T, LexiconRef<T>>(p_lexicon) {
 	}
 };
 
-template<typename T, typename X>
-class IncrementalLexicon : public LexiconImpl<T, const LexiconImpl<T, X>&> {
+template<typename T>
+using IncrementalLexiconRef = std::shared_ptr<IncrementalLexicon<T>>;
+
+template<typename T>
+class Lexicon : public
+	LexiconImpl<T, LexiconBaseRef<T>>,
+	std::enable_shared_from_this<Lexicon<T>> {
 public:
-	IncrementalLexicon(const LexiconImpl<T, X> &p_lexicon) :
-		LexiconImpl<T, const LexiconImpl<T, X>&>(p_lexicon) {
+	Lexicon() : LexiconImpl<T, LexiconBaseRef<T>>(
+		std::make_shared<LexiconBase<T>>()) {
 	}
 };
+
+template<typename T>
+IncrementalLexiconRef<T> make_incremental(const LexiconRef<T> &p_lexicon) {
+	return std::make_shared<IncrementalLexicon<T>>(p_lexicon);
+}
+
 
 class QueryVocabulary;
 
@@ -135,9 +163,9 @@ class Vocabulary {
 protected:
 	friend class QueryVocabulary;
 
-	Lexicon<token_t> m_tokens;
-	Lexicon<int8_t> m_pos;
-	Lexicon<int8_t> m_tag;
+	const LexiconRef<token_t> m_tokens;
+	const LexiconRef<int8_t> m_pos;
+	const LexiconRef<int8_t> m_tag;
 
 	struct Embedding {
 		EmbeddingRef embedding;
@@ -223,18 +251,27 @@ public:
 
 	std::recursive_mutex m_mutex;
 
-	Vocabulary() {
+	Vocabulary() :
+		m_tokens(std::make_shared<Lexicon<token_t>>()),
+		m_pos(std::make_shared<Lexicon<int8_t>>()),
+		m_tag(std::make_shared<Lexicon<int8_t>>()) {
+
+		//std::cout << "creating vocabulary at " << this << "\n";
+	}
+
+	virtual ~Vocabulary() {
+		//std::cout << "destroying vocabulary at " << this << "\n";
 	}
 
 	inline size_t size() const {
-		return m_tokens.size();
+		return m_tokens->size();
 	}
 
 	int add_embedding(EmbeddingRef p_embedding) {
 
 		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
-		if (m_tokens.size() > 0) {
+		if (m_tokens->size() > 0) {
 			throw std::runtime_error(
 				"cannot add embeddings after tokens were added.");
 		}
@@ -250,33 +287,33 @@ public:
 	}
 
 	inline int add_pos(const std::string &p_name) {
-		return m_pos.add(p_name);
+		return m_pos->add(p_name);
 	}
 
 	inline int unsafe_pos_id(const std::string &p_name) const {
-		return m_pos.to_id(p_name);
+		return m_pos->to_id(p_name);
 	}
 
 	inline int add_tag(const std::string &p_name) {
-		return m_tag.add(p_name);
+		return m_tag->add(p_name);
 	}
 
 	inline int unsafe_tag_id(const std::string &p_name) const {
-		return m_tag.to_id(p_name);
+		return m_tag->to_id(p_name);
 	}
 
 	inline token_t token_to_id(const std::string &p_token) const {
-		return m_tokens.to_id(p_token);
+		return m_tokens->to_id(p_token);
 	}
 
 	inline token_t add(const std::string &p_token) {
-		const size_t old_size = m_tokens.size();
+		const size_t old_size = m_tokens->size();
 		/*if (old_size == 0) {
 			init_with_embedding_tokens();
 		}*/
 
-		const token_t t = m_tokens.add(p_token);
-		if (m_tokens.size() > old_size) { // new token?
+		const token_t t = m_tokens->add(p_token);
+		if (m_tokens->size() > old_size) { // new token?
 			for (Embedding &e : m_embeddings) {
 				e.map.push_back(e.embedding->lookup(p_token));
 			}
@@ -286,21 +323,21 @@ public:
 	}
 
 	inline const std::string &id_to_token(token_t p_token) const {
-		return m_tokens.to_str(p_token);
+		return m_tokens->to_str(p_token);
 	}
 
 	inline const std::string &pos_str(int8_t p_pos_id) {
-		return m_pos.to_str(p_pos_id);
+		return m_pos->to_str(p_pos_id);
 	}
 
 	inline const std::string &tag_str(int8_t p_tag_id) {
-		return m_tag.to_str(p_tag_id);
+		return m_tag->to_str(p_tag_id);
 	}
 
 	POSWMap mapped_pos_weights(const std::map<std::string, float> &p_pos_weights) const {
 		POSWMap pos_weights;
 		for (auto const &x : p_pos_weights) {
-			const int i = m_tag.to_id(x.first);
+			const int i = m_tag->to_id(x.first);
 			if (i >= 0) {
 				pos_weights[i] = x.second;
 			}
@@ -314,9 +351,9 @@ typedef std::shared_ptr<Vocabulary> VocabularyRef;
 class QueryVocabulary {
 	const VocabularyRef m_vocab;
 
-	IncrementalLexicon<token_t, Lexicon<token_t>> m_tokens;
-	IncrementalLexicon<token_t, Lexicon<int8_t>> m_pos;
-	IncrementalLexicon<token_t, Lexicon<int8_t>> m_tag;
+	const IncrementalLexiconRef<token_t> m_tokens;
+	const IncrementalLexiconRef<int8_t> m_pos;
+	const IncrementalLexiconRef<int8_t> m_tag;
 
 	struct Embedding {
 		EmbeddingRef embedding;
@@ -328,29 +365,35 @@ class QueryVocabulary {
 public:
 	QueryVocabulary(const VocabularyRef &p_vocab) :
 		m_vocab(p_vocab),
-		m_tokens(m_vocab->m_tokens),
-		m_pos(m_vocab->m_pos),
-		m_tag(m_vocab->m_tag) {
+		m_tokens(make_incremental(m_vocab->m_tokens)),
+		m_pos(make_incremental(m_vocab->m_pos)),
+		m_tag(make_incremental(m_vocab->m_tag)) {
 
 		for (const auto &e : m_vocab->m_embeddings) {
 			m_embeddings.push_back(Embedding{e.embedding});
 		}
+
+		//std::cout << "creating query vocabulary at " << this << "\n";
+	}
+
+	virtual ~QueryVocabulary() {
+		//std::cout << "destroying query vocabulary at " << this << "\n";
 	}
 
 	inline size_t size() const {
-		return m_tokens.size();
+		return m_tokens->size();
 	}
 
 	inline const std::string &id_to_token(const token_t p_token) const {
-		return m_tokens.to_str(p_token);
+		return m_tokens->to_str(p_token);
 	}
 
 	inline token_t add(const std::string &p_token) {
-		const token_t t = m_tokens.to_id(p_token);
+		const token_t t = m_tokens->to_id(p_token);
 		if (t >= 0) {
 			return t;
 		} else {
-			const token_t t_new = m_tokens.add(p_token);
+			const token_t t_new = m_tokens->add(p_token);
 			for (Embedding &e : m_embeddings) {
 				e.extra_map.push_back(e.embedding->lookup(p_token));
 			}
@@ -359,19 +402,19 @@ public:
 	}
 
 	inline int add_pos(const std::string &p_name) {
-		return m_pos.add(p_name);
+		return m_pos->add(p_name);
 	}
 
 	inline int add_tag(const std::string &p_name) {
-		return m_tag.add(p_name);
+		return m_tag->add(p_name);
 	}
 
 	inline const std::string &pos_str(int8_t p_pos_id) {
-		return m_pos.to_str(p_pos_id);
+		return m_pos->to_str(p_pos_id);
 	}
 
 	inline const std::string &tag_str(int8_t p_tag_id) {
-		return m_tag.to_str(p_tag_id);
+		return m_tag->to_str(p_tag_id);
 	}
 
 	MetricRef create_metric(
