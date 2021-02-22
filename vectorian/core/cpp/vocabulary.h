@@ -334,12 +334,18 @@ public:
 		return m_tag->to_str(p_tag_id);
 	}
 
-	POSWMap mapped_pos_weights(const std::map<std::string, float> &p_pos_weights) const {
+	POSWMap mapped_pos_weights(
+		const std::map<std::string, float> &p_pos_weights) const {
+
 		POSWMap pos_weights;
 		for (auto const &x : p_pos_weights) {
 			const int i = m_tag->to_id(x.first);
 			if (i >= 0) {
 				pos_weights[i] = x.second;
+			} else {
+				std::ostringstream err;
+				err << "unknown Penn Treebank tag " << x.first;
+				throw std::runtime_error(err.str());
 			}
 		}
 		return pos_weights;
