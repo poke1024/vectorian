@@ -88,12 +88,64 @@ class WatermanSmithBeyer:
 
 
 class WordMoversDistance:
-	def __init__(self, relaxed=True):
-		self._relaxed = relaxed
+	_variants = {
+		'kusner': {
+			'multiplicity': 'n:n',
+			'repr': 'nbow',
+			'symmetric': True
+		},
+		'relaxed-kusner': {
+			'multiplicity': '1:1',
+			'repr': 'nbow',
+			'symmetric': True
+		},
+		'relaxed-vectorian': {
+			'multiplicity': '1:1',
+			'repr': 'bow',
+			'symmetric': False,
+		},
+		'relaxed-jablonsky': {
+			'multiplicity': '1:n',
+			'repr': 'nbow',
+			'symmetric': True,
+		}
+	}
+
+	def __init__(self, variant=None, options=None):
+		if options is None:
+			if variant is None:
+				variant = 'relaxed-vectorian'
+			self._options = WordMoversDistance._variants.get(variant)
+			if self._options is None:
+				raise ValueError(f"unsupported WMD variant {variant}")
+		else:
+			assert variant is None
+			self._options = options
 
 	def to_args(self, session):
-		if not self._relaxed:
+		multiplicity = self._options['multiplicity']
+		representation = self._options['repr']
+		symmetric = self._options['symmetric']
+
+		if multiplicity == "1:1":
+			one_target = True
+		elif multiplicity == "1:n":
+			one_target = False
+		elif multiplicity == "n:n":
 			raise NotImplementedError("full wmd is not yet implemented")
+		else:
+			raise ValueError(f"unsupported multiplicity {multiplicity}")
+
+		if representation == "bow":
+			normalize_bow = False
+		elif representation == "nbow":
+			normalize_bow = True
+		else:
+			raise ValueError("repr must be either 'bow' or 'nbow'")
+
 		return {
-			'algorithm': 'rwmd'
+			'algorithm': 'rwmd',
+			'one_target': one_target,
+			'normalize_bow': normalize_bow,
+			'symmetric': symmetric
 		}

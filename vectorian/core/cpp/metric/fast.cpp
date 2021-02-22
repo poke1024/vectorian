@@ -61,51 +61,12 @@ public:
 	}
 };
 
-// from: https://github.com/src-d/wmd-relax/blob/master/emd_relaxed.h
-template <typename T>
-T emd_relaxed(const T *__restrict__ w1, const T *__restrict__ w2,
-              const T *__restrict__ dist, uint32_t size,
-              int32_t *boilerplate) {
-
-  for (size_t i = 0; i < size; i++) {
-    boilerplate[i] = i;
-  }
-
-  T cost = std::numeric_limits<T>::max();
-  for (size_t c = 0; c < 1; c++) { // do not flip problem.
-    T acc = 0;
-    for (size_t i = 0; i < size; i++) {
-      if (w1[i] != 0) {
-        // FIXME use a heap.
-
-        std::sort(
-          boilerplate,
-          boilerplate + size,
-          [&](const int a, const int b) {
-            return dist[i * size + a] < dist[i * size + b];
-          });
-
-        T remaining = w1[i];
-        for (size_t j = 0; j < size; j++) {
-          int w = boilerplate[j];
-          if (remaining <= w2[w]) {
-            acc += remaining * dist[i * size + w];
-            break;
-          } else {
-            remaining -= w2[w];
-            acc += w2[w] * dist[i * size + w];
-          }
-        }
-      }
-    }
-    cost = std::min(cost, acc);
-    std::swap(w1, w2);
-  }
-  return cost;
-}
-
 template<typename Index>
 class RelaxedWordMoversDistance {
+	const bool m_normalize_bow;
+	const bool m_symmetric;
+	const bool m_one_target;
+
 	float m_score;
 	std::vector<Index> m_match;
 
@@ -120,18 +81,37 @@ class RelaxedWordMoversDistance {
 		Index i;
 	};
 
+	struct DistanceRef {
+		Index i;
+		float d;
+
+		inline bool operator<(const DistanceRef &other) const {
+			// inverted, so that heap yields smallest elements.
+			return d > other.d;
+		}
+	};
+
 	struct Scratch {
 		size_t size;
 
 		std::vector<RefToken> tokens;
 		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
 		//Eigen::Array<float, Eigen::Dynamic, 1> w2;
-		std::vector<float> w1; // nbow for s
-		std::vector<float> w2; // nbow for t
+		std::vector<float> w1; // (n)bow for s
+		std::vector<float> w2; // (n)bow for t
 		std::vector<VocabPair> vocab_s;
 		std::vector<VocabPair> vocab_t;
+
+		// Eigen::Array<Index, 2, Eigen::Dynamic> pos_to_vocab;
+		std::vector<Index> pos_to_vocab_s;
+		std::vector<Index> pos_to_vocab_t;
+
+		std::vector<Index> vocab_to_pos_s; // not correct, since 1:n
+		std::vector<Index> vocab_to_pos_t; // not correct, since 1:n
+
 		std::vector<float> dist;
-		std::vector<int32_t> match;
+		std::vector<DistanceRef> candidates;
+		std::vector<Index> result;
 
 		void resize(const size_t p_size) {
 			size = p_size;
@@ -140,8 +120,15 @@ class RelaxedWordMoversDistance {
 			w2.resize(p_size);
 			vocab_s.reserve(p_size);
 			vocab_t.reserve(p_size);
+
+			pos_to_vocab_s.resize(p_size);
+			pos_to_vocab_t.resize(p_size);
+			vocab_to_pos_s.resize(p_size);
+			vocab_to_pos_t.resize(p_size);
+
 			dist.resize(p_size * p_size);
-			match.resize(p_size);
+			candidates.reserve(p_size);
+			result.resize(p_size);
 		}
 
 		inline void reset(const int k) {
@@ -151,7 +138,7 @@ class RelaxedWordMoversDistance {
 			}
 		}
 
-		inline int init_for_k(const int k) {
+		inline int init_for_k(const int k, const bool normalize_bow) {
 			reset(k);
 
 			float * const ws[2] = {
@@ -169,6 +156,15 @@ class RelaxedWordMoversDistance {
 			std::vector<VocabPair> * const vocab_x[2] = {
 				&vocab_s,
 				&vocab_t
+			};
+
+			std::vector<Index> * const pos_to_vocab_x[2] = {
+				&pos_to_vocab_s,
+				&pos_to_vocab_t
+			};
+			std::vector<Index> * const vocab_to_pos_x[2] = {
+				&vocab_to_pos_s,
+				&vocab_to_pos_t
 			};
 
 			int cur_word_id = tokens[0].word_id;
@@ -195,14 +191,20 @@ class RelaxedWordMoversDistance {
 							static_cast<Index>(vocab),
 							token.i});
 				}
+
+				(*pos_to_vocab_x[j])[token.i] = vocab;
+				(*vocab_to_pos_x[j])[vocab] = token.i;
+
 				vocab_mask |= 1 << j;
 			}
 
-			for (int c = 0; c < 2; c++) {
-				float *w = ws[c];
-				const float s = w_sum[c];
-				for (const auto &u : *vocab_x[c]) {
-					w[u.vocab] /= s;
+			if (normalize_bow) {
+				for (int c = 0; c < 2; c++) {
+					float *w = ws[c];
+					const float s = w_sum[c];
+					for (const auto &u : *vocab_x[c]) {
+						w[u.vocab] /= s;
+					}
 				}
 			}
 
@@ -214,11 +216,18 @@ class RelaxedWordMoversDistance {
 			const int len_s, const int len_t,
 			const int p_size, const Similarity &sim) {
 
+#if 0
+			// since wmd_relaxed will only access dist entries
+			// that are sourced from vocab_s and vocab_t, we do
+			// not need to initialize the full matrix, which saves
+			// us from quadratic time here.
+
 			for (int i = 0; i < p_size; i++) {
 				for (int j = 0; j < p_size; j++) {
 					dist[i * p_size + j] = 1.0f;
 				}
 			}
+#endif
 
 			for (const auto &u : vocab_s) {
 				for (const auto &v : vocab_t) {
@@ -231,6 +240,108 @@ class RelaxedWordMoversDistance {
 	};
 
 	Scratch m_scratch;
+
+	// inspired by implementation in https://github.com/src-d/wmd-relax
+	template <typename T>
+	T wmd_relaxed(
+		const T *w1, const T *w2,
+		const std::vector<VocabPair> *v1,
+		const std::vector<VocabPair> *v2,
+		const T *dist, const int size, const int len_t, const int len_s) {
+
+		constexpr float max_dist = 1; // assume max dist of 1
+
+		T cost = 0;
+		for (int c = 0; c < 2; c++) {
+			T acc = 0;
+			for (const auto &v1_entry : *v1) {
+				const int i = v1_entry.vocab;
+
+				if (m_one_target) {
+					// 1:1 case
+
+					float best_dist = std::numeric_limits<float>::max();
+					int best_j = -1;
+
+					// find argmin.
+					for (const auto &v2_entry : *v2) {
+						const int j = v2_entry.vocab;
+						const float d = dist[i * size + j];
+						if (d < best_dist) {
+							best_dist = d;
+							best_j = j;
+						}
+					}
+
+					// move w1[i] completely to w2[j].
+					if (best_j >= 0) {
+						acc += w1[i] * best_dist;
+					} else {
+						acc += w1[i] * max_dist;
+					}
+					m_scratch.result[i] = best_j;
+
+				} else {
+					// 1:n case
+
+					T remaining = w1[i];
+
+					auto &candidates = m_scratch.candidates;
+					candidates.clear();
+
+					for (const auto &v2_entry : *v2) {
+						const int j = v2_entry.vocab;
+						const float d = dist[i * size + j];
+						candidates.push_back(DistanceRef{
+							static_cast<Index>(j),
+							d});
+					}
+					std::make_heap(candidates.begin(), candidates.end());
+
+					while (!candidates.empty()) {
+						std::pop_heap(candidates.begin(), candidates.end());
+						const auto &r = candidates.back();
+						const int w = r.i;
+
+						if (remaining <= w2[w]) {
+							acc += remaining * r.d;
+							break;
+						} else {
+							remaining -= w2[w];
+							acc += w2[w] * r.d;
+						}
+
+						candidates.pop_back();
+					}
+
+					if (remaining > 0.0f) {
+						acc += remaining * max_dist;
+					}
+				}
+			}
+
+			if (c == 0) { // w1 is t
+				// vocab item i to query pos.
+				for (int i = 0; i < len_t; i++) {
+					const int j = m_scratch.result[m_scratch.pos_to_vocab_t[i]];
+					m_match[i] = m_scratch.vocab_to_pos_s[j]; // not ideal
+				}
+			} else { // w1 is s
+				// FIXME
+			}
+
+			if (!m_symmetric) {
+				cost = acc;
+				break;
+			} else {
+				cost = std::max(cost, acc);
+				std::swap(w1, w2);
+				std::swap(v1, v2);
+			}
+		}
+
+		return cost;
+	}
 
 	template<typename Slice>
 	inline void print_debug(
@@ -288,11 +399,19 @@ class RelaxedWordMoversDistance {
 	}
 
 public:
-	RelaxedWordMoversDistance() {
+	RelaxedWordMoversDistance(
+		const bool p_normalize_bow,
+		const bool p_symmetric,
+		const bool p_one_target) :
+
+		m_normalize_bow(p_normalize_bow),
+		m_symmetric(p_symmetric),
+		m_one_target(p_one_target) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
 		m_scratch.resize(max_len_s + max_len_t);
+		m_match.reserve(max_len_t);
 	}
 
 	inline float gap_cost(size_t len) const {
@@ -325,7 +444,7 @@ public:
 			return a.word_id < b.word_id;
 		});
 
-		const int vocabulary_size = m_scratch.init_for_k(k);
+		const int vocabulary_size = m_scratch.init_for_k(k, m_normalize_bow);
 
 		m_scratch.compute_dist(len_s, len_t, vocabulary_size, [&slice] (int i, int j) -> float {
 			return slice.similarity(i, j);
@@ -335,12 +454,19 @@ public:
 		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
 		print_debug(p_query, slice, len_s, len_t, vocabulary_size, outfile);
 
-		m_score = 1.0f - emd_relaxed<float>(
+		m_match.resize(len_t);
+
+		m_score = 1.0f - wmd_relaxed<float>(
 			m_scratch.w2.data(), // t
 			m_scratch.w1.data(), // s
+			&m_scratch.vocab_t,
+			&m_scratch.vocab_s,
 			m_scratch.dist.data(),
 			vocabulary_size,
-			m_scratch.match.data());
+			len_t,
+			len_s);
+
+		outfile << "score is " << m_score;
 	}
 
 	inline float score() const {
@@ -419,9 +545,24 @@ MatcherRef create_matcher(
 
 	} else if (algorithm == "rwmd") {
 
+		bool normalize_bow = true;
+		bool symmetric = true;
+		bool one_target = true;
+
+		if (args.contains("normalize_bow")) {
+			normalize_bow = args["normalize_bow"].cast<bool>();
+		}
+		if (args.contains("symmetric")) {
+			symmetric = args["symmetric"].cast<bool>();
+		}
+		if (args.contains("one_target")) {
+			one_target = args["one_target"].cast<bool>();
+		}
+
 		return make_matcher(
 			p_query, p_document, p_metric, scores,
-			RelaxedWordMoversDistance<int16_t>());
+			RelaxedWordMoversDistance<int16_t>(
+				normalize_bow, symmetric, one_target));
 
 	} else {
 

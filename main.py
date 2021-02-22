@@ -49,7 +49,7 @@ if __name__ == '__main__':
     query = nlp("company")
     matches = session.find(query)
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
-        f.write(json.dumps(matches, indent=4))
+        f.write(json.dumps(matches.to_json(), indent=4))
 
 
 
