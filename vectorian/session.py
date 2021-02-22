@@ -189,7 +189,8 @@ class Session:
 
 	def find(
 		self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None,
-		n=100, progress=None, ret_class=Result, options: dict = dict()):
+		n=100, min_score=0.2, progress=None, ret_class=Result,
+		options: dict = dict()):
 
 		if not isinstance(doc, spacy.tokens.doc.Doc):
 			raise TypeError("please specify a spaCy document as query")
@@ -207,6 +208,7 @@ class Session:
 		options["metrics"] = [m.to_args() for m in metrics]
 		options["alignment"] = alignment.to_args(self)
 		options["max_matches"] = n
+		options["min_score"] = min_score
 
 		start_time = time.time()
 

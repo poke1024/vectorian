@@ -91,23 +91,28 @@ class RelaxedWordMoversDistance {
 		}
 	};
 
+	struct Document {
+		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
+		std::vector<float> bow; // (n)bow
+		Index w_sum;
+		std::vector<VocabPair> vocab;
+		// Eigen::Array<Index, 2, Eigen::Dynamic> pos_to_vocab;
+		std::vector<Index> pos_to_vocab;
+		std::vector<Index> vocab_to_pos; // not correct, since 1:n
+
+		void resize(const size_t p_size) {
+			bow.resize(p_size);
+			vocab.reserve(p_size);
+			pos_to_vocab.resize(p_size);
+			vocab_to_pos.resize(p_size);
+		}
+	};
+
 	struct Scratch {
 		size_t size;
 
 		std::vector<RefToken> tokens;
-		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
-		//Eigen::Array<float, Eigen::Dynamic, 1> w2;
-		std::vector<float> w1; // (n)bow for s
-		std::vector<float> w2; // (n)bow for t
-		std::vector<VocabPair> vocab_s;
-		std::vector<VocabPair> vocab_t;
-
-		// Eigen::Array<Index, 2, Eigen::Dynamic> pos_to_vocab;
-		std::vector<Index> pos_to_vocab_s;
-		std::vector<Index> pos_to_vocab_t;
-
-		std::vector<Index> vocab_to_pos_s; // not correct, since 1:n
-		std::vector<Index> vocab_to_pos_t; // not correct, since 1:n
+		Document doc[2]; // s, t
 
 		std::vector<float> dist;
 		std::vector<DistanceRef> candidates;
@@ -116,15 +121,10 @@ class RelaxedWordMoversDistance {
 		void resize(const size_t p_size) {
 			size = p_size;
 			tokens.resize(p_size);
-			w1.resize(p_size);
-			w2.resize(p_size);
-			vocab_s.reserve(p_size);
-			vocab_t.reserve(p_size);
 
-			pos_to_vocab_s.resize(p_size);
-			pos_to_vocab_t.resize(p_size);
-			vocab_to_pos_s.resize(p_size);
-			vocab_to_pos_t.resize(p_size);
+			for (int i = 0; i < 2; i++) {
+				doc[i].resize(p_size);
+			}
 
 			dist.resize(p_size * p_size);
 			candidates.reserve(p_size);
@@ -132,40 +132,21 @@ class RelaxedWordMoversDistance {
 		}
 
 		inline void reset(const int k) {
-			for (int i = 0; i < k; i++) {
-				w1[i] = 0.0f;
-				w2[i] = 0.0f;
+			for (int j = 0; j < 2; j++) {
+				float *w = doc[j].bow.data();
+				for (int i = 0; i < k; i++) {
+					w[i] = 0.0f;
+				}
 			}
 		}
 
 		inline int init_for_k(const int k, const bool normalize_bow) {
 			reset(k);
 
-			float * const ws[2] = {
-				w1.data(),
-				w2.data()
-			};
-
-			Index w_sum[2] = {
-				0, 0
-			};
-
-			vocab_s.clear();
-			vocab_t.clear();
-
-			std::vector<VocabPair> * const vocab_x[2] = {
-				&vocab_s,
-				&vocab_t
-			};
-
-			std::vector<Index> * const pos_to_vocab_x[2] = {
-				&pos_to_vocab_s,
-				&pos_to_vocab_t
-			};
-			std::vector<Index> * const vocab_to_pos_x[2] = {
-				&vocab_to_pos_s,
-				&vocab_to_pos_t
-			};
+			for (int i = 0; i < 2; i++) {
+				doc[i].w_sum = 0;
+				doc[i].vocab.clear();
+			}
 
 			int cur_word_id = tokens[0].word_id;
 			int vocab = 0;
@@ -182,27 +163,26 @@ class RelaxedWordMoversDistance {
 				}
 
 				const int j = token.j;
-				ws[j][vocab] += 1.0f;
-				w_sum[j] += 1;
+				doc[j].bow[vocab] += 1.0f;
+				doc[j].w_sum += 1;
+				doc[j].pos_to_vocab[token.i] = vocab;
+				doc[j].vocab_to_pos[vocab] = token.i;
 
 				if ((vocab_mask & (1 << j)) == 0) {
-					vocab_x[j]->emplace_back(
+					doc[j].vocab.emplace_back(
 						VocabPair{
 							static_cast<Index>(vocab),
 							token.i});
 				}
-
-				(*pos_to_vocab_x[j])[token.i] = vocab;
-				(*vocab_to_pos_x[j])[vocab] = token.i;
 
 				vocab_mask |= 1 << j;
 			}
 
 			if (normalize_bow) {
 				for (int c = 0; c < 2; c++) {
-					float *w = ws[c];
-					const float s = w_sum[c];
-					for (const auto &u : *vocab_x[c]) {
+					float *w = doc[c].bow.data();
+					const float s = doc[c].w_sum;
+					for (const auto &u : doc[c].vocab) {
 						w[u.vocab] /= s;
 					}
 				}
@@ -213,6 +193,7 @@ class RelaxedWordMoversDistance {
 
 		template<typename Similarity>
 		inline void compute_dist(
+			Document &doc_s, Document &doc_t,
 			const int len_s, const int len_t,
 			const int p_size, const Similarity &sim) {
 
@@ -229,8 +210,8 @@ class RelaxedWordMoversDistance {
 			}
 #endif
 
-			for (const auto &u : vocab_s) {
-				for (const auto &v : vocab_t) {
+			for (const auto &u : doc_s.vocab) {
+				for (const auto &v : doc_t.vocab) {
 					const float d = 1.0f - sim(u.i, v.i);
 					dist[u.vocab * p_size + v.vocab] = d;
 					dist[v.vocab * p_size + u.vocab] = d;
@@ -241,20 +222,33 @@ class RelaxedWordMoversDistance {
 
 	Scratch m_scratch;
 
+	struct Weights {
+		const float *w;
+		float sum;
+		const std::vector<VocabPair> *v;
+	};
+
 	// inspired by implementation in https://github.com/src-d/wmd-relax
 	template <typename T>
 	T wmd_relaxed(
-		const T *w1, const T *w2,
-		const std::vector<VocabPair> *v1,
-		const std::vector<VocabPair> *v2,
-		const T *dist, const int size, const int len_t, const int len_s) {
+		const Document &doc_s,
+		const Document &doc_t,
+		const int len_s, const int len_t,
+		const T *dist, const int size,
+		const bool normalized_w) {
 
 		constexpr float max_dist = 1; // assume max dist of 1
+		const Document * const docs[2] = {&doc_t, &doc_s};
 
 		T cost = 0;
 		for (int c = 0; c < 2; c++) {
+			const T *w1 = docs[c]->bow.data();
+			const T *w2 = docs[1 - c]->bow.data();
+			const std::vector<VocabPair> &v1 = docs[c]->vocab;
+			const std::vector<VocabPair> &v2 = docs[1 - c]->vocab;
+
 			T acc = 0;
-			for (const auto &v1_entry : *v1) {
+			for (const auto &v1_entry : v1) {
 				const int i = v1_entry.vocab;
 
 				if (m_one_target) {
@@ -264,7 +258,7 @@ class RelaxedWordMoversDistance {
 					int best_j = -1;
 
 					// find argmin.
-					for (const auto &v2_entry : *v2) {
+					for (const auto &v2_entry : v2) {
 						const int j = v2_entry.vocab;
 						const float d = dist[i * size + j];
 						if (d < best_dist) {
@@ -289,7 +283,7 @@ class RelaxedWordMoversDistance {
 					auto &candidates = m_scratch.candidates;
 					candidates.clear();
 
-					for (const auto &v2_entry : *v2) {
+					for (const auto &v2_entry : v2) {
 						const int j = v2_entry.vocab;
 						const float d = dist[i * size + j];
 						candidates.push_back(DistanceRef{
@@ -320,11 +314,15 @@ class RelaxedWordMoversDistance {
 				}
 			}
 
+			if (!normalized_w) {
+				acc /= docs[c]->w_sum;
+			}
+
 			if (c == 0) { // w1 is t
 				// vocab item i to query pos.
 				for (int i = 0; i < len_t; i++) {
-					const int j = m_scratch.result[m_scratch.pos_to_vocab_t[i]];
-					m_match[i] = m_scratch.vocab_to_pos_s[j]; // not ideal
+					const int j = m_scratch.result[doc_t.pos_to_vocab[i]];
+					m_match[i] = doc_s.vocab_to_pos[j]; // not ideal
 				}
 			} else { // w1 is s
 				// FIXME
@@ -335,8 +333,6 @@ class RelaxedWordMoversDistance {
 				break;
 			} else {
 				cost = std::max(cost, acc);
-				std::swap(w1, w2);
-				std::swap(v1, v2);
 			}
 		}
 
@@ -364,26 +360,26 @@ class RelaxedWordMoversDistance {
 		os << "\n";
 
 		os << "vocab s: ";
-		for (const auto &u : m_scratch.vocab_s) {
+		for (const auto &u : m_scratch.doc[0].vocab) {
 			os << vocab->id_to_token(slice.s(u.i).id) << " [" << u.vocab << "]" << " ";
 		}
 		os << "\n";
 
 		os << "vocab t: ";
-		for (const auto &u : m_scratch.vocab_t) {
+		for (const auto &u : m_scratch.doc[1].vocab) {
 			os << vocab->id_to_token(slice.t(u.i).id) << " [" << u.vocab << "]" << " ";
 		}
 		os << "\n";
 
 		os << "w1: ";
 		for (int i = 0; i < vocabulary_size; i++) {
-			os << m_scratch.w1[i] << " ";
+			os << m_scratch.doc[0].bow[i] << " ";
 		}
 		os << "\n";
 
 		os << "w2: ";
 		for (int i = 0; i < vocabulary_size; i++) {
-			os << m_scratch.w2[i] << " ";
+			os << m_scratch.doc[1].bow[i] << " ";
 		}
 		os << "\n";
 
@@ -446,9 +442,12 @@ public:
 
 		const int vocabulary_size = m_scratch.init_for_k(k, m_normalize_bow);
 
-		m_scratch.compute_dist(len_s, len_t, vocabulary_size, [&slice] (int i, int j) -> float {
-			return slice.similarity(i, j);
-		});
+		m_scratch.compute_dist(
+			m_scratch.doc[0], m_scratch.doc[1], len_s, len_t,
+			vocabulary_size,
+			[&slice] (int i, int j) -> float {
+				return slice.similarity(i, j);
+			});
 
 		std::ofstream outfile;
 		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
@@ -457,14 +456,10 @@ public:
 		m_match.resize(len_t);
 
 		m_score = 1.0f - wmd_relaxed<float>(
-			m_scratch.w2.data(), // t
-			m_scratch.w1.data(), // s
-			&m_scratch.vocab_t,
-			&m_scratch.vocab_s,
+			m_scratch.doc[0], m_scratch.doc[1], len_s, len_t,
 			m_scratch.dist.data(),
 			vocabulary_size,
-			len_t,
-			len_s);
+			m_normalize_bow);
 
 		outfile << "score is " << m_score;
 	}
