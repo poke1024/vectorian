@@ -390,8 +390,6 @@ class RelaxedWordMoversDistance {
 			}
 			os << "\n";
 		}
-
-		os << "\n";
 	}
 
 public:
@@ -417,6 +415,11 @@ public:
 	template<typename Slice>
 	inline void operator()(
 		const QueryRef &p_query, const Slice &slice, const int len_s, const int len_t) {
+
+		const bool pos_tag_aware = p_query->has_non_uniform_pos_weights();
+		if (pos_tag_aware) {
+			throw std::runtime_error("pos weights are not yet supported for WMD");
+		}
 
 		int k = 0;
 		std::vector<RefToken> &z = m_scratch.tokens;
@@ -455,13 +458,20 @@ public:
 
 		m_match.resize(len_t);
 
+		//p_query->t_tokens_pos_weights();
+
 		m_score = 1.0f - wmd_relaxed<float>(
 			m_scratch.doc[0], m_scratch.doc[1], len_s, len_t,
 			m_scratch.dist.data(),
 			vocabulary_size,
 			m_normalize_bow);
 
-		outfile << "score is " << m_score;
+		if (!pos_tag_aware) {
+			m_score *= len_t;
+		}
+
+		outfile << "score: " << m_score << "\n";
+		outfile << "\n";
 	}
 
 	inline float score() const {

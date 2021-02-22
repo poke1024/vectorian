@@ -50,6 +50,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	py::dict m_py_t_tokens;
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
+	bool m_non_uniform_pos_weights;
 	float m_total_score;
 	float m_submatch_weight;
 	bool m_bidirectional;
@@ -160,6 +161,7 @@ public:
 		m_pos_weights = p_vocab->mapped_pos_weights(pos_weights);
 
 		m_t_tokens_pos_weights.reserve(m_t_tokens->size());
+		m_non_uniform_pos_weights = false;
 		for (size_t i = 0; i < m_t_tokens->size(); i++) {
 			const Token &t = m_t_tokens->at(i);
 
@@ -167,6 +169,9 @@ public:
 			float s;
 			if (w != m_pos_weights.end()) {
 				s = w->second;
+				if (s != 1.0f) {
+					m_non_uniform_pos_weights = true;
+				}
 			} else {
 				s = 1.0f;
 			}
@@ -312,6 +317,15 @@ public:
 
 		return p_raw_score / reference_score(matched_score, unmatched_score);
 	}
+
+	const std::vector<float> &t_tokens_pos_weights() const {
+		return m_t_tokens_pos_weights;
+	}
+
+	const bool has_non_uniform_pos_weights() const {
+		return m_non_uniform_pos_weights;
+	}
+
 };
 
 typedef std::shared_ptr<Query> QueryRef;

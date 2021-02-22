@@ -5,6 +5,7 @@
 #include "query.h"
 #include "document.h"
 #include "result_set.h"
+#include <fstream>
 
 template<typename Aligner>
 class MatcherBase : public Matcher {
@@ -37,6 +38,11 @@ protected:
 			raw_score, m_aligner.match());
 
 		if (best_final_score > p_min_score) {
+
+			std::ofstream outfile;
+			outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
+			outfile << "final score: " << best_final_score << "\n";
+			outfile << "\n";
 
 			return std::make_shared<Match>(
 				this->shared_from_this(),
