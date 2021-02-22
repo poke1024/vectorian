@@ -120,6 +120,13 @@ py::list Match::regions() const {
 		}
 	}
 
+	struct MatchLoc {
+		int32_t i;
+		int32_t match_at_i;
+	};
+	std::vector<MatchLoc> locs;
+	locs.reserve(n);
+
 	for (int32_t i = 0; i < n; i++) {
 	    int match_at_i = match[i];
 
@@ -130,6 +137,17 @@ py::list Match::regions() const {
 		if (!index_map.empty()) {
 			match_at_i = index_map[match_at_i];
 		}
+
+		locs.emplace_back(MatchLoc{i, match_at_i});
+	}
+
+	std::sort(locs.begin(), locs.end(), [] (const MatchLoc &a, const MatchLoc &b) {
+		return a.match_at_i < b.match_at_i;
+	});
+
+	for (const auto &loc : locs) {
+		const auto i = loc.i;
+		const auto match_at_i = loc.match_at_i;
 
 		const auto &s = s_tokens.at(token_at + match_at_i);
 		const auto &t = t_tokens.at(i);
