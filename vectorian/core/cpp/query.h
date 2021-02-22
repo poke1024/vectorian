@@ -82,7 +82,7 @@ public:
 			"alignment",
 			"metrics",
 			"pos_mismatch_penalty",
-			"pos_weights",
+			"tag_weights",
 			"pos_filter",
 			"tag_filter",
 			"similarity_falloff",
@@ -151,8 +151,8 @@ public:
 			0.2f;
 
 		std::map<std::string, float> pos_weights;
-		if (p_kwargs && p_kwargs.contains("pos_weights")) {
-			auto pws = p_kwargs["pos_weights"].cast<py::dict>();
+		if (p_kwargs && p_kwargs.contains("tag_weights")) {
+			auto pws = p_kwargs["tag_weights"].cast<py::dict>();
 			for (const auto &pw : pws) {
 				pos_weights[pw.first.cast<py::str>()] = pw.second.cast<py::float_>();
 			}
