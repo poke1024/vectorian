@@ -74,6 +74,14 @@ class RelaxedWordMoversDistance {
 		wvec_t word_id;
 		Index i; // index in s or t
 		int8_t j; // 0 for s, 1 for t
+
+		inline bool eq(const RefToken &t) const {
+			return word_id == t.word_id;
+		}
+
+		inline bool lt(const RefToken &t) const {
+			return word_id < t.word_id;
+		}
 	};
 
 	struct VocabPair {
@@ -140,7 +148,33 @@ class RelaxedWordMoversDistance {
 			}
 		}
 
-		inline int init_for_k(const int k, const bool normalize_bow) {
+		template<typename Slice, typename MakeWordId>
+		inline int init(
+			const Slice &slice,
+			const MakeWordId &make_word_id,
+			const int len_s, const int len_t,
+			const bool normalize_bow) {
+
+			int k = 0;
+			std::vector<RefToken> &z = tokens;
+
+			for (int i = 0; i < len_s; i++) {
+				z[k++] = RefToken{
+					make_word_id(slice.s(i)), static_cast<Index>(i), 0};
+			}
+			for (int i = 0; i < len_t; i++) {
+				z[k++] = RefToken{
+					make_word_id(slice.t(i)), static_cast<Index>(i), 1};
+			}
+
+			if (k < 1) {
+				return 0;
+			}
+
+			std::sort(z.begin(), z.begin() + k, [] (const RefToken &a, const RefToken &b) {
+				return a.word_id < b.word_id;
+			});
+
 			reset(k);
 
 			for (int i = 0; i < 2; i++) {
@@ -416,34 +450,23 @@ public:
 	inline void operator()(
 		const QueryRef &p_query, const Slice &slice, const int len_s, const int len_t) {
 
-		const bool pos_tag_aware = p_query->has_non_uniform_pos_weights();
+		const bool pos_tag_aware = p_query->is_pos_tag_aware();
 		if (pos_tag_aware) {
-			throw std::runtime_error("pos weights are not yet supported for WMD");
+			throw std::runtime_error(
+				"tag weights and pos penalties are not yet supported for WMD");
 		}
 
-		int k = 0;
-		std::vector<RefToken> &z = m_scratch.tokens;
 		const auto &enc = slice.encoder();
 
-		for (int i = 0; i < len_s; i++) {
-			z[k++] = RefToken{
-				enc.to_embedding(slice.s(i)), static_cast<Index>(i), 0};
-		}
-		for (int i = 0; i < len_t; i++) {
-			z[k++] = RefToken{
-				enc.to_embedding(slice.t(i)), static_cast<Index>(i), 1};
-		}
+		const int vocabulary_size = m_scratch.init(
+			slice, [&enc] (const auto &t) {
+				return enc.to_embedding(t);
+			},len_s, len_t, m_normalize_bow);
 
-		if (k < 1) {
-			m_score = 0;
+		if (vocabulary_size == 0) {
+			m_score = 0.0f;
 			return;
 		}
-
-		std::sort(z.begin(), z.begin() + k, [] (const RefToken &a, const RefToken &b) {
-			return a.word_id < b.word_id;
-		});
-
-		const int vocabulary_size = m_scratch.init_for_k(k, m_normalize_bow);
 
 		m_scratch.compute_dist(
 			m_scratch.doc[0], m_scratch.doc[1], len_s, len_t,

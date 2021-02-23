@@ -48,9 +48,6 @@ class Query : public std::enable_shared_from_this<Query> {
 	const std::string m_text;
 	TokenVectorRef m_t_tokens;
 	py::dict m_py_t_tokens;
-	POSWMap m_pos_weights;
-	std::vector<float> m_t_tokens_pos_weights;
-	bool m_non_uniform_pos_weights;
 	float m_total_score;
 	float m_submatch_weight;
 	bool m_bidirectional;
@@ -58,6 +55,11 @@ class Query : public std::enable_shared_from_this<Query> {
 	bool m_aborted;
 	size_t m_max_matches;
 	float m_min_score;
+
+	POSWMap m_pos_weights;
+	std::vector<float> m_t_tokens_pos_weights;
+	bool m_non_uniform_pos_weights;
+	bool m_pos_aware;
 
 public:
 	Query(
@@ -115,7 +117,7 @@ public:
 		const float pos_mismatch_penalty =
 			(p_kwargs && p_kwargs.contains("pos_mismatch_penalty")) ?
 				p_kwargs["pos_mismatch_penalty"].cast<float>() :
-				1.0f;
+				0.0f;
 
 		const float similarity_threshold = (p_kwargs && p_kwargs.contains("similarity_threshold")) ?
             p_kwargs["similarity_threshold"].cast<float>() :
@@ -178,6 +180,8 @@ public:
 
 			m_t_tokens_pos_weights.push_back(s);
 		}
+
+		m_pos_aware = m_non_uniform_pos_weights || pos_mismatch_penalty != 0.0f;
 
 		m_total_score = 0.0f;
 		for (float w : m_t_tokens_pos_weights) {
@@ -326,6 +330,9 @@ public:
 		return m_non_uniform_pos_weights;
 	}
 
+	const bool is_pos_tag_aware() const {
+		return m_pos_aware;
+	}
 };
 
 typedef std::shared_ptr<Query> QueryRef;
