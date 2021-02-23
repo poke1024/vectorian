@@ -33,7 +33,7 @@ void Match::compute_scores(
             if (m >= 0) {
                 m_scores.emplace_back(TokenScore{
                     slice.unmodified_similarity(m, i),
-                    0}); // FIXME; was: slice.weight(m, i)
+                    1.0f}); // FIXME; was: slice.weight(m, i)
             } else {
                 m_scores.emplace_back(
                     TokenScore{0.0f, 0.0f});
