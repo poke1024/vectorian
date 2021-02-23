@@ -5,9 +5,6 @@ import string
 
 from yattag import Doc
 
-# https://www.yattag.org/
-# https://bulma.io/documentation/elements/tag/
-
 
 def score_color_class(score):
 	if score <= 0.75:
@@ -21,38 +18,13 @@ def score_color_class(score):
 def trim_regions(regions):
 	return regions
 
-'''
-joinRegions : Region -> List Region -> (String -> String -> String) -> List Region
-joinRegions left rest joinStr
-  = case List.head rest of
-    Just h ->
-      if h.similarity * h.weight == 0 then
-        trimRegionsHead ([{
-          s = (joinStr left.s  h.s), mismatch_penalty = 0, t = "", similarity = 0, weight = 0,
-          pos_s = "", pos_t = "", metric = ""}] ++ (List.drop 1 rest)) joinStr
-      else [left] ++ rest
-    Nothing -> [left] ++ rest
-
-trimRegionsHead : List Region -> (String -> String -> String) -> List Region
-trimRegionsHead regions joinStr
-  = case List.head regions of
-    Just r ->
-      if r.similarity * r.weight == 0
-      then joinRegions r (List.drop 1 regions) joinStr
-      else regions
-    Nothing -> regions
-
-trimRegions : List Region -> List Region
-trimRegions r
-  = List.reverse (trimRegionsHead (List.reverse (trimRegionsHead r (\a b -> a ++ b))) (\a b -> b ++ a))
-
-'''
 
 class Renderer:
-	def __init__(self):
+	def __init__(self, annotate=None):
 		doc, tag, text = Doc().tagtext()
 		doc.asis('<!DOCTYPE html>')
 		self._html = (doc, tag, text)
+		self._annotate = annotate or {}
 
 	def add_bold(self, s):
 		doc, tag, text = self._html
@@ -84,7 +56,24 @@ class Renderer:
 						with tag('span', klass=score_color_class(region['similarity'])):
 							text("%d%%" % int(math.floor(100 * region['similarity'])))
 
-		# FIXME annotate POS here.
+				if self._annotate.get('tags') or self._annotate.get('metric'):
+					cell_style = 'display:table-cell; padding-left: 0.2em; padding-right: 0.2em;'
+
+					with tag('span', style='display:table-row;'):
+						if region['pos_s'] == region['pos_t']:
+							text_class = 'has-text-black'
+						else:
+							text_class = 'has-text-danger'
+
+						with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered {text_class}'):
+							if self._annotate.get('tags'):
+								text(region['pos_s'])
+						with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered'):
+							if self._annotate.get('tags'):
+								text(region['pos_t'])
+						with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered has-text-grey-light'):
+							if self._annotate.get('metric'):
+								text(region['metric'])
 
 	def add_region(self, region):
 		if len(region.get('t', '')) > 0 and region['similarity'] * region['weight'] > 0:

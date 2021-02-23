@@ -113,8 +113,8 @@ def result_set_to_json(items):
 
 
 class Result:
-	def __init__(self, result_set, duration):
-		self._matches = result_set.best_n(-1)
+	def __init__(self, matches, duration):
+		self._matches = matches
 		self._duration = duration
 
 	def __iter__(self):
@@ -246,16 +246,30 @@ class Session:
 		query = Query(self._vocab, doc, options)
 		r = self._finder(query, progress=progress)
 
-		return ret_class(r, duration=time.time() - start_time)
+		return ret_class(
+			r.best_n(-1),
+			duration=time.time() - start_time)
 
 
 class LabResult(Result):
-	def _repr_html_(self):
+	def __init__(self, matches, duration, annotate=None):
+		super().__init__(matches, duration)
+		self._annotate = annotate
+
+	def _render(self, r):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
-		r = Renderer()
 		for match in self.to_json():
 			r.add_match(match)
 		return r.to_html()
+
+	def annotate(self, tags=True, metric=True, **kwargs):
+		return LabResult(
+			self._matches,
+			self._duration,
+			annotate=dict(tags=tags, metric=metric, **kwargs))
+
+	def _repr_html_(self):
+		return self._render(Renderer(annotate=self._annotate))
 
 
 class LabSession(Session):
