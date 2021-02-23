@@ -48,7 +48,6 @@ class Query : public std::enable_shared_from_this<Query> {
 	const std::string m_text;
 	TokenVectorRef m_t_tokens;
 	py::dict m_py_t_tokens;
-	float m_total_score;
 	float m_submatch_weight;
 	bool m_bidirectional;
 	TokenFilter m_token_filter;
@@ -69,6 +68,8 @@ public:
 		m_text(p_text),
 		m_aborted(false) {
 
+		// FIXME: assert that we are in main thread here.
+
 		const std::shared_ptr<arrow::Table> table(
 		    unwrap_table(p_tokens_table.ptr()));
 
@@ -80,12 +81,8 @@ public:
 		static const std::set<std::string> valid_options = {
 			"alignment",
 			"metrics",
-			"pos_mismatch_penalty",
-			"tag_weights",
 			"pos_filter",
 			"tag_filter",
-			"similarity_falloff",
-			"similarity_threshold",
 			"submatch_weight",
 			"bidirectional",
 			"max_matches",
@@ -110,19 +107,6 @@ public:
 
 		m_alignment_algorithm = (p_kwargs && p_kwargs.contains("alignment")) ?
             p_kwargs["alignment"].cast<py::dict>() : py::dict();
-
-		const float pos_mismatch_penalty =
-			(p_kwargs && p_kwargs.contains("pos_mismatch_penalty")) ?
-				p_kwargs["pos_mismatch_penalty"].cast<float>() :
-				0.0f;
-
-		const float similarity_threshold = (p_kwargs && p_kwargs.contains("similarity_threshold")) ?
-            p_kwargs["similarity_threshold"].cast<float>() :
-            0.0f;
-
-		const float similarity_falloff = (p_kwargs && p_kwargs.contains("similarity_falloff")) ?
-            p_kwargs["similarity_falloff"].cast<float>() :
-            1.0f;
 
 		m_submatch_weight = (p_kwargs && p_kwargs.contains("submatch_weight")) ?
             p_kwargs["submatch_weight"].cast<float>() :
@@ -149,48 +133,16 @@ public:
 			p_kwargs["min_score"].cast<float>() :
 			0.2f;
 
-		std::map<std::string, float> pos_weights;
-		if (p_kwargs && p_kwargs.contains("tag_weights")) {
-			auto pws = p_kwargs["tag_weights"].cast<py::dict>();
-			for (const auto &pw : pws) {
-				pos_weights[pw.first.cast<py::str>()] = pw.second.cast<py::float_>();
-			}
-		}
-
-		m_pos_weights = p_vocab->mapped_pos_weights(pos_weights);
-
-		m_t_tokens_pos_weights.reserve(m_t_tokens->size());
-		for (size_t i = 0; i < m_t_tokens->size(); i++) {
-			const Token &t = m_t_tokens->at(i);
-			const auto w = m_pos_weights.find(t.tag);
-			float s;
-			if (w != m_pos_weights.end()) {
-				s = w->second;
-			} else {
-				s = 1.0f;
-			}
-			m_t_tokens_pos_weights.push_back(s);
-		}
-
-		m_total_score = 0.0f;
-		for (float w : m_t_tokens_pos_weights) {
-			m_total_score += w;
-		}
-
 		if (p_kwargs && p_kwargs.contains("metrics")) {
-			MetricModifiers modifiers;
-			modifiers.pos_mismatch_penalty = pos_mismatch_penalty;
-			modifiers.similarity_falloff = similarity_falloff;
-			modifiers.similarity_threshold = similarity_threshold;
-			modifiers.t_pos_weights = m_t_tokens_pos_weights;
-
 			const auto given_metric_defs = p_kwargs["metrics"].cast<py::list>();
 			for (auto metric_def : given_metric_defs) {
+				const auto metric_def_dict = metric_def.cast<py::dict>();
+
 				m_metrics.push_back(m_vocab->create_metric(
 					m_text,
 					*m_t_tokens.get(),
-					metric_def.cast<py::dict>(),
-					modifiers));
+					metric_def_dict,
+					metric_def_dict["word_metric"]));
 			}
 		}
 	}
@@ -262,61 +214,8 @@ public:
 		return m_min_score;
 	}
 
-	inline float reference_score(
-		const float p_matched,
-		const float p_unmatched) const {
-
-		// m_matched_weight == 0 indicates that there
-		// is no higher relevance of matched content than
-		// unmatched content, both are weighted equal (see
-		// maximum_internal_score()).
-
-		const float unmatched_weight = std::pow(
-			(m_total_score - p_matched) / m_total_score,
-			m_submatch_weight);
-
-		const float reference_score =
-			p_matched +
-			unmatched_weight * (m_total_score - p_matched);
-
-		return reference_score;
-	}
-
-	inline float normalized_score(
-		const float p_raw_score,
-		const std::vector<int16_t> &p_match) const {
-
-		// unboosted version would be:
-		// return p_raw_score / m_total_score;
-
-		// a final boosting step allowing matched content
-		// more weight than unmatched content.
-
-		const size_t n = p_match.size();
-
-		float matched_score = 0.0f;
-		float unmatched_score = 0.0f;
-
-		for (size_t i = 0; i < n; i++) {
-
-			const float s = m_t_tokens_pos_weights[i];
-
-			if (p_match[i] < 0) {
-				unmatched_score += s;
-			} else {
-				matched_score += s;
-			}
-		}
-
-		return p_raw_score / reference_score(matched_score, unmatched_score);
-	}
-
-	const std::vector<float> &t_tokens_pos_weights() const {
-		return m_t_tokens_pos_weights;
-	}
-
-	const float max_weighted_score() const {
-		return m_total_score;
+	inline float submatch_weight() const {
+		return m_submatch_weight;
 	}
 };
 

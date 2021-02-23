@@ -1,8 +1,8 @@
-class Metric:
+class WordMetric:
 	pass
 
 
-class CosineMetric(Metric):
+class CosineMetric(WordMetric):
 	def __init__(self, embedding):
 		self._embedding = embedding
 
@@ -15,7 +15,7 @@ class CosineMetric(Metric):
 		}
 
 
-class ZhuCosineMetric(Metric):
+class ZhuCosineMetric(WordMetric):
 	def __init__(self, embedding):
 		self._embedding = embedding
 
@@ -28,7 +28,7 @@ class ZhuCosineMetric(Metric):
 		}
 
 
-class SohangirCosineMetric(Metric):
+class SohangirCosineMetric(WordMetric):
 	def __init__(self, embedding):
 		self._embedding = embedding
 
@@ -41,7 +41,7 @@ class SohangirCosineMetric(Metric):
 		}
 
 
-class PNormMetric(Metric):
+class PNormMetric(WordMetric):
 	def __init__(self, embedding, p=2, scale=1):
 		self._embedding = embedding
 		self._p = p
@@ -59,8 +59,8 @@ class PNormMetric(Metric):
 		}
 
 
-class LerpMetric(Metric):
-	def __init__(self, a: Metric, b: Metric, t: float):
+class LerpMetric(WordMetric):
+	def __init__(self, a: WordMetric, b: WordMetric, t: float):
 		self._a = a
 		self._b = b
 		self._t = t
@@ -78,8 +78,8 @@ class LerpMetric(Metric):
 		}
 
 
-class MinMetric(Metric):
-	def __init__(self, a: Metric, b: Metric):
+class MinMetric(WordMetric):
+	def __init__(self, a: WordMetric, b: WordMetric):
 		self._a = a
 		self._b = b
 
@@ -95,8 +95,8 @@ class MinMetric(Metric):
 		}
 
 
-class MaxMetric(Metric):
-	def __init__(self, a: Metric, b: Metric):
+class MaxMetric(WordMetric):
+	def __init__(self, a: WordMetric, b: WordMetric):
 		self._a = a
 		self._b = b
 
@@ -109,4 +109,32 @@ class MaxMetric(Metric):
 				'a': self._a.to_args(),
 				'b': self._b.to_args()
 			}
+		}
+
+
+class SentenceMetric:
+	pass
+
+
+class IsolatedMetric(SentenceMetric):
+	def __init__(self, word_metric):
+		assert isinstance(word_metric, WordMetric)
+		self._word_metric = word_metric
+
+	def to_args(self):
+		return {
+			'metric': 'isolated',
+			'word_metric': self._word_metric.to_args()
+		}
+
+
+class TagWeightedMetric(SentenceMetric):
+	def __init__(self, word_metric, tag_weights, pos_mismatch_penalty, similarity_threshold):
+		assert isinstance(word_metric, WordMetric)
+		self._word_metric = word_metric
+
+	def to_args(self):
+		return {
+			'metric': 'tag_weighted',
+			'word_metric': self._word_metric.to_args()
 		}

@@ -5,21 +5,21 @@
 
 class FastMetric : public Metric {
 protected:
-	MatrixXf m_similarity;
 	const EmbeddingRef m_embedding;
-	const MetricModifiers m_modifiers;
+	const py::dict m_options;
+	MatrixXf m_similarity;
 	bool m_similarity_depends_on_pos;
 
 public:
 	FastMetric(
 		const EmbeddingRef &p_embedding,
-		const MetricModifiers &p_modifiers) :
+		const py::dict &p_sent_metric_def) :
 
 		m_embedding(p_embedding),
-		m_modifiers(p_modifiers),
+		m_options(p_sent_metric_def),
 		m_similarity_depends_on_pos(false) {
 
-		if (p_modifiers.pos_mismatch_penalty != 0.0f) {
+		/*if (p_modifiers.pos_mismatch_penalty != 0.0f) {
 			m_similarity_depends_on_pos = true;
 		} else {
 			for (auto x : p_modifiers.t_pos_weights) {
@@ -28,7 +28,11 @@ public:
 					break;
 				}
 			}
-		}
+		}*/
+	}
+
+	inline const py::dict &options() const {
+		return m_options;
 	}
 
 	inline MatrixXf &w_similarity() {
@@ -37,14 +41,6 @@ public:
 
 	inline const MatrixXf &similarity() const {
 		return m_similarity;
-	}
-
-	inline const MetricModifiers &modifiers() const {
-		return m_modifiers;
-	}
-
-	inline float pos_weight_for_t(int i) const {
-		return m_modifiers.t_pos_weights[i];
 	}
 
 	inline bool similarity_depends_on_pos() const {

@@ -19,7 +19,7 @@ public:
 
 		FastMetric(
 			EmbeddingRef(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->modifiers()),
+			std::dynamic_pointer_cast<FastMetric>(p_a)->options()),
 		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
 
@@ -80,7 +80,7 @@ public:
 
 		FastMetric(
 			EmbeddingRef(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->modifiers()),
+			std::dynamic_pointer_cast<FastMetric>(p_a)->options()),
 		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
 

@@ -13,6 +13,64 @@ protected:
 	Aligner m_aligner;
 	MatchRef m_no_match;
 
+	template<typename Slice>
+	inline float reference_score(
+		const Slice &p_slice,
+		const float p_matched,
+		const float p_unmatched) const {
+
+		// m_matched_weight == 0 indicates that there
+		// is no higher relevance of matched content than
+		// unmatched content, both are weighted equal (see
+		// maximum_internal_score()).
+
+		const float total_score = p_slice.max_sum_of_similarities();
+
+		const float unmatched_weight = std::pow(
+			(total_score - p_matched) / total_score,
+			m_query->submatch_weight());
+
+		const float reference_score =
+			p_matched +
+			unmatched_weight * (total_score - p_matched);
+
+		return reference_score;
+	}
+
+	template<typename Slice>
+	inline float normalized_score(
+		const Slice &p_slice,
+		const float p_raw_score,
+		const std::vector<int16_t> &p_match) const {
+
+		//return p_raw_score / p_slice.len_t(); // FIXME
+
+		// unboosted version would be:
+		// return p_raw_score / m_total_score;
+
+		// a final boosting step allowing matched content
+		// more weight than unmatched content.
+
+		const size_t n = p_match.size();
+
+		float matched_score = 0.0f;
+		float unmatched_score = 0.0f;
+
+		for (size_t i = 0; i < n; i++) {
+
+			const float s = p_slice.max_similarity_for_t(i);
+
+			if (p_match[i] < 0) {
+				unmatched_score += s;
+			} else {
+				matched_score += s;
+			}
+		}
+
+		return p_raw_score / reference_score(
+			p_slice, matched_score, unmatched_score);
+	}
+
 	template<typename Slice, typename REVERSE>
 	inline MatchRef optimal_match(
 		const int32_t sentence_id,
@@ -32,12 +90,12 @@ protected:
 
 		float raw_score = m_aligner.score();
 
-		reverse(m_aligner.mutable_match(), len_s);
-
-		float best_final_score = m_query->normalized_score(
-			raw_score, m_aligner.match());
+		float best_final_score = normalized_score(
+			slice, raw_score, m_aligner.match());
 
 		if (best_final_score > p_min_score) {
+
+			reverse(m_aligner.mutable_match(), len_s);
 
 			/*std::ofstream outfile;
 			outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);

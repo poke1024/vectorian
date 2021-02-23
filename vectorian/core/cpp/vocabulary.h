@@ -333,23 +333,6 @@ public:
 	inline const std::string &tag_str(int8_t p_tag_id) {
 		return m_tag->to_str(p_tag_id);
 	}
-
-	POSWMap mapped_pos_weights(
-		const std::map<std::string, float> &p_pos_weights) const {
-
-		POSWMap pos_weights;
-		for (auto const &x : p_pos_weights) {
-			const int i = m_tag->to_id(x.first);
-			if (i >= 0) {
-				pos_weights[i] = x.second;
-			} else {
-				std::ostringstream err;
-				err << "unknown Penn Treebank tag " << x.first;
-				throw std::runtime_error(err.str());
-			}
-		}
-		return pos_weights;
-	}
 };
 
 typedef std::shared_ptr<Vocabulary> VocabularyRef;
@@ -426,33 +409,33 @@ public:
 	MetricRef create_metric(
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
-		const py::dict &p_metric_def,
-		const MetricModifiers &p_modifiers) {
+		const py::dict &p_sent_metric_def,
+		const py::dict &p_word_metric_def) {
 
-		const MetricDef metric_def{
-			p_metric_def["name"].cast<py::str>(),
-			p_metric_def["embedding"].cast<py::str>(),
-			p_metric_def["metric"].cast<py::str>(),
-			p_metric_def["options"].cast<py::dict>()};
+		const WordMetricDef metric_def{
+			p_word_metric_def["name"].cast<py::str>(),
+			p_word_metric_def["embedding"].cast<py::str>(),
+			p_word_metric_def["metric"].cast<py::str>(),
+			p_word_metric_def["options"].cast<py::dict>()};
 
 		if (metric_def.name == "lerp") {
 
 			return std::make_shared<LerpMetric>(
-				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
-				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers),
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
 				metric_def.options["t"].cast<float>());
 
 		} else if (metric_def.name == "min") {
 
 			return std::make_shared<MinMetric>(
-				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
-				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers));
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 		} else if (metric_def.name == "max") {
 
 			return std::make_shared<MaxMetric>(
-				create_metric(p_needle_text, p_needle, metric_def.options["a"].cast<py::dict>(), p_modifiers),
-				create_metric(p_needle_text, p_needle, metric_def.options["b"].cast<py::dict>(), p_modifiers));
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 		} else {
 
@@ -472,11 +455,28 @@ public:
 
 			return m_embeddings[it->second].embedding->create_metric(
 				metric_def,
+				p_sent_metric_def,
 				vocabulary_ids,
 				p_needle_text,
-				p_needle,
-				p_modifiers);
+				p_needle);
 		}
+	}
+
+	POSWMap mapped_pos_weights(
+		const std::map<std::string, float> &p_pos_weights) const {
+
+		POSWMap pos_weights;
+		for (auto const &x : p_pos_weights) {
+			const int i = m_tag->to_id(x.first);
+			if (i >= 0) {
+				pos_weights[i] = x.second;
+			} else {
+				std::ostringstream err;
+				err << "unknown Penn Treebank tag " << x.first;
+				throw std::runtime_error(err.str());
+			}
+		}
+		return pos_weights;
 	}
 };
 

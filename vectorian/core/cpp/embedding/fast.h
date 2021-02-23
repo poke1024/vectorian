@@ -71,15 +71,15 @@ public:
 	}*/
 
 	virtual MetricRef create_metric(
-		const MetricDef &p_metric,
+		const WordMetricDef &p_metric,
+		const py::dict &p_sent_metric_def,
 		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
 		const std::string &p_needle_text,
-		const std::vector<Token> &p_needle,
-		const MetricModifiers &p_modifiers) {
+		const std::vector<Token> &p_needle) {
 
 		auto m = std::make_shared<FastMetric>(
 			shared_from_this(),
-			p_modifiers);
+			p_sent_metric_def);
 
 		auto s = p_metric.instantiate(m_embeddings);
 		/*m_similarity_measures.find(p_embedding_similarity);
@@ -95,7 +95,10 @@ public:
 			s,
 			m->w_similarity());
 
-		m->w_similarity() = m->w_similarity().array().pow(p_modifiers.similarity_falloff);
+		if (p_sent_metric_def.contains("similarity_falloff")) {
+			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
+			m->w_similarity() = m->w_similarity().array().pow(similarity_falloff);
+		}
 
 		return m;
 	}

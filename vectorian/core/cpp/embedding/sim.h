@@ -22,7 +22,7 @@ public:
 typedef std::shared_ptr<EmbeddingSimilarity> EmbeddingSimilarityRef;
 
 
-class MetricDef {
+class WordMetricDef {
 public:
 	const std::string name;
 	const std::string embedding; // e.g. fasttext

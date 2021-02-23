@@ -52,7 +52,7 @@ struct PNorm {
 	}
 };
 
-EmbeddingSimilarityRef MetricDef::instantiate(
+EmbeddingSimilarityRef WordMetricDef::instantiate(
 	const WordVectors &p_vectors) const {
 
 	if (metric == "cosine") {

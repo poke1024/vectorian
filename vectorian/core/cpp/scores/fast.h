@@ -86,24 +86,41 @@ public:
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
-	inline float unmodified_similarity(int i, int j) const {
-		return similarity(i, j);
+	inline float max_similarity_for_t(int i) const {
+		return 1.0f;
+	}
+
+	inline float max_sum_of_similarities() const {
+		return m_len_t;
 	}
 
 	inline bool similarity_depends_on_pos() const {
-		return m_metric->similarity_depends_on_pos();
+		return false;
 	}
+
+	inline float unmodified_similarity(int i, int j) const {
+		return similarity(i, j);
+	}
+};
+
+struct TagWeightedOptions {
+	float pos_mismatch_penalty;
+	float similarity_threshold;
+	std::vector<float> t_pos_weights; // by index in t
+	float t_pos_weights_sum;
 };
 
 template<typename Delegate>
 class TagWeightedSlice {
 	const Delegate m_delegate;
-	const MetricModifiers &m_modifiers;
+	const TagWeightedOptions &m_modifiers;
 
 public:
+	typedef typename Delegate::Encoder Encoder;
+
 	inline TagWeightedSlice(
 		const Delegate &p_delegate,
-		const MetricModifiers &p_modifiers) :
+		const TagWeightedOptions &p_modifiers) :
 
 		m_delegate(p_delegate),
 		m_modifiers(p_modifiers) {
@@ -114,11 +131,11 @@ public:
 	}
 
 	inline const Token &s(int i) const {
-		return m_delegate.s[i];
+		return m_delegate.s(i);
 	}
 
 	inline const Token &t(int i) const {
-		return m_delegate.t[i];
+		return m_delegate.t(i);
 	}
 
 	inline int32_t len_s() const {
@@ -154,9 +171,23 @@ public:
 		}
 	}
 
-	inline float unmodified_similarity(int i, int j) const {
-		return m_delegate.similarity(i, j)(i, j);
+	inline float max_similarity_for_t(int i) const {
+		return m_modifiers.t_pos_weights[i];
 	}
+
+	inline float max_sum_of_similarities() const {
+		return m_modifiers.t_pos_weights_sum;
+	}
+
+	inline bool similarity_depends_on_pos() const {
+		return true;
+	}
+
+	inline float unmodified_similarity(int i, int j) const {
+		return m_delegate.similarity(i, j);
+	}
+
+
 };
 
 template<typename Slice>
@@ -166,6 +197,10 @@ class ReversedSlice {
 public:
 	inline ReversedSlice(const Slice &slice) :
 		m_slice(slice) {
+	}
+
+	inline typename Slice::Encoder encoder() const {
+		return m_slice.encoder();
 	}
 
 	inline const Token &s(int i) const {
@@ -192,12 +227,23 @@ public:
 		return m_slice.similarity(len_s - 1 - u, len_t - 1 - v);
 	}
 
-	inline typename Slice::Encoder encoder() const {
-		return m_slice.encoder();
+	inline float max_similarity_for_t(int i) const {
+		const auto len_t = m_slice.len_t();
+		return m_slice.max_similarity_for_t(len_t - 1 - i);
+	}
+
+	inline float max_sum_of_similarities() const {
+		return m_slice.max_sum_of_similarities();
 	}
 
 	inline bool similarity_depends_on_pos() const {
 		return m_slice.similarity_depends_on_pos();
+	}
+
+	inline float unmodified_similarity(int u, int v) const {
+		const auto len_s = m_slice.len_s();
+		const auto len_t = m_slice.len_t();
+		return m_slice.unmodified_similarity(len_s - 1 - u, len_t - 1 - v);
 	}
 };
 
@@ -230,7 +276,7 @@ public:
 	    const auto len_s = s_span.len;
 
 	    Token *new_s = m_filtered.data();
-        PPK_ASSERT(len_s <= m_filtered.size());
+        PPK_ASSERT(static_cast<size_t>(len_s) <= m_filtered.size());
 
 	    int32_t new_len_s = 0;
         for (int32_t i = 0; i < len_s; i++) {

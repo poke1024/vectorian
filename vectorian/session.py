@@ -12,7 +12,7 @@ from functools import lru_cache
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
 from vectorian.alignment import WatermanSmithBeyer
-from vectorian.metrics import CosineMetric
+from vectorian.metrics import CosineMetric, IsolatedMetric, SentenceMetric
 
 
 class Query:
@@ -207,7 +207,8 @@ class Session:
 		self._default_metrics = []
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
-			self._default_metrics.append(CosineMetric(embedding))
+			self._default_metrics.append(
+				IsolatedMetric(CosineMetric(embedding)))
 		self._finder = Finder(self._vocab, corpus, import_filter)
 
 	@property
@@ -234,6 +235,7 @@ class Session:
 			metrics = [metric]
 		if metrics is None:
 			metrics = self._default_metrics
+		assert all(isinstance(x, SentenceMetric) for x in metrics)
 
 		options = options.copy()
 		options["metrics"] = [m.to_args() for m in metrics]
