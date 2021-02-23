@@ -54,6 +54,11 @@ struct Token {
 };
 #pragma pack(pop)
 
+struct TokenSpan {
+	const Token *tokens;
+	int32_t len;
+};
+
 typedef Eigen::Array<token_t, Eigen::Dynamic, 1> TokenIdArray;
 typedef Eigen::Map<Eigen::Array<token_t, Eigen::Dynamic, 1>> MappedTokenIdArray;
 

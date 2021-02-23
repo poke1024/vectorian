@@ -39,7 +39,7 @@ public:
 
 		m_aligner->waterman_smith_beyer(
 			[&slice] (int i, int j) -> float {
-				return slice.modified_similarity(i, j);
+				return slice.similarity(i, j);
 			},
 			[this] (size_t len) -> float {
 				return this->gap_cost(len);
@@ -265,8 +265,20 @@ MatcherRef FastMetric::create_matcher(
 
 	const auto &token_filter = p_query->token_filter();
 
-	const auto factory = FilteredSliceFactory<FastSliceFactory>(
-		FastSliceFactory(metric),
+	const auto make_fast_slice = [metric] (
+		const TokenSpan &s,
+		const TokenSpan &t) -> FastSlice {
+
+        return FastSlice(
+	        metric,
+            s.tokens,
+            t.tokens,
+            s.len,
+            t.len);
+	};
+
+	const auto factory = FilteredSliceFactory<SliceFactory<decltype(make_fast_slice)>>(
+		SliceFactory<decltype(make_fast_slice)>(make_fast_slice),
 		token_filter, p_document);
 
 	return ::create_matcher(p_query, p_document, metric, factory);

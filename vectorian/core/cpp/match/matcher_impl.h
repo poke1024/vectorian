@@ -13,22 +13,22 @@ protected:
 	Aligner m_aligner;
 	MatchRef m_no_match;
 
-	template<typename SCORES, typename REVERSE>
+	template<typename Slice, typename REVERSE>
 	inline MatchRef optimal_match(
 		const int32_t sentence_id,
-		const SCORES &scores,
+		const Slice &slice,
 		const int16_t scores_variant_id,
 		const float p_min_score,
 		const REVERSE &reverse) {
 
-		const int len_s = scores.s_len();
-		const int len_t = m_query->len();
+		const int len_s = slice.len_s();
+		const int len_t = slice.len_t();
 
 		if (len_t < 1 || len_s < 1) {
 			return m_no_match;
 		}
 
-		m_aligner(m_query, scores, len_s, len_t);
+		m_aligner(m_query, slice, len_s, len_t);
 
 		float raw_score = m_aligner.score();
 
@@ -81,46 +81,6 @@ public:
 
 	virtual float gap_cost(size_t len) const {
 		return m_aligner.gap_cost(len);
-	}
-};
-
-template<typename Slice>
-class ReversedSlice {
-	const Slice &m_slice;
-	const int m_len_s;
-	const int m_len_t;
-
-public:
-	inline ReversedSlice(const Slice &slice, int len_t) :
-		m_slice(slice), m_len_s(slice.s_len()), m_len_t(len_t) {
-	}
-
-	inline const Token &s(int i) const {
-		return m_slice.s(m_len_s - 1 - i);
-	}
-
-	inline const Token &t(int i) const {
-		return m_slice.t(m_len_t - 1 - i);
-	}
-
-	inline int s_len() const {
-	    return m_len_s;
-	}
-
-	inline float unmodified_similarity(int u, int v) const {
-		return m_slice.unmodified_similarity(m_len_s - 1 - u, m_len_t - 1 - v);
-	}
-
-	inline float modified_similarity(int u, int v) const {
-		return m_slice.modified_similarity(m_len_s - 1 - u, m_len_t - 1 - v);
-	}
-
-	inline typename Slice::Encoder encoder() const {
-		return m_slice.encoder();
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return m_slice.similarity_depends_on_pos();
 	}
 };
 
@@ -179,7 +139,7 @@ public:
 
 		const Token *s_tokens = this->m_document->tokens()->data();
 		const Token *t_tokens = this->m_query->tokens()->data();
-		const size_t len_t =  this->m_query->tokens()->size();
+		const int len_t =  this->m_query->tokens()->size();
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
@@ -195,7 +155,8 @@ public:
 			MatchRef best_slice_match = this->m_no_match;
 
 			const auto slice = m_slice_factory.create_slice(
-			    s_tokens + token_at, t_tokens, len_s, len_t);
+			    TokenSpan{s_tokens + token_at, len_s},
+			    TokenSpan{t_tokens, len_t});
 
 			MatchRef m = this->optimal_match(
 				slice_id,
@@ -207,8 +168,7 @@ public:
 			if (Bidirectional) {
 				const MatchRef m_reverse = this->optimal_match(
 					slice_id,
-					ReversedSlice(
-                        slice, this->m_query->len()),
+					ReversedSlice(slice),
 					0, // variant
 					p_matches->worst_score(),
 					reverse_alignment);

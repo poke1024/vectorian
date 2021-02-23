@@ -24,18 +24,16 @@ void Match::compute_scores(
 		const Token *t_tokens = query()->tokens()->data();
 
         const auto slice = p_factory.create_slice(
-            s_tokens + token_at,
-            t_tokens,
-            p_len_s,
-            p_len_t);
+            TokenSpan{s_tokens + token_at, p_len_s},
+            TokenSpan{t_tokens, p_len_t});
         m_scores.reserve(match.size());
 
         int i = 0;
         for (auto m : match) {
             if (m >= 0) {
                 m_scores.emplace_back(TokenScore{
-                    slice.unmodified_similarity(m, i),
-                    slice.weight(m, i)});
+                    slice.similarity(m, i),
+                    0}); // FIXME; was: slice.weight(m, i)
             } else {
                 m_scores.emplace_back(
                     TokenScore{0.0f, 0.0f});

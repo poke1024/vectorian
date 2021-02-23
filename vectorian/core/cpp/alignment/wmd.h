@@ -395,7 +395,7 @@ public:
 			len_s, len_t,
 			vocabulary_size,
 			[&slice] (int i, int j) -> float {
-				return slice.modified_similarity(i, j);
+				return slice.similarity(i, j);
 			});
 
 		/*std::ofstream outfile;
