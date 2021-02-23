@@ -107,16 +107,20 @@ public:
 	    return m_len_s;
 	}
 
-	inline float similarity(int u, int v) const {
-		return m_slice.similarity(m_len_s - 1 - u, m_len_t - 1 - v);
+	inline float unmodified_similarity(int u, int v) const {
+		return m_slice.unmodified_similarity(m_len_s - 1 - u, m_len_t - 1 - v);
 	}
 
-	inline float score(int u, int v) const {
-		return m_slice.score(m_len_s - 1 - u, m_len_t - 1 - v);
+	inline float modified_similarity(int u, int v) const {
+		return m_slice.modified_similarity(m_len_s - 1 - u, m_len_t - 1 - v);
 	}
 
 	inline typename Slice::Encoder encoder() const {
 		return m_slice.encoder();
+	}
+
+	inline bool similarity_depends_on_pos() const {
+		return m_slice.similarity_depends_on_pos();
 	}
 };
 

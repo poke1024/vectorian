@@ -65,7 +65,7 @@ struct MetricModifiers {
 	float pos_mismatch_penalty;
 	float similarity_falloff;
 	float similarity_threshold;
-	POSWMap pos_weights;
+	std::vector<float> t_pos_weights; // by index in t
 };
 
 class Query;

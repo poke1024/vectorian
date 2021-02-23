@@ -6,9 +6,15 @@ struct WMDOptions {
 	bool one_target;
 };
 
-template<typename Index, typename RefToken>
+template<typename Index, typename WordId>
 class WMD {
 public:
+	struct RefToken {
+		WordId word_id;
+		Index i; // index in s or t
+		int8_t j; // 0 for s, 1 for t
+	};
+
 	struct VocabPair {
 		Index vocab;
 		Index i;
@@ -199,7 +205,7 @@ public:
 	};
 
 	// inspired by implementation in https://github.com/src-d/wmd-relax
-	float relaxed(
+	float _relaxed(
 		const int len_s, const int len_t,
 		const int size,
 		const WMDOptions &p_options) {
@@ -362,6 +368,40 @@ public:
 			}
 			os << "\n";
 		}
+	}
+
+	template<typename Slice, typename MakeWordId>
+	float relaxed(
+		const Slice &slice,
+		const size_t len_s,
+		const size_t len_t,
+		const MakeWordId &make_word_id,
+		const WMDOptions &p_options) {
+
+		const int vocabulary_size = init(
+			slice, make_word_id, len_s, len_t, p_options);
+
+		if (vocabulary_size == 0) {
+			return 0.0f;
+		}
+
+		compute_dist(
+			len_s, len_t,
+			vocabulary_size,
+			[&slice] (int i, int j) -> float {
+				return slice.modified_similarity(i, j);
+			});
+
+		/*std::ofstream outfile;
+		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
+		print_debug(p_query, slice, len_s, len_t, vocabulary_size, outfile);*/
+
+		//p_query->t_tokens_pos_weights();
+
+		return 1.0f - _relaxed(
+			len_s, len_t,
+			vocabulary_size,
+			p_options);
 	}
 
 	inline const std::vector<Index> &match() const {

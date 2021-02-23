@@ -79,7 +79,7 @@ public:
 	    return _s_len;
 	}
 
-	inline float similarity(int i, int j) const {
+	inline float unmodified_similarity(int i, int j) const {
 		const Token &s = s_tokens[i];
 		const auto &sim = m_metric->similarity();
 		return sim(m_encoder.to_embedding(s), j);
@@ -90,7 +90,7 @@ public:
 		const Token &t = t_tokens[j];
 
 		// weight based on PennTree POS tag.
-		float weight = m_metric->pos_weight(t.tag);
+		float weight = m_metric->pos_weight_for_t(j);
 
 		// difference based on universal POS tag.
 		if (s.pos != t.pos) {
@@ -100,15 +100,19 @@ public:
 		return weight;
 	}
 
-	inline float score(int i, int j) const {
+	inline float modified_similarity(int i, int j) const {
 
-		const float score = similarity(i, j) * weight(i, j);
+		const float score = unmodified_similarity(i, j) * weight(i, j);
 
 		if (score <= m_metric->modifiers().similarity_threshold) {
 			return 0.0f;
 		} else {
 			return score;
 		}
+	}
+
+	inline bool similarity_depends_on_pos() const {
+		return m_metric->similarity_depends_on_pos();
 	}
 };
 

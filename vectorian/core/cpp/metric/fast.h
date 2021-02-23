@@ -8,6 +8,7 @@ protected:
 	MatrixXf m_similarity;
 	const EmbeddingRef m_embedding;
 	const MetricModifiers m_modifiers;
+	bool m_similarity_depends_on_pos;
 
 public:
 	FastMetric(
@@ -15,7 +16,19 @@ public:
 		const MetricModifiers &p_modifiers) :
 
 		m_embedding(p_embedding),
-		m_modifiers(p_modifiers) {
+		m_modifiers(p_modifiers),
+		m_similarity_depends_on_pos(false) {
+
+		if (p_modifiers.pos_mismatch_penalty != 0.0f) {
+			m_similarity_depends_on_pos = true;
+		} else {
+			for (auto x : p_modifiers.t_pos_weights) {
+				if (x != 1.0f) {
+					m_similarity_depends_on_pos = true;
+					break;
+				}
+			}
+		}
 	}
 
 	inline MatrixXf &w_similarity() {
@@ -30,14 +43,12 @@ public:
 		return m_modifiers;
 	}
 
-	inline float pos_weight(int tag) const {
-		const auto &posw = m_modifiers.pos_weights;
-		const auto w = posw.find(tag);
-		if (w != posw.end()) {
-			return w->second;
-		} else {
-			return 1.0f;
-		}
+	inline float pos_weight_for_t(int i) const {
+		return m_modifiers.t_pos_weights[i];
+	}
+
+	inline bool similarity_depends_on_pos() const {
+		return m_similarity_depends_on_pos;
 	}
 
 	virtual MatcherRef create_matcher(

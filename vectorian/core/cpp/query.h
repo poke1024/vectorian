@@ -55,11 +55,8 @@ class Query : public std::enable_shared_from_this<Query> {
 	bool m_aborted;
 	size_t m_max_matches;
 	float m_min_score;
-
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
-	bool m_non_uniform_pos_weights;
-	bool m_pos_aware;
 
 public:
 	Query(
@@ -163,25 +160,17 @@ public:
 		m_pos_weights = p_vocab->mapped_pos_weights(pos_weights);
 
 		m_t_tokens_pos_weights.reserve(m_t_tokens->size());
-		m_non_uniform_pos_weights = false;
 		for (size_t i = 0; i < m_t_tokens->size(); i++) {
 			const Token &t = m_t_tokens->at(i);
-
-			auto w = m_pos_weights.find(t.tag);
+			const auto w = m_pos_weights.find(t.tag);
 			float s;
 			if (w != m_pos_weights.end()) {
 				s = w->second;
-				if (s != 1.0f) {
-					m_non_uniform_pos_weights = true;
-				}
 			} else {
 				s = 1.0f;
 			}
-
 			m_t_tokens_pos_weights.push_back(s);
 		}
-
-		m_pos_aware = m_non_uniform_pos_weights || pos_mismatch_penalty != 0.0f;
 
 		m_total_score = 0.0f;
 		for (float w : m_t_tokens_pos_weights) {
@@ -193,7 +182,7 @@ public:
 			modifiers.pos_mismatch_penalty = pos_mismatch_penalty;
 			modifiers.similarity_falloff = similarity_falloff;
 			modifiers.similarity_threshold = similarity_threshold;
-			modifiers.pos_weights = m_pos_weights;
+			modifiers.t_pos_weights = m_t_tokens_pos_weights;
 
 			const auto given_metric_defs = p_kwargs["metrics"].cast<py::list>();
 			for (auto metric_def : given_metric_defs) {
@@ -324,14 +313,6 @@ public:
 
 	const std::vector<float> &t_tokens_pos_weights() const {
 		return m_t_tokens_pos_weights;
-	}
-
-	const bool has_non_uniform_pos_weights() const {
-		return m_non_uniform_pos_weights;
-	}
-
-	const bool is_pos_tag_aware() const {
-		return m_pos_aware;
 	}
 };
 

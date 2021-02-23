@@ -39,7 +39,7 @@ public:
 
 		m_aligner->waterman_smith_beyer(
 			[&slice] (int i, int j) -> float {
-				return slice.score(i, j);
+				return slice.modified_similarity(i, j);
 			},
 			[this] (size_t len) -> float {
 				return this->gap_cost(len);
@@ -65,14 +65,15 @@ public:
 template<typename Index>
 class RelaxedWordMoversDistance {
 
-	struct RefToken {
-		wvec_t word_id;
-		Index i; // index in s or t
-		int8_t j; // 0 for s, 1 for t
+	struct TaggedWordId {
+		token_t token;
+		int8_t tag;
+
+
 	};
 
 	const WMDOptions m_options;
-	WMD<Index, RefToken> m_wmd;
+	WMD<Index, token_t> m_wmd;
 
 	float m_score;
 
@@ -101,7 +102,7 @@ public:
 	inline void operator()(
 		const QueryRef &p_query, const Slice &slice, const int len_s, const int len_t) {
 
-		const bool pos_tag_aware = p_query->is_pos_tag_aware();
+		const bool pos_tag_aware = slice.similarity_depends_on_pos();
 		if (pos_tag_aware) {
 			throw std::runtime_error(
 				"tag weights and pos penalties are not yet supported for WMD");
@@ -109,40 +110,16 @@ public:
 
 		const auto &enc = slice.encoder();
 
-		const int vocabulary_size = m_wmd.init(
-			slice, [&enc] (const auto &t) {
+		m_score = m_wmd.relaxed(
+			slice, len_s, len_t,
+			[&enc] (const auto &t) {
 				return enc.to_embedding(t);
-			}, len_s, len_t, m_options);
-
-		if (vocabulary_size == 0) {
-			m_score = 0.0f;
-			return;
-		}
-
-		m_wmd.compute_dist(
-			len_s, len_t,
-			vocabulary_size,
-			[&slice] (int i, int j) -> float {
-				return slice.similarity(i, j);
-			});
-
-		std::ofstream outfile;
-		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
-		m_wmd.print_debug(p_query, slice, len_s, len_t, vocabulary_size, outfile);
-
-		//p_query->t_tokens_pos_weights();
-
-		m_score = 1.0f - m_wmd.relaxed(
-			len_s, len_t,
-			vocabulary_size,
+			},
 			m_options);
 
 		if (!pos_tag_aware) {
 			m_score *= len_t;
 		}
-
-		outfile << "score: " << m_score << "\n";
-		outfile << "\n";
 	}
 
 	inline float score() const {

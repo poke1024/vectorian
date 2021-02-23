@@ -27,7 +27,7 @@ void Match::compute_scores(const Scores &p_scores, int p_len_s) {
         for (auto m : match) {
             if (m >= 0) {
                 m_scores.emplace_back(TokenScore{
-                    slice.similarity(m, i),
+                    slice.unmodified_similarity(m, i),
                     slice.weight(m, i)});
             } else {
                 m_scores.emplace_back(
