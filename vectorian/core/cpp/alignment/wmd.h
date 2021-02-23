@@ -162,9 +162,11 @@ public:
 
 	template<typename Similarity>
 	inline void compute_dist(
-		Document &doc_s, Document &doc_t,
 		const int len_s, const int len_t,
 		const int p_size, const Similarity &sim) {
+
+		Document &doc_s = m_doc[0];
+		Document &doc_t = m_doc[1];
 
 		float *dist = m_dist.data();
 
@@ -197,17 +199,18 @@ public:
 	};
 
 	// inspired by implementation in https://github.com/src-d/wmd-relax
-	float wmd_relaxed(
-		const Document &doc_s,
-		const Document &doc_t,
+	float relaxed(
 		const int len_s, const int len_t,
-		const float *dist, const int size,
+		const int size,
 		const WMDOptions &p_options) {
 
-		m_match.resize(len_t);
-
 		constexpr float max_dist = 1; // assume max dist of 1
+
+		Document &doc_s = m_doc[0];
+		Document &doc_t = m_doc[1];
 		const Document * const docs[2] = {&doc_t, &doc_s};
+
+		m_match.resize(len_t);
 
 		float cost = 0;
 		for (int c = 0; c < 2; c++) {

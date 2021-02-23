@@ -120,7 +120,7 @@ public:
 		}
 
 		m_wmd.compute_dist(
-			m_wmd.m_doc[0], m_wmd.m_doc[1], len_s, len_t,
+			len_s, len_t,
 			vocabulary_size,
 			[&slice] (int i, int j) -> float {
 				return slice.similarity(i, j);
@@ -132,9 +132,8 @@ public:
 
 		//p_query->t_tokens_pos_weights();
 
-		m_score = 1.0f - m_wmd.wmd_relaxed(
-			m_wmd.m_doc[0], m_wmd.m_doc[1], len_s, len_t,
-			m_wmd.m_dist.data(),
+		m_score = 1.0f - m_wmd.relaxed(
+			len_s, len_t,
 			vocabulary_size,
 			m_options);
 
