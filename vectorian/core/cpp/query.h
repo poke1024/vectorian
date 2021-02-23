@@ -314,6 +314,10 @@ public:
 	const std::vector<float> &t_tokens_pos_weights() const {
 		return m_t_tokens_pos_weights;
 	}
+
+	const float max_weighted_score() const {
+		return m_total_score;
+	}
 };
 
 typedef std::shared_ptr<Query> QueryRef;

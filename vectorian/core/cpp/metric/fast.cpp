@@ -65,15 +65,32 @@ public:
 template<typename Index>
 class RelaxedWordMoversDistance {
 
-	struct TaggedWordId {
+	struct TaggedTokenId {
 		token_t token;
 		int8_t tag;
 
+		inline bool operator==(const TaggedTokenId &t) const {
+			return token == t.token && tag == t.tag;
+		}
 
+		inline bool operator!=(const TaggedTokenId &t) const {
+			return !(*this == t);
+		}
+
+		inline bool operator<(const TaggedTokenId &t) const {
+			if (token < t.token) {
+				return true;
+			} else if (token == t.token) {
+				return tag < t.tag;
+			} else {
+				return false;
+			}
+		}
 	};
 
 	const WMDOptions m_options;
 	WMD<Index, token_t> m_wmd;
+	WMD<Index, TaggedTokenId> m_wmd_tagged;
 
 	float m_score;
 
@@ -100,25 +117,39 @@ public:
 
 	template<typename Slice>
 	inline void operator()(
-		const QueryRef &p_query, const Slice &slice, const int len_s, const int len_t) {
+		const QueryRef &p_query,
+		const Slice &slice,
+		const int len_s,
+		const int len_t) {
 
 		const bool pos_tag_aware = slice.similarity_depends_on_pos();
-		if (pos_tag_aware) {
-			throw std::runtime_error(
-				"tag weights and pos penalties are not yet supported for WMD");
-		}
-
 		const auto &enc = slice.encoder();
 
-		m_score = m_wmd.relaxed(
-			slice, len_s, len_t,
-			[&enc] (const auto &t) {
-				return enc.to_embedding(t);
-			},
-			m_options);
+		if (pos_tag_aware) {
+			// perform WMD on a vocabulary
+			// built from (token id, pos tag).
 
-		if (!pos_tag_aware) {
-			m_score *= len_t;
+			m_score = m_wmd_tagged.relaxed(
+				slice, len_s, len_t,
+				[&enc] (const auto &t) {
+					return TaggedTokenId{
+						enc.to_embedding(t),
+						t.tag
+					};
+				},
+				m_options,
+				p_query->max_weighted_score());
+		} else {
+			// perform WMD on a vocabulary
+			// built from token ids.
+
+			m_score = m_wmd.relaxed(
+				slice, len_s, len_t,
+				[&enc] (const auto &t) {
+					return enc.to_embedding(t);
+				},
+				m_options,
+				p_query->max_weighted_score());
 		}
 	}
 

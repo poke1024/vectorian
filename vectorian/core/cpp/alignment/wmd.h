@@ -246,11 +246,8 @@ public:
 					}
 
 					// move w1[i] completely to w2[j].
-					if (best_j >= 0) {
-						acc += w1[i] * best_dist;
-					} else {
-						acc += w1[i] * max_dist;
-					}
+					const float d = (best_j >= 0 ? best_dist : max_dist);
+					acc += w1[i] * d;
 					m_result[i] = best_j;
 
 				} else {
@@ -376,7 +373,16 @@ public:
 		const size_t len_s,
 		const size_t len_t,
 		const MakeWordId &make_word_id,
-		const WMDOptions &p_options) {
+		const WMDOptions &p_options,
+		const float max_weighted_score) {
+
+		if (p_options.symmetric && !p_options.normalize_bow) {
+			throw std::runtime_error(
+				"cannot run symmetric mode WMD with bow (needs nbow)");
+		}
+
+		const float max_score = p_options.normalize_bow ?
+			1.0f : max_weighted_score;
 
 		const int vocabulary_size = init(
 			slice, make_word_id, len_s, len_t, p_options);
@@ -398,7 +404,7 @@ public:
 
 		//p_query->t_tokens_pos_weights();
 
-		return 1.0f - _relaxed(
+		return max_score - _relaxed(
 			len_s, len_t,
 			vocabulary_size,
 			p_options);
