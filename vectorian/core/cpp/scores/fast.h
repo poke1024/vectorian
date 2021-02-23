@@ -50,16 +50,14 @@ public:
 
 	inline FastSlice(
 		const FastMetricRef &metric,
-		const Token * const s_tokens,
-		const Token * const t_tokens,
-		const size_t p_len_s,
-		const size_t p_len_t) :
+		const TokenSpan &s,
+		const TokenSpan &t) :
 
 		m_metric(metric),
-		s_tokens(s_tokens),
-		m_len_s(p_len_s),
-		t_tokens(t_tokens),
-		m_len_t(p_len_t) {
+		s_tokens(s.tokens),
+		m_len_s(s.len),
+		t_tokens(t.tokens),
+		m_len_t(t.len) {
 	}
 
 	inline const TokenIdEncoder &encoder() const {
@@ -88,24 +86,31 @@ public:
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
+	inline float unmodified_similarity(int i, int j) const {
+		return similarity(i, j);
+	}
+
 	inline bool similarity_depends_on_pos() const {
 		return m_metric->similarity_depends_on_pos();
 	}
 };
 
-/*template<typename Delegate>
-class WeightedTagSlice {
+template<typename Delegate>
+class TagWeightedSlice {
 	const Delegate m_delegate;
-
-	const float pos_mismatch_penalty;
-	const std::vector<float> &pos_weight_for_t;
-	const float m_similarity_threshold;
+	const MetricModifiers &m_modifiers;
 
 public:
-	inline WeightedTagSlice(
-		const Delegate &delegate) :
+	inline TagWeightedSlice(
+		const Delegate &p_delegate,
+		const MetricModifiers &p_modifiers) :
 
-		m_delegate(delegate) {
+		m_delegate(p_delegate),
+		m_modifiers(p_modifiers) {
+	}
+
+	inline const typename Delegate::Encoder &encoder() const {
+		return m_delegate.encoder();
 	}
 
 	inline const Token &s(int i) const {
@@ -129,27 +134,30 @@ public:
 		const Token &t = m_delegate.t(j);
 
 		// weight based on PennTree POS tag.
-		float weight = m_pos_weight_for_t[j];
+		float weight = m_modifiers.t_pos_weights[j];
 
 		// difference based on universal POS tag.
 		if (s.pos != t.pos) {
-			weight *= 1.0f - pos_mismatch_penalty;
+			weight *= 1.0f - m_modifiers.pos_mismatch_penalty;
 		}
 
 		return weight;
 	}
 
 	inline float similarity(int i, int j) const {
-
 		const float score = m_delegate.similarity(i, j) * weight(i, j);
 
-		if (score <= m_similarity_threshold) {
+		if (score <= m_modifiers.similarity_threshold) {
 			return 0.0f;
 		} else {
 			return score;
 		}
 	}
-}*/
+
+	inline float unmodified_similarity(int i, int j) const {
+		return m_delegate.similarity(i, j)(i, j);
+	}
+};
 
 template<typename Slice>
 class ReversedSlice {
@@ -205,13 +213,13 @@ public:
 
 	inline FilteredSliceFactory(
 		const Delegate &p_delegate,
-		const TokenFilter &p_filter,
-		const DocumentRef &p_document) :
+		const DocumentRef &p_document,
+		const TokenFilter &p_filter) :
 
 		m_delegate(p_delegate),
 		m_filter(p_filter) {
 
-       m_filtered.resize(p_document->max_len_s());
+		m_filtered.resize(p_document->max_len_s());
 	}
 
 	inline Slice create_slice(
