@@ -37,33 +37,30 @@ public:
 	}
 };
 
-template<typename EmbeddingEncoder>
 class FastSlice {
 private:
 	const FastMetricRef m_metric;
 	const Token * const s_tokens;
 	const int32_t _s_len;
 	const Token * const t_tokens;
-	const EmbeddingEncoder m_encoder;
+	const TokenIdEncoder m_encoder;
 
 public:
-	typedef EmbeddingEncoder Encoder;
+	typedef TokenIdEncoder Encoder;
 
 	inline FastSlice(
 		const FastMetricRef &metric,
 		const Token * const s_tokens,
 		const int32_t s_len,
-		const Token * const t_tokens,
-		const EmbeddingEncoder &p_encoder) :
+		const Token * const t_tokens) :
 
 		m_metric(metric),
 		s_tokens(s_tokens),
 		_s_len(s_len),
-		t_tokens(t_tokens),
-		m_encoder(p_encoder) {
+		t_tokens(t_tokens) {
 	}
 
-	inline const EmbeddingEncoder &encoder() const {
+	inline const TokenIdEncoder &encoder() const {
 		return m_encoder;
 	}
 
@@ -116,64 +113,74 @@ public:
 	}
 };
 
-class FastScores {
-	const QueryRef &m_query;
-	const DocumentRef &m_document;
+template<typename Delegate>
+class FilteredSliceFactory {
+	const Delegate m_delegate;
+	const TokenFilter m_filter;
+
+	mutable std::vector<Token> m_filtered;
+
+public:
+	typedef typename Delegate::slice_t slice_t;
+
+	FilteredSliceFactory(
+		const Delegate &p_delegate,
+		const TokenFilter &p_filter,
+		const DocumentRef &p_document) :
+
+		m_delegate(p_delegate),
+		m_filter(p_filter) {
+
+       m_filtered.resize(p_document->max_len_s());
+	}
+
+	slice_t create_slice(
+		const Token *s_tokens,
+		const Token *t_tokens,
+		const size_t p_len_s,
+		const size_t p_len_t) const {
+
+	    const Token *s = s_tokens;
+	    Token *new_s = m_filtered.data();
+        PPK_ASSERT(p_len_s <= m_filtered.size());
+
+	    size_t new_s_len = 0;
+        for (size_t i = 0; i < p_len_s; i++) {
+            if (m_filter(s[i])) {
+                new_s[new_s_len++] = s[i];
+            }
+        }
+
+		return m_delegate.create_slice(
+			new_s, t_tokens, new_s_len, p_len_t);
+	}
+};
+
+class FastSliceFactory {
 	const FastMetricRef m_metric;
 
 	mutable std::vector<Token> m_filtered;
 
 public:
-	FastScores(
-		const QueryRef &p_query,
-		const DocumentRef &p_document,
-		const FastMetricRef &p_metric);
+	typedef FastSlice slice_t;
 
-	template<typename EmbeddingEncoder>
-	FastSlice<EmbeddingEncoder> create_slice(
-		const size_t p_s_offset,
-		const size_t p_s_len,
-		const TokenFilter &p_filter,
-		const EmbeddingEncoder &p_encoder) const {
+	FastSliceFactory(
+		const FastMetricRef &p_metric) :
 
-		const Token *s_tokens = m_document->tokens()->data();
-		const Token *t_tokens = m_query->tokens()->data();
-
-		if (!p_filter.all()) {
-		    const Token *s = s_tokens + p_s_offset;
-		    Token *new_s = m_filtered.data();
-	        PPK_ASSERT(p_s_len <= m_filtered.size());
-
-		    size_t new_s_len = 0;
-	        for (size_t i = 0; i < p_s_len; i++) {
-	            if (p_filter(s[i])) {
-	                new_s[new_s_len++] = s[i];
-	            }
-	        }
-
-	        return FastSlice<EmbeddingEncoder>(
-	            m_metric,
-	            new_s,
-	            new_s_len,
-	            t_tokens,
-	            p_encoder);
-		}
-	    else {
-	        return FastSlice<EmbeddingEncoder>(
-	            m_metric,
-	            s_tokens + p_s_offset,
-	            p_s_len,
-	            t_tokens,
-	            p_encoder);
-	    }
+	    m_metric(p_metric) {
 	}
 
-	inline bool good() const {
-		return true;
-	}
+	FastSlice create_slice(
+		const Token *s_tokens,
+		const Token *t_tokens,
+		const size_t p_len_s,
+		const size_t p_len_t) const {
 
-	inline int variant() const {
-		return 0;
+        return FastSlice(
+            m_metric,
+            s_tokens,
+            p_len_s,
+            t_tokens);
 	}
 };
 

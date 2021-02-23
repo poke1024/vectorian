@@ -39,10 +39,10 @@ protected:
 
 		if (best_final_score > p_min_score) {
 
-			std::ofstream outfile;
+			/*std::ofstream outfile;
 			outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
 			outfile << "final score: " << best_final_score << "\n";
-			outfile << "\n";
+			outfile << "\n";*/
 
 			return std::make_shared<Match>(
 				this->shared_from_this(),
@@ -135,10 +135,10 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	std::reverse(match.begin(), match.end());
 }
 
-template<typename Scores, typename Aligner, typename EmbeddingEncoder, bool Bidirectional>
+template<typename SliceFactory, typename Aligner, bool Bidirectional>
 class MatcherImpl : public MatcherBase<Aligner> {
 
-	const std::vector<Scores> m_scores;
+	const SliceFactory m_slice_factory;
 
 public:
 	MatcherImpl(
@@ -146,21 +146,21 @@ public:
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
 		const Aligner &p_aligner,
-		const std::vector<Scores> &p_scores) :
+		const SliceFactory &p_slice_factory) :
 
 		MatcherBase<Aligner>(
 			p_query,
 			p_document,
 			p_metric,
 			p_aligner),
-		m_scores(p_scores) {
+		m_slice_factory(p_slice_factory) {
 
 	}
 
 	virtual void match(
 		const ResultSetRef &p_matches) {
 
-		std::vector<Scores> good_scores;
+		/*std::vector<Scores> good_scores;
 		good_scores.reserve(m_scores.size());
 		for (const auto &scores : m_scores) {
 			if (scores.good()) {
@@ -169,9 +169,7 @@ public:
 		}
 		if (good_scores.empty()) {
 			return;
-		}
-
-		const auto &token_filter = this->m_query->token_filter();
+		}*/
 
 		const auto &slices = this->m_document->sentences();
 		const size_t n_slices = slices.size();
@@ -179,12 +177,16 @@ public:
 
 		size_t token_at = 0;
 
+		const Token *s_tokens = this->m_document->tokens()->data();
+		const Token *t_tokens = this->m_query->tokens()->data();
+		const size_t len_t =  this->m_query->tokens()->size();
+
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
 			slice_id++) {
 
-			const auto &slice = slices[slice_id];
-			const int len_s = slice.n_tokens;
+			const auto &slice_data = slices[slice_id];
+			const int len_s = slice_data.n_tokens;
 
 			if (len_s < 1) {
 				continue;
@@ -192,41 +194,38 @@ public:
 
 			MatchRef best_slice_match = this->m_no_match;
 
-			for (const auto &scores : good_scores) {
+			const auto slice = m_slice_factory.create_slice(
+			    s_tokens + token_at, t_tokens, len_s, len_t);
 
-				const auto slice = scores.template create_slice<EmbeddingEncoder>(
-				    token_at, len_s, token_filter, EmbeddingEncoder());
+			MatchRef m = this->optimal_match(
+				slice_id,
+				slice,
+				0, // variant
+				p_matches->worst_score(),
+				[] (std::vector<int16_t> &match, int len_s) {});
 
-				MatchRef m = this->optimal_match(
+			if (Bidirectional) {
+				const MatchRef m_reverse = this->optimal_match(
 					slice_id,
-					slice,
-					scores.variant(),
+					ReversedSlice(
+                        slice, this->m_query->len()),
+					0, // variant
 					p_matches->worst_score(),
-					[] (std::vector<int16_t> &match, int len_s) {});
+					reverse_alignment);
 
-				if (Bidirectional) {
-					MatchRef m_reverse = this->optimal_match(
-						slice_id,
-						ReversedSlice(
-                            slice, this->m_query->len()),
-						scores.variant(),
-						p_matches->worst_score(),
-						reverse_alignment);
-
-					if (m_reverse->score() > m->score()) {
-						m = m_reverse;
-					}
+				if (m_reverse->score() > m->score()) {
+					m = m_reverse;
 				}
+			}
 
-				if (m->score() > best_slice_match->score()) {
-					best_slice_match = m;
-				}
+			if (m->score() > best_slice_match->score()) {
+				best_slice_match = m;
 			}
 
 			if (best_slice_match->score() > this->m_no_match->score()) {
 
 				best_slice_match->compute_scores(
-					m_scores.at(best_slice_match->scores_variant_id()), len_s);
+					m_slice_factory, len_s, len_t);
 
 				p_matches->add(best_slice_match);
 			}

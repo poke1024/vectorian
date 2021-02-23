@@ -5,8 +5,11 @@
 #include "document.h"
 #include "scores/fast.h"
 
-template<typename Scores>
-void Match::compute_scores(const Scores &p_scores, int p_len_s) {
+template<typename SliceFactory>
+void Match::compute_scores(
+	const SliceFactory &p_factory,
+	const int p_len_s, const int p_len_t) {
+
     const auto &match = m_digest.match;
 
     if (m_scores.empty() && !match.empty()) {
@@ -17,10 +20,14 @@ void Match::compute_scores(const Scores &p_scores, int p_len_s) {
             end = std::max(end, int(m));
         }
 
-        const auto slice = p_scores.template create_slice<TokenIdEncoder>(
-            token_at, p_len_s,
-            query()->token_filter(),
-            TokenIdEncoder());
+		const Token *s_tokens = document()->tokens()->data();
+		const Token *t_tokens = query()->tokens()->data();
+
+        const auto slice = p_factory.create_slice(
+            s_tokens + token_at,
+            t_tokens,
+            p_len_s,
+            p_len_t);
         m_scores.reserve(match.size());
 
         int i = 0;

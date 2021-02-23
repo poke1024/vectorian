@@ -166,29 +166,29 @@ public:
 	}
 };
 
-template<typename Scores, typename Aligner>
+template<typename SliceFactory, typename Aligner>
 MatcherRef make_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
-	const std::vector<Scores> &scores,
+	const SliceFactory &p_factory,
 	const Aligner &p_aligner) {
 
 	if (p_query->bidirectional()) {
-		return std::make_shared<MatcherImpl<Scores, Aligner, TokenIdEncoder, true>>(
-			p_query, p_document, p_metric, p_aligner, scores);
+		return std::make_shared<MatcherImpl<SliceFactory, Aligner, true>>(
+			p_query, p_document, p_metric, p_aligner, p_factory);
 	} else {
-		return std::make_shared<MatcherImpl<Scores, Aligner, TokenIdEncoder, false>>(
-			p_query, p_document, p_metric, p_aligner, scores);
+		return std::make_shared<MatcherImpl<SliceFactory, Aligner, false>>(
+			p_query, p_document, p_metric, p_aligner, p_factory);
 	}
 }
 
-template<typename Scores>
+template<typename SliceFactory>
 MatcherRef create_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
-	const std::vector<Scores> &scores) {
+	const SliceFactory &p_factory) {
 
 	// FIXME support different alignment algorithms here.
 
@@ -224,7 +224,7 @@ MatcherRef create_matcher(
 		}
 
 		return make_matcher(
-			p_query, p_document, p_metric, scores,
+			p_query, p_document, p_metric, p_factory,
 			WatermanSmithBeyer<int16_t>(gap_cost, zero));
 
 	} else if (algorithm == "rwmd") {
@@ -244,7 +244,7 @@ MatcherRef create_matcher(
 		}
 
 		return make_matcher(
-			p_query, p_document, p_metric, scores,
+			p_query, p_document, p_metric, p_factory,
 			RelaxedWordMoversDistance<int16_t>(
 				normalize_bow, symmetric, one_target));
 
@@ -261,12 +261,15 @@ MatcherRef FastMetric::create_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document) {
 
-	auto self = std::dynamic_pointer_cast<FastMetric>(shared_from_this());
+	const auto metric = std::dynamic_pointer_cast<FastMetric>(shared_from_this());
 
-	std::vector<FastScores> scores;
-	scores.emplace_back(FastScores(p_query, p_document, self));
+	const auto &token_filter = p_query->token_filter();
 
-	return ::create_matcher(p_query, p_document, self, scores);
+	const auto factory = FilteredSliceFactory<FastSliceFactory>(
+		FastSliceFactory(metric),
+		token_filter, p_document);
+
+	return ::create_matcher(p_query, p_document, metric, factory);
 }
 
 const std::string &FastMetric::name() const {

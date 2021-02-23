@@ -95,7 +95,7 @@ public:
 	using is_less = compare_by_score<std::less>;
 
 	template<typename Scores>
-	void compute_scores(const Scores &p_scores, int p_len_s);
+	void compute_scores(const Scores &p_scores, int p_len_s, int p_len_t);
 
 	void print_scores() const {
 		for (auto s : m_scores) {
