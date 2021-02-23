@@ -93,6 +93,20 @@ class Document:
 		with open(path, "w") as f:
 			f.write(json.dumps(self._json, indent=4, sort_keys=True))
 
+	def to_json(self):
+		return self._json
+
+	@property
+	def structure(self):
+		lines = []
+		for i, p in enumerate(self._json["partitions"]):
+			text = p["text"]
+			lines.append(f"partition {i + 1}:")
+			for j, sent in enumerate(p["sents"]):
+				lines.append(f"  sentence {j + 1}:")
+				lines.append("    " + text[sent["start"]:sent["end"]])
+		return "\n".join(lines)
+
 	@property
 	def unique_id(self):
 		return self._json['unique_id']
@@ -108,22 +122,40 @@ class Document:
 		location_table = LocationTable()
 
 		partitions = self._json['partitions']
-		for partition in partitions:
+		for partition_i, partition in enumerate(partitions):
 			text = partition["text"]
 			tokens = partition["tokens"]
+			sents = partition["sents"]
 			loc = partition["loc"]
 
-			p_tokens = []
-			for sent in partition["sents"]:
-				for t0 in tokens[sent["start"]:sent["end"]]:
+			token_i = 0
+			for sent in sents:
+				sent_tokens = []
+
+				if sent["start"] > tokens[token_i]["start"]:
+					raise RuntimeError(
+						f"unexpected sentence start {sent['start']} vs. {token_i}, "
+						f"partition={partition_i}, tokens={tokens}, sents={sents}")
+
+				token_j = token_i + 1
+				while token_j < len(tokens):
+					if tokens[token_j]["start"] >= sent["end"]:
+						break
+					token_j += 1
+
+				for t0 in tokens[token_i:token_j]:
 					t = filter_(t0)
 					if t:
-						p_tokens.append(t)
+						sent_tokens.append(t)
 
-			token_table.extend(text, p_tokens)
-			location_table.extend(loc, p_tokens)
+				token_i = token_j
 
-			texts.append(text)
+				sent_text = text[sent["start"]:sent["end"]]
+
+				token_table.extend(sent_text, sent_tokens)
+				location_table.extend(loc, sent_tokens)
+
+				texts.append(sent_text)
 
 		return core.Document(
 			index,
