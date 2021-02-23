@@ -4,29 +4,6 @@ import pandas as pd
 import vectorian.core as core
 
 
-class DefaultTokenFilter:
-	_pos = {
-		'PROPN': 'NOUN'
-	}
-
-	_tag = {
-		'NNP': 'NN',
-		'NNPS': 'NNS',
-	}
-
-	def __call__(self, t):
-		if t["pos"] == "PUNCT":
-			return False
-
-		# spaCy is very generous with labeling things as PROPN,
-		# which really breaks pos_mimatch_penalty often. we re-
-		# classify PROPN as NOUN.
-		t_new = t.copy()
-		t_new["pos"] = self._pos.get(t["pos"], t["pos"])
-		t_new["tag"] = self._tag.get(t["tag"], t["tag"])
-		return t_new
-
-
 class LocationTable:
 	def __init__(self):
 		self._loc = [[] for _ in range(5)]
@@ -124,7 +101,7 @@ class Document:
 	def title(self):
 		return self._json['title']
 
-	def to_core(self, index, vocab, filter=DefaultTokenFilter()):
+	def to_core(self, index, vocab, filter_):
 		texts = []
 
 		token_table = TokenTable()
@@ -139,7 +116,7 @@ class Document:
 			p_tokens = []
 			for sent in partition["sents"]:
 				for t0 in tokens[sent["start"]:sent["end"]]:
-					t = filter(t0)
+					t = filter_(t0)
 					if t:
 						p_tokens.append(t)
 

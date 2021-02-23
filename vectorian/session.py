@@ -136,13 +136,17 @@ class Result:
 
 
 class Finder:
-	def __init__(self, vocab, corpus):
+	def __init__(self, vocab, corpus, filter_):
 		self._vocab = vocab
 		self._docs = []
 		for doc in corpus:
 			self._docs.append(
-				doc.to_core(len(self._docs), self._vocab)
+				doc.to_core(len(self._docs), self._vocab, filter_)
 			)
+
+	@property
+	def documents(self):
+		return self._docs
 
 	@cached_property
 	def max_sentence_len(self):
@@ -174,14 +178,41 @@ class Finder:
 		return results
 
 
+class DefaultImportFilter:
+	_pos = {
+		'PROPN': 'NOUN'
+	}
+
+	_tag = {
+		'NNP': 'NN',
+		'NNPS': 'NNS',
+	}
+
+	def __call__(self, t):
+		if t["pos"] == "PUNCT":
+			return False
+
+		# spaCy is very generous with labeling things as PROPN,
+		# which really breaks pos_mimatch_penalty often. we re-
+		# classify PROPN as NOUN.
+		t_new = t.copy()
+		t_new["pos"] = self._pos.get(t["pos"], t["pos"])
+		t_new["tag"] = self._tag.get(t["tag"], t["tag"])
+		return t_new
+
+
 class Session:
-	def __init__(self, corpus, embeddings):
+	def __init__(self, corpus, embeddings, import_filter=DefaultImportFilter()):
 		self._vocab = core.Vocabulary()
 		self._default_metrics = []
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(CosineMetric(embedding))
-		self._finder = Finder(self._vocab, corpus)
+		self._finder = Finder(self._vocab, corpus, import_filter)
+
+	@property
+	def documents(self):
+		return self._finder.documents
 
 	@property
 	def max_sentence_len(self):
