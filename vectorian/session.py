@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from vectorian.render import Renderer
 from vectorian.metrics import CosineMetric, AlignmentSentenceMetric, SentenceMetric
+from vectorian.importers import StringImporter
 
 
 def get_location_desc(metadata, location):
@@ -143,14 +144,14 @@ class DefaultImportFilter:
 
 
 class Session:
-	def __init__(self, corpus, embeddings, import_filter=DefaultImportFilter()):
+	def __init__(self, docs, embeddings, import_filter=DefaultImportFilter()):
 		self._vocab = core.Vocabulary()
 		self._default_metrics = []
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(
 				AlignmentSentenceMetric(CosineMetric(embedding)))
-		self._collection = Collection(self._vocab, corpus, import_filter)
+		self._collection = Collection(self._vocab, docs, import_filter)
 
 	@property
 	def documents(self):

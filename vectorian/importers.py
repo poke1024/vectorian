@@ -1,5 +1,6 @@
 import re
 import logging
+import datetime
 
 from tqdm import tqdm
 from pathlib import Path
@@ -181,3 +182,25 @@ class NovelImporter(Importer):
 			speakers={})
 
 		return self._make_doc(md, paragraphs, locations)
+
+
+class StringImporter(Importer):
+	# a generic importer for short text strings for ad-hoc experiments.
+
+	def __call__(self, s, unique_id=None, author="", title=""):
+		if unique_id is None:
+			unique_id = str(datetime.datetime.now())
+
+		locations = [
+			(-1, -1, -1, 0)
+		]
+
+		md = Metadata(
+			version="1.0",
+			unique_id=unique_id,
+			origin="<string>",
+			author=author,
+			title=title,
+			speakers={})
+
+		return self._make_doc(md, [s], locations)
