@@ -131,6 +131,30 @@ public:
 		return m;
 	}*/
 
+	virtual void update_map(
+		std::vector<token_t> &p_map,
+		const std::vector<std::string> &p_tokens,
+		const size_t p_offset) const {
+
+		const size_t i0 = p_map.size();
+		const size_t i1 = p_tokens.size();
+		PPK_ASSERT(i0 <= i1);
+		if (i0 == i1) {
+			return;
+		}
+		p_map.resize(i1);
+
+		for (size_t i = i0; i < i1; i++) {
+			const auto it = m_tokens.find(p_tokens[i]);
+			if (it != m_tokens.end()) {
+				p_map[i] = it->second;
+			} else {
+				p_map[i] = -1;
+			}
+		}
+	}
+
+
 	token_t lookup(const std::string &p_token) const {
 		const auto i = m_tokens.find(p_token);
 		if (i != m_tokens.end()) {

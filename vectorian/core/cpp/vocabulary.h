@@ -122,6 +122,14 @@ public:
 	inline size_t size() const {
 		return m_base->size() + m_to_int.size();
 	}
+
+	inline size_t inc_offset() const {
+		return m_base->size();
+	}
+
+	inline const std::vector<std::string>& inc_strings() const {
+		return m_to_str;
+	}
 };
 
 template<typename T>
@@ -307,19 +315,14 @@ public:
 	}
 
 	inline token_t add(const std::string &p_token) {
-		const size_t old_size = m_tokens->size();
-		/*if (old_size == 0) {
-			init_with_embedding_tokens();
-		}*/
+		return m_tokens->add(p_token);
+	}
 
-		const token_t t = m_tokens->add(p_token);
-		if (m_tokens->size() > old_size) { // new token?
-			for (Embedding &e : m_embeddings) {
-				e.map.push_back(e.embedding->lookup(p_token));
-			}
-		}
-
-		return t;
+	const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
+		auto &e = m_embeddings[p_emb_idx];
+		e.embedding->update_map(
+			e.map, m_tokens->inc_strings(), m_tokens->inc_offset());
+		return e.map;
 	}
 
 	inline const std::string &id_to_token(token_t p_token) const {
@@ -378,16 +381,14 @@ public:
 	}
 
 	inline token_t add(const std::string &p_token) {
-		const token_t t = m_tokens->to_id(p_token);
-		if (t >= 0) {
-			return t;
-		} else {
-			const token_t t_new = m_tokens->add(p_token);
-			for (Embedding &e : m_embeddings) {
-				e.extra_map.push_back(e.embedding->lookup(p_token));
-			}
-			return t_new;
-		}
+		return m_tokens->add(p_token);
+	}
+
+	const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
+		auto &e = m_embeddings[p_emb_idx];
+		e.embedding->update_map(
+			e.extra_map, m_tokens->inc_strings(), m_tokens->inc_offset());
+		return e.extra_map;
 	}
 
 	inline int add_pos(const std::string &p_name) {
@@ -446,8 +447,8 @@ public:
 				throw std::runtime_error(err.str());
 			}
 
-			const auto &map0 = m_vocab->m_embeddings[it->second].map;
-			const auto &map1 = m_embeddings[it->second].extra_map;
+			const auto &map0 = m_vocab->get_embedding_map(it->second);
+			const auto &map1 = get_embedding_map(it->second);
 			const std::vector<MappedTokenIdArray> vocabulary_ids = {
 				MappedTokenIdArray(const_cast<token_t*>(map0.data()), map0.size()),
 				MappedTokenIdArray(const_cast<token_t*>(map1.data()), map1.size())

@@ -14,11 +14,10 @@ public:
 	virtual ~Embedding() {
 	}
 
-	virtual token_t lookup(const std::string &p_token) const {
-		return -1;
-	}
-
-	//virtual const std::vector<std::string> &tokens() const = 0;
+	virtual void update_map(
+		std::vector<token_t> &p_map,
+		const std::vector<std::string> &p_tokens,
+		const size_t p_offset) const = 0;
 
 	virtual MetricRef create_metric(
 		const WordMetricDef &p_metric,

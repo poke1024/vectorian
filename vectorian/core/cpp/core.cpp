@@ -75,7 +75,7 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
-	'metric/fast.cpp',
+	'metric/static.cpp',
 	'module.cpp',
 	'common.cpp',
 	'result_set.cpp',
