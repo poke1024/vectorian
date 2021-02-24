@@ -164,3 +164,18 @@ class TagWeightedSentenceMetric(SentenceMetric):
 			'word_metric': self._word_metric.to_args(),
 			'alignment': self._alignment.to_args(session)
 		}
+
+
+class SentenceEmbeddingMetric(SentenceMetric):
+	def __init__(self, base_metric):
+		self._base_metric = base_metric
+
+	def create_index(self, session):
+		return SentenceEmbeddingIndex(session, self)
+
+	def to_args(self, session):
+		return {
+			'metric': 'sentence-embedding',
+			'base_metric': self._base_metric.to_args()
+		}
+
