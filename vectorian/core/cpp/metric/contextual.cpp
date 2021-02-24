@@ -10,7 +10,7 @@ MatcherRef ContextualEmbeddingMetric::create_matcher(
 	py::gil_scoped_acquire acquire;
 
 	/*const auto cb = m_embedding->compute_embedding_callback();
-	py:array_t embeddings = cb(p_document->unique_id()).cast<py::array_t>();
+	py:array_t embeddings = cb(p_document->py_doc()).cast<py::array_t>();
 	PPK_ASSERT(embeddings.shape(0) == p_document->n_tokens());*/
 
 	// embeddings is a numpy array that can either be dynamically
@@ -26,11 +26,9 @@ MatcherRef ContextualEmbeddingMetric::create_matcher(
 	if (sentence_metric_kind == "alignment-isolated") {
 
 #if 0
-		const auto make_contextual_slice = [metric] (
+		const auto make_contextual_slice = [metric, embeddings] (
 			const TokenSpan &s,
 			const TokenSpan &t) {
-
-			py::gil_scoped_acquire acquire;
 
 	        return ContextualEmbeddingSlice(metric, embeddings, s, t);
 		};
