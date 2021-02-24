@@ -1,5 +1,5 @@
-#include "metric/fast.h"
-#include "scores/fast.h"
+#include "metric/static.h"
+#include "slice/static.h"
 #include "query.h"
 #include "match/matcher_impl.h"
 #include "alignment/wmd.h"
@@ -315,13 +315,13 @@ std::vector<float> parse_tag_weights(
 	return t_tokens_pos_weights;
 }
 
-MatcherRef FastMetric::create_matcher(
+MatcherRef StaticEmbeddingMetric::create_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document) {
 
 	py::gil_scoped_acquire acquire;
 
-	const auto metric = std::dynamic_pointer_cast<FastMetric>(shared_from_this());
+	const auto metric = std::dynamic_pointer_cast<StaticEmbeddingMetric>(shared_from_this());
 
 	const auto &token_filter = p_query->token_filter();
 
@@ -334,7 +334,7 @@ MatcherRef FastMetric::create_matcher(
 			const TokenSpan &s,
 			const TokenSpan &t) {
 
-	        return FastSlice(metric, s, t);
+	        return StaticEmbeddingSlice(metric, s, t);
 		};
 
 		const FactoryGenerator gen(make_fast_slice);
@@ -361,7 +361,7 @@ MatcherRef FastMetric::create_matcher(
 			const TokenSpan &t) {
 
 			return TagWeightedSlice(
-				FastSlice(metric, s, t),
+				StaticEmbeddingSlice(metric, s, t),
 				options);
 		};
 
@@ -378,6 +378,6 @@ MatcherRef FastMetric::create_matcher(
 	}
 }
 
-const std::string &FastMetric::name() const {
+const std::string &StaticEmbeddingMetric::name() const {
 	return m_embedding->name();
 }

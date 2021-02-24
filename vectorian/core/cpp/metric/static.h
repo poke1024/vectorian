@@ -3,7 +3,7 @@
 
 #include "metric/metric.h"
 
-class FastMetric : public Metric {
+class StaticEmbeddingMetric : public Metric {
 protected:
 	const EmbeddingRef m_embedding;
 	const py::dict m_options;
@@ -11,7 +11,7 @@ protected:
 	MatrixXf m_similarity;
 
 public:
-	FastMetric(
+	StaticEmbeddingMetric(
 		const EmbeddingRef &p_embedding,
 		const py::dict &p_sent_metric_def) :
 
@@ -43,6 +43,6 @@ public:
 	}
 };
 
-typedef std::shared_ptr<FastMetric> FastMetricRef;
+typedef std::shared_ptr<StaticEmbeddingMetric> StaticEmbeddingMetricRef;
 
 #endif // __VECTORIAN_FAST_METRIC_H__

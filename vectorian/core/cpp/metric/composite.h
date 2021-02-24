@@ -1,11 +1,11 @@
 #ifndef __VECTORIAN_COMPOSITE_METRIC_H__
 #define __VECTORIAN_COMPOSITE_METRIC_H__
 
-#include "metric/fast.h"
+#include "metric/static.h"
 
-class MinMaxMetric : public FastMetric {
-	const FastMetricRef m_a;
-	const FastMetricRef m_b;
+class MinMaxMetric : public StaticEmbeddingMetric {
+	const StaticEmbeddingMetricRef m_a;
+	const StaticEmbeddingMetricRef m_b;
 	std::string m_name;
 	Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> m_is_from_a;
 
@@ -17,11 +17,11 @@ public:
 		const F &p_f,
 		const char *p_name) :
 
-		FastMetric(
+		StaticEmbeddingMetric(
 			EmbeddingRef(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->options()),
-		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
-		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
+			std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)->options()),
+		m_a(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)),
+		m_b(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_b)) {
 
 		this->m_similarity = m_a->similarity().cwiseMax(m_b->similarity());
 		m_is_from_a = this->m_similarity.cwiseEqual(m_a->similarity());
@@ -67,9 +67,9 @@ public:
 typedef std::shared_ptr<MinMetric> MinMetricRef;
 
 
-class LerpMetric : public FastMetric {
-	const FastMetricRef m_a;
-	const FastMetricRef m_b;
+class LerpMetric : public StaticEmbeddingMetric {
+	const StaticEmbeddingMetricRef m_a;
+	const StaticEmbeddingMetricRef m_b;
 	std::string m_name;
 
 public:
@@ -78,11 +78,11 @@ public:
 		const MetricRef &p_b,
 		float t) :
 
-		FastMetric(
+		StaticEmbeddingMetric(
 			EmbeddingRef(),
-			std::dynamic_pointer_cast<FastMetric>(p_a)->options()),
-		m_a(std::dynamic_pointer_cast<FastMetric>(p_a)),
-		m_b(std::dynamic_pointer_cast<FastMetric>(p_b)) {
+			std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)->options()),
+		m_a(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)),
+		m_b(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_b)) {
 
 		this->m_similarity = (m_a->similarity() * (1 - t)) + (m_b->similarity() * t);
 

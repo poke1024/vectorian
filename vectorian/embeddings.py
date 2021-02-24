@@ -111,7 +111,7 @@ class Glove(Embedding):
 
 	@lru_cache(1)
 	def to_core(self):
-		embedding = core.FastEmbedding(self.name, self._table)
+		embedding = core.StaticEmbedding(self.name, self._table)
 		self._table = None  # free up memory
 		return embedding
 
@@ -161,6 +161,6 @@ class FastText(Embedding):
 
 	@lru_cache(1)
 	def to_core(self):
-		embedding = core.FastEmbedding(self.name, self._table)
+		embedding = core.StaticEmbedding(self.name, self._table)
 		self._table = None  # free up memory
 		return embedding

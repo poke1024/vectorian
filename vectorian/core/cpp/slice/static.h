@@ -4,7 +4,7 @@
 #include "common.h"
 #include "document.h"
 #include "query.h"
-#include "metric/fast.h"
+#include "metric/static.h"
 
 class TokenIdEncoder {
 public:
@@ -37,8 +37,8 @@ public:
 	}
 };
 
-class FastSlice {
-	const FastMetricRef m_metric;
+class StaticEmbeddingSlice {
+	const StaticEmbeddingMetricRef m_metric;
 	const Token * const s_tokens;
 	const int32_t m_len_s;
 	const Token * const t_tokens;
@@ -48,8 +48,8 @@ class FastSlice {
 public:
 	typedef TokenIdEncoder Encoder;
 
-	inline FastSlice(
-		const FastMetricRef &metric,
+	inline StaticEmbeddingSlice(
+		const StaticEmbeddingMetricRef &metric,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 

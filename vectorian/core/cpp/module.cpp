@@ -5,7 +5,7 @@
 #include "match/match.h"
 #include "match/match_impl.h"
 #include "embedding/embedding.h"
-#include "embedding/fast.h"
+#include "embedding/static.h"
 #include "vocabulary.h"
 #include "query.h"
 #include "document.h"
@@ -87,13 +87,13 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
 
-	py::class_<FastEmbedding, Embedding, FastEmbeddingRef> fast_embedding(m, "FastEmbedding");
+	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> fast_embedding(m, "StaticEmbedding");
 	fast_embedding.def(py::init<const std::string &, py::object>());
-	//fast_embedding.def("cosine_similarity", &FastEmbedding::cosine_similarity);
-	//fast_embedding.def("similarity_matrix", &FastEmbedding::similarity_matrix);
-	//fast_embedding.def("load_percentiles", &FastEmbedding::load_percentiles);
-	fast_embedding.def_property_readonly("n_tokens", &FastEmbedding::n_tokens);
-	fast_embedding.def_property_readonly("measures", &FastEmbedding::measures);
+	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);
+	//fast_embedding.def("similarity_matrix", &StaticEmbedding::similarity_matrix);
+	//fast_embedding.def("load_percentiles", &StaticEmbedding::load_percentiles);
+	fast_embedding.def_property_readonly("n_tokens", &StaticEmbedding::n_tokens);
+	fast_embedding.def_property_readonly("measures", &StaticEmbedding::measures);
 
 	py::class_<Vocabulary, VocabularyRef> vocabulary(m, "Vocabulary");
 	vocabulary.def(py::init());

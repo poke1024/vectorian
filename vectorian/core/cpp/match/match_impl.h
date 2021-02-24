@@ -3,7 +3,7 @@
 
 #include "query.h"
 #include "document.h"
-#include "scores/fast.h"
+#include "slice/static.h"
 
 template<typename SliceFactory>
 void Match::compute_scores(

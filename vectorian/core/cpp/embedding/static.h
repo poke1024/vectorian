@@ -5,14 +5,14 @@
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
 
-class FastEmbedding : public Embedding {
+class StaticEmbedding : public Embedding {
 	//std::vector<std::string> m_tokens;
 	std::unordered_map<std::string, token_t> m_tokens;
 	WordVectors m_embeddings;
 	std::map<std::string, EmbeddingSimilarityRef> m_similarity_measures;
 
 public:
-	FastEmbedding(
+	StaticEmbedding(
 		const std::string &p_name,
 		py::object p_table) : Embedding(p_name) {
 
@@ -77,7 +77,7 @@ public:
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle) {
 
-		auto m = std::make_shared<FastMetric>(
+		auto m = std::make_shared<StaticEmbeddingMetric>(
 			shared_from_this(),
 			p_sent_metric_def);
 
@@ -233,6 +233,6 @@ private:
 	}
 };
 
-typedef std::shared_ptr<FastEmbedding> FastEmbeddingRef;
+typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;
 
 #endif // __VECTORIAN_FAST_EMBEDDING_H__
