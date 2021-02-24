@@ -43,7 +43,6 @@ uint64_t parse_filter_mask(
 
 class Query : public std::enable_shared_from_this<Query> {
 	const QueryVocabularyRef m_vocab;
-	py::dict m_alignment_algorithm;
 	std::vector<MetricRef> m_metrics;
 	const std::string m_text;
 	TokenVectorRef m_t_tokens;
@@ -79,8 +78,7 @@ public:
 		m_py_t_tokens = to_py_array(m_t_tokens);
 
 		static const std::set<std::string> valid_options = {
-			"alignment",
-			"metrics",
+			"metric",
 			"pos_filter",
 			"tag_filter",
 			"submatch_weight",
@@ -104,9 +102,6 @@ public:
 #endif
 			}
 		}
-
-		m_alignment_algorithm = (p_kwargs && p_kwargs.contains("alignment")) ?
-            p_kwargs["alignment"].cast<py::dict>() : py::dict();
 
 		m_submatch_weight = (p_kwargs && p_kwargs.contains("submatch_weight")) ?
             p_kwargs["submatch_weight"].cast<float>() :
@@ -133,17 +128,14 @@ public:
 			p_kwargs["min_score"].cast<float>() :
 			0.2f;
 
-		if (p_kwargs && p_kwargs.contains("metrics")) {
-			const auto given_metric_defs = p_kwargs["metrics"].cast<py::list>();
-			for (auto metric_def : given_metric_defs) {
-				const auto metric_def_dict = metric_def.cast<py::dict>();
+		if (p_kwargs && p_kwargs.contains("metric")) {
+			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
-				m_metrics.push_back(m_vocab->create_metric(
-					m_text,
-					*m_t_tokens.get(),
-					metric_def_dict,
-					metric_def_dict["word_metric"]));
-			}
+			m_metrics.push_back(m_vocab->create_metric(
+				m_text,
+				*m_t_tokens.get(),
+				metric_def_dict,
+				metric_def_dict["word_metric"]));
 		}
 	}
 
@@ -177,10 +169,6 @@ public:
 
 	inline const POSWMap &pos_weights() const {
 		return m_pos_weights;
-	}
-
-	const py::dict &alignment_algorithm() const {
-		return m_alignment_algorithm;
 	}
 
 	const std::vector<MetricRef> &metrics() const {

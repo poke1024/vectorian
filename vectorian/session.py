@@ -11,8 +11,7 @@ from functools import lru_cache
 
 from vectorian.corpus.document import TokenTable
 from vectorian.render import Renderer
-from vectorian.alignment import WatermanSmithBeyer
-from vectorian.metrics import CosineMetric, IsolatedMetric, SentenceMetric
+from vectorian.metrics import CosineMetric, AlignmentSentenceMetric, SentenceMetric
 
 
 class Query:
@@ -135,7 +134,7 @@ class Result:
 		return self._duration
 
 
-class Index:
+class Collection:
 	def __init__(self, vocab, corpus, filter_):
 		self._vocab = vocab
 		self._docs = []
@@ -152,21 +151,53 @@ class Index:
 	def max_sentence_len(self):
 		return max([doc.max_sentence_len for doc in self._docs])
 
-	def __call__(self, query, n_threads=None, progress=None):
+
+class Index:
+	def __init__(self, session, metric):
+		self._session = session
+		self._metric = metric
+
+	def find(
+		self, doc: spacy.tokens.doc.Doc,
+		n=100, min_score=0.2,
+		options: dict = dict()):
+
+		if not isinstance(doc, spacy.tokens.doc.Doc):
+			raise TypeError("please specify a spaCy document as query")
+
+		options = options.copy()
+		options["metric"] = self._metric.to_args(self._session)
+		options["max_matches"] = n
+		options["min_score"] = min_score
+
+		start_time = time.time()
+
+		query = Query(self._session.vocab, doc, options)
+		result_class, r = self._session.run_query(self._find, query)
+
+		return result_class(
+			r.best_n(-1),
+			duration=time.time() - start_time)
+
+
+class BruteForceIndex(Index):
+	def _find(self, query, n_threads=None, progress=None):
 		c_query = query.to_core()
 
 		def find_in_doc(x):
 			return x, x.find(c_query)
 
-		total = sum([x.n_tokens for x in self._docs])
+		docs = self._session.documents
+
+		total = sum([x.n_tokens for x in docs])
 		done = 0
 
 		if n_threads is None:
-			n_threads = min(len(self._docs), multiprocessing.cpu_count())
+			n_threads = min(len(docs), multiprocessing.cpu_count())
 
 		results = None
 		with multiprocessing.pool.ThreadPool(processes=n_threads) as pool:
-			for doc, r in pool.imap_unordered(find_in_doc, self._docs):
+			for doc, r in pool.imap_unordered(find_in_doc, docs):
 				if results is None:
 					results = r
 				else:
@@ -208,49 +239,33 @@ class Session:
 		for embedding in embeddings:
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(
-				IsolatedMetric(CosineMetric(embedding)))
-		self._index = Index(self._vocab, corpus, import_filter)
+				AlignmentSentenceMetric(CosineMetric(embedding)))
+		self._collection = Collection(self._vocab, corpus, import_filter)
 
 	@property
 	def documents(self):
-		return self._index.documents
+		return self._collection.documents
+
+	@property
+	def vocab(self):
+		return self._vocab
 
 	@property
 	def max_sentence_len(self):
-		return self._index.max_sentence_len
+		return self._collection.max_sentence_len
 
-	def find(
-		self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None,
-		n=100, min_score=0.2, progress=None, ret_class=Result,
-		options: dict = dict()):
+	@property
+	def result_class(self):
+		return Result
 
-		if not isinstance(doc, spacy.tokens.doc.Doc):
-			raise TypeError("please specify a spaCy document as query")
+	def make_index(self, metric=None):
+		if metric is None:
+			metric = self._default_metrics[0]
+		assert isinstance(metric, SentenceMetric)
+		return BruteForceIndex(self, metric)
 
-		if alignment is None:
-			alignment = WatermanSmithBeyer()
-
-		metrics = options.get("metrics")
-		if metrics is None and metric is not None:
-			metrics = [metric]
-		if metrics is None:
-			metrics = self._default_metrics
-		assert all(isinstance(x, SentenceMetric) for x in metrics)
-
-		options = options.copy()
-		options["metrics"] = [m.to_args() for m in metrics]
-		options["alignment"] = alignment.to_args(self)
-		options["max_matches"] = n
-		options["min_score"] = min_score
-
-		start_time = time.time()
-
-		query = Query(self._vocab, doc, options)
-		r = self._index(query, progress=progress)
-
-		return ret_class(
-			r.best_n(-1),
-			duration=time.time() - start_time)
+	def run_query(self, find, query):
+		return Result, find(query)
 
 
 class LabResult(Result):
@@ -275,7 +290,7 @@ class LabResult(Result):
 
 
 class LabSession(Session):
-	def find(self, *args, return_json=False, **kwargs):
+	def run_query(self, find, query):
 		import ipywidgets as widgets
 		from IPython.display import display
 
@@ -289,12 +304,10 @@ class LabSession(Session):
 			progress.value = progress.max * t
 
 		try:
-			result = super().find(
-				*args,
-				progress=update_progress,
-				ret_class=LabResult,
-				**kwargs)
+			result = find(
+				query,
+				progress=update_progress)
 		finally:
 			progress.close()
 
-		return result
+		return LabResult, result

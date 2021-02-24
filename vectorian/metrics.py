@@ -1,3 +1,6 @@
+from vectorian.alignment import WatermanSmithBeyer
+
+
 class WordMetric:
 	pass
 
@@ -113,28 +116,41 @@ class MaxMetric(WordMetric):
 
 
 class SentenceMetric:
-	pass
+	def to_args(self, session):
+		raise NotImplementedError()
 
 
-class IsolatedMetric(SentenceMetric):
-	def __init__(self, word_metric):
+class AlignmentSentenceMetric(SentenceMetric):
+	def __init__(self, word_metric, alignment=None):
 		assert isinstance(word_metric, WordMetric)
-		self._word_metric = word_metric
 
-	def to_args(self):
+		if alignment is None:
+			alignment = WatermanSmithBeyer()
+
+		self._word_metric = word_metric
+		self._alignment = alignment
+
+	def to_args(self, session):
 		return {
-			'metric': 'isolated',
-			'word_metric': self._word_metric.to_args()
+			'metric': 'alignment-isolated',
+			'word_metric': self._word_metric.to_args(),
+			'alignment': self._alignment.to_args(session)
 		}
 
 
-class TagWeightedMetric(SentenceMetric):
-	def __init__(self, word_metric, tag_weights, pos_mismatch_penalty, similarity_threshold):
+class TagWeightedSentenceMetric(SentenceMetric):
+	def __init__(self, word_metric, alignment, tag_weights, pos_mismatch_penalty, similarity_threshold):
 		assert isinstance(word_metric, WordMetric)
-		self._word_metric = word_metric
 
-	def to_args(self):
+		if alignment is None:
+			alignment = WatermanSmithBeyer()
+
+		self._word_metric = word_metric
+		self._alignment = alignment
+
+	def to_args(self, session):
 		return {
-			'metric': 'tag_weighted',
-			'word_metric': self._word_metric.to_args()
+			'metric': 'alignment-tag-weighted',
+			'word_metric': self._word_metric.to_args(),
+			'alignment': self._alignment.to_args(session)
 		}

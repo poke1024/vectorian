@@ -190,30 +190,27 @@ MatcherRef create_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
+	const py::dict &p_alignment_def,
 	const SliceFactory &p_factory) {
 
 	// FIXME support different alignment algorithms here.
 
-	py::gil_scoped_acquire acquire;
-
-	const py::dict args = p_query->alignment_algorithm();
-
 	std::string algorithm;
-	if (args.contains("algorithm")) {
-		algorithm = args["algorithm"].cast<py::str>();
+	if (p_alignment_def.contains("algorithm")) {
+		algorithm = p_alignment_def["algorithm"].cast<py::str>();
 	} else {
 		algorithm = "wsb"; // default
 	}
 
 	if (algorithm == "wsb") {
 		float zero = 0.5;
-		if (args.contains("zero")) {
-			zero = args["zero"].cast<float>();
+		if (p_alignment_def.contains("zero")) {
+			zero = p_alignment_def["zero"].cast<float>();
 		}
 
 		std::vector<float> gap_cost;
-		if (args.contains("gap")) {
-			auto cost = args["gap"].cast<py::array_t<float>>();
+		if (p_alignment_def.contains("gap")) {
+			auto cost = p_alignment_def["gap"].cast<py::array_t<float>>();
 			auto r = cost.unchecked<1>();
 			const ssize_t n = r.shape(0);
 			gap_cost.resize(n);
@@ -235,14 +232,14 @@ MatcherRef create_matcher(
 		bool symmetric = true;
 		bool one_target = true;
 
-		if (args.contains("normalize_bow")) {
-			normalize_bow = args["normalize_bow"].cast<bool>();
+		if (p_alignment_def.contains("normalize_bow")) {
+			normalize_bow = p_alignment_def["normalize_bow"].cast<bool>();
 		}
-		if (args.contains("symmetric")) {
-			symmetric = args["symmetric"].cast<bool>();
+		if (p_alignment_def.contains("symmetric")) {
+			symmetric = p_alignment_def["symmetric"].cast<bool>();
 		}
-		if (args.contains("one_target")) {
-			one_target = args["one_target"].cast<bool>();
+		if (p_alignment_def.contains("one_target")) {
+			one_target = p_alignment_def["one_target"].cast<bool>();
 		}
 
 		return make_matcher(
@@ -322,6 +319,8 @@ MatcherRef FastMetric::create_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document) {
 
+	py::gil_scoped_acquire acquire;
+
 	const auto metric = std::dynamic_pointer_cast<FastMetric>(shared_from_this());
 
 	const auto &token_filter = p_query->token_filter();
@@ -329,7 +328,7 @@ MatcherRef FastMetric::create_matcher(
 	const std::string sentence_metric_kind =
 		m_options["metric"].cast<py::str>();
 
-	if (sentence_metric_kind == "isolated") {
+	if (sentence_metric_kind == "alignment-isolated") {
 
 		const auto make_fast_slice = [metric] (
 			const TokenSpan &s,
@@ -341,10 +340,10 @@ MatcherRef FastMetric::create_matcher(
 		const FactoryGenerator gen(make_fast_slice);
 
 		return ::create_matcher(
-			p_query, p_document, metric,
+			p_query, p_document, metric, metric->alignment_def(),
 			gen.create_filtered(p_document, token_filter));
 
-	} else if (sentence_metric_kind == "tag_weighted") {
+	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
 		TagWeightedOptions options;
 		options.t_pos_weights = parse_tag_weights(p_query, m_options["tag_weights"]);
@@ -369,7 +368,7 @@ MatcherRef FastMetric::create_matcher(
 		const FactoryGenerator gen(make_tag_weighted_slice);
 
 		return ::create_matcher(
-			p_query, p_document, metric,
+			p_query, p_document, metric, metric->alignment_def(),
 			gen.create_filtered(p_document, token_filter));
 	} else {
 
