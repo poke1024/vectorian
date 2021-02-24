@@ -1,4 +1,5 @@
 from vectorian.alignment import WatermanSmithBeyer
+from vectorian.index import BruteForceIndex
 
 
 class WordMetric:
@@ -116,6 +117,9 @@ class MaxMetric(WordMetric):
 
 
 class SentenceMetric:
+	def create_index(self, session):
+		raise NotImplementedError()
+
 	def to_args(self, session):
 		raise NotImplementedError()
 
@@ -129,6 +133,9 @@ class AlignmentSentenceMetric(SentenceMetric):
 
 		self._word_metric = word_metric
 		self._alignment = alignment
+
+	def create_index(self, session):
+		return BruteForceIndex(session, self)
 
 	def to_args(self, session):
 		return {
@@ -147,6 +154,9 @@ class TagWeightedSentenceMetric(SentenceMetric):
 
 		self._word_metric = word_metric
 		self._alignment = alignment
+
+	def create_index(self, session):
+		return BruteForceIndex(session, self)
 
 	def to_args(self, session):
 		return {
