@@ -135,7 +135,7 @@ class Result:
 		return self._duration
 
 
-class Finder:
+class Index:
 	def __init__(self, vocab, corpus, filter_):
 		self._vocab = vocab
 		self._docs = []
@@ -209,15 +209,15 @@ class Session:
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(
 				IsolatedMetric(CosineMetric(embedding)))
-		self._finder = Finder(self._vocab, corpus, import_filter)
+		self._index = Index(self._vocab, corpus, import_filter)
 
 	@property
 	def documents(self):
-		return self._finder.documents
+		return self._index.documents
 
 	@property
 	def max_sentence_len(self):
-		return self._finder.max_sentence_len
+		return self._index.max_sentence_len
 
 	def find(
 		self, doc: spacy.tokens.doc.Doc, alignment=None, metric=None,
@@ -246,7 +246,7 @@ class Session:
 		start_time = time.time()
 
 		query = Query(self._vocab, doc, options)
-		r = self._finder(query, progress=progress)
+		r = self._index(query, progress=progress)
 
 		return ret_class(
 			r.best_n(-1),
