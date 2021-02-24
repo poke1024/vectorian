@@ -35,6 +35,7 @@ std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_ta
 }
 
 Document::Document(
+	const py::object &p_py_doc,
 	int64_t p_document_id,
 	VocabularyRef p_vocab,
 	const std::string &p_text,
@@ -43,6 +44,7 @@ Document::Document(
 	const py::dict &p_metadata,
 	const std::string &p_cache_path = std::string()):
 
+	m_py_doc(p_py_doc),
 	m_id(p_document_id),
 	m_vocab(p_vocab),
 	m_text(p_text),

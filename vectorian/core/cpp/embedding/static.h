@@ -77,16 +77,11 @@ public:
 		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle) {
 
-		auto m = std::make_shared<StaticEmbeddingMetric>(
+		const auto m = std::make_shared<StaticEmbeddingMetric>(
 			shared_from_this(),
 			p_sent_metric_def);
 
-		auto s = p_metric.instantiate(m_embeddings);
-		/*m_similarity_measures.find(p_embedding_similarity);
-		if (s == m_similarity_measures.end()) {
-			throw std::runtime_error(
-				std::string("unknown similary measure ") + p_embedding_similarity);
-		}*/
+		const auto s = p_metric.instantiate(m_embeddings);
 
 		build_similarity_matrix(
 			p_vocabulary_to_embedding,
@@ -154,16 +149,6 @@ public:
 		}
 	}
 
-
-	token_t lookup(const std::string &p_token) const {
-		const auto i = m_tokens.find(p_token);
-		if (i != m_tokens.end()) {
-			return i->second;
-		} else {
-			return -1;
-		}
-	}
-
 	size_t n_tokens() const {
 		return m_embeddings.raw.rows();
 	}
@@ -215,10 +200,11 @@ private:
 				PPK_ASSERT(mapped >= 0);
 				needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
 			} else {
-				// that word is not in our Vocabulary, it might be in the Embedding though.
-				const auto word = p_needle_text.substr(p_needle.at(i).idx, p_needle.at(i).len);
-				std::string lower = py::str(py::str(word).attr("lower")());
-				needle_embedding_token_ids[i] = lookup(lower);
+				// that word is not in our current Vocabulary, it might be in the Embedding though.
+				// (with new two-stage QueryVocabulary this case should no longer occur).
+				//const auto word = p_needle_text.substr(p_needle.at(i).idx, p_needle.at(i).len);
+				//std::string lower = py::str(py::str(word).attr("lower")());
+				needle_embedding_token_ids[i] = -1; //lookup(lower);
 			}
 			//std::cout << "xx mapped " << t << " -> " << p_a[t] << std::endl;
 		}

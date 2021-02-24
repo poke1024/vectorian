@@ -20,6 +20,7 @@ inline void add_dummy_token(std::vector<Token> &tokens) {
 
 class Document : public std::enable_shared_from_this<Document> {
 private:
+	const py::object m_py_doc;
 	const int64_t m_id;
 	const VocabularyRef m_vocab;
 	const std::string m_text;
@@ -34,6 +35,7 @@ private:
 
 public:
 	Document(
+		const py::object &p_py_doc,
 		int64_t p_document_id,
 		VocabularyRef p_vocab,
 		const std::string &p_text,

@@ -162,3 +162,74 @@ public:
 		return m_wmd.match();
 	}
 };
+
+
+template<typename SliceFactory>
+MatcherRef create_alignment_matcher(
+	const QueryRef &p_query,
+	const DocumentRef &p_document,
+	const MetricRef &p_metric,
+	const py::dict &p_alignment_def,
+	const SliceFactory &p_factory) {
+
+	// FIXME support different alignment algorithms here.
+
+	std::string algorithm;
+	if (p_alignment_def.contains("algorithm")) {
+		algorithm = p_alignment_def["algorithm"].cast<py::str>();
+	} else {
+		algorithm = "wsb"; // default
+	}
+
+	if (algorithm == "wsb") {
+		float zero = 0.5;
+		if (p_alignment_def.contains("zero")) {
+			zero = p_alignment_def["zero"].cast<float>();
+		}
+
+		std::vector<float> gap_cost;
+		if (p_alignment_def.contains("gap")) {
+			auto cost = p_alignment_def["gap"].cast<py::array_t<float>>();
+			auto r = cost.unchecked<1>();
+			const ssize_t n = r.shape(0);
+			gap_cost.resize(n);
+			for (ssize_t i = 0; i < n; i++) {
+				gap_cost[i] = r(i);
+			}
+		}
+		if (gap_cost.empty()) {
+			gap_cost.push_back(std::numeric_limits<float>::infinity());
+		}
+
+		return make_matcher(
+			p_query, p_document, p_metric, p_factory,
+			WatermanSmithBeyer<int16_t>(gap_cost, zero));
+
+	} else if (algorithm == "rwmd") {
+
+		bool normalize_bow = true;
+		bool symmetric = true;
+		bool one_target = true;
+
+		if (p_alignment_def.contains("normalize_bow")) {
+			normalize_bow = p_alignment_def["normalize_bow"].cast<bool>();
+		}
+		if (p_alignment_def.contains("symmetric")) {
+			symmetric = p_alignment_def["symmetric"].cast<bool>();
+		}
+		if (p_alignment_def.contains("one_target")) {
+			one_target = p_alignment_def["one_target"].cast<bool>();
+		}
+
+		return make_matcher(
+			p_query, p_document, p_metric, p_factory,
+			RelaxedWordMoversDistance<int16_t>(
+				normalize_bow, symmetric, one_target));
+
+	} else {
+
+		std::ostringstream err;
+		err << "illegal alignment algorithm " << algorithm;
+		throw std::runtime_error(err.str());
+	}
+}

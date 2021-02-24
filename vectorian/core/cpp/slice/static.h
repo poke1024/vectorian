@@ -49,11 +49,11 @@ public:
 	typedef TokenIdEncoder Encoder;
 
 	inline StaticEmbeddingSlice(
-		const StaticEmbeddingMetricRef &metric,
+		const MetricRef &metric,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 
-		m_metric(metric),
+		m_metric(std::dynamic_pointer_cast<StaticEmbeddingMetric>(metric)),
 		s_tokens(s.tokens),
 		m_len_s(s.len),
 		t_tokens(t.tokens),

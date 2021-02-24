@@ -13,7 +13,7 @@ def normalize_dashes(s):
 
 
 Metadata = namedtuple(
-	"Metadata", ["version", "unique_id", "author", "title", "speakers"])
+	"Metadata", ["version", "unique_id", "origin", "author", "title", "speakers"])
 
 
 class Importer:
@@ -54,6 +54,7 @@ class Importer:
 		json = {
 			"version": md.version,
 			'unique_id': md.unique_id,
+			'origin': str(md.origin),
 			'author': md.author,
 			'title': md.title,
 			'speakers': md.speakers,
@@ -92,6 +93,7 @@ class TextImporter(Importer):
 		md = Metadata(
 			version="1.0",
 			unique_id=unique_id,
+			origin=path,
 			author=author,
 			title=title,
 			speakers={})
@@ -173,6 +175,7 @@ class NovelImporter(Importer):
 		md = Metadata(
 			version="1.0",
 			unique_id=unique_id,
+			origin=path,
 			author=author,
 			title=title,
 			speakers={})

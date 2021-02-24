@@ -25,7 +25,9 @@ class Corpus:
 		path = Path(path)
 		for p in sorted(path.iterdir()):
 			if p.suffix == ".json":
-				yield Document.load(p)
+				doc = Document.load(p)
+				doc["origin"] = p
+				yield doc
 
 	def save(self, path):
 		path = Path(path)
@@ -78,4 +80,6 @@ class LazyCorpus:
 		self._compile()
 
 		for p in sorted(self._path.iterdir()):
-			yield Document.load(p)
+			doc = Document.load(p)
+			doc["origin"] = p
+			yield doc

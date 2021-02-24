@@ -111,7 +111,7 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<Document, DocumentRef> document(m, "Document");
 	document.def(py::init<
-		int64_t, VocabularyRef, const std::string&, py::object,
+		py::object, int64_t, VocabularyRef, const std::string&, py::object,
 		py::object, py::dict, const std::string&>());
 	document.def("find", &Document::find);
 	document.def("__str__", &Document::__str__);

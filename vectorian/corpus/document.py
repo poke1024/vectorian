@@ -84,10 +84,20 @@ class Document:
 	def __init__(self, json):
 		self._json = json
 
+	def free_up_memory(self):
+		self._json = {
+			'unique_id': self._json['unique_id'],
+			'origin': self._json['origin'],
+			'author': self._json['author'],
+			'title': self._json['title']
+		}
+
 	@staticmethod
 	def load(path):
 		with open(path, "r") as f:
-			return Document(json.loads(f.read()))
+			doc = Document(json.loads(f.read()))
+			doc['origin'] = path
+			return doc
 
 	def save(self, path):
 		with open(path, "w") as f:
@@ -110,6 +120,10 @@ class Document:
 	@property
 	def unique_id(self):
 		return self._json['unique_id']
+
+	@property
+	def origin(self):
+		return self._json['origin']
 
 	@property
 	def title(self):
@@ -158,6 +172,7 @@ class Document:
 				texts.append(sent_text)
 
 		return core.Document(
+			self,
 			index,
 			vocab,
 			"".join(texts).encode("utf8"),

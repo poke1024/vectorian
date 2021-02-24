@@ -108,6 +108,7 @@ class Collection:
 			self._docs.append(
 				doc.to_core(len(self._docs), self._vocab, filter_)
 			)
+			doc.free_up_memory()
 
 	@property
 	def documents(self):
