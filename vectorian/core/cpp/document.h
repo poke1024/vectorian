@@ -105,7 +105,7 @@ public:
 		return m_sentences.at(p_index);
 	}
 
-	py::dict py_sentence(size_t p_index) const {
+	py::dict py_sentence_info(const size_t p_index) const {
 		const Sentence &s = m_sentences.at(p_index);
 		py::dict d;
 		d["book"] = s.book;
@@ -132,27 +132,32 @@ public:
 		return py_doc;
 	}*/
 
-	py::list py_sentences_as_text() const {
-		py::list py_sentences;
-		const auto &tokens = *m_tokens.get();
-		for (const Sentence &s : m_sentences) {
-			if (s.n_tokens > 0) {
-				const auto &t0 = tokens[s.token_at];
+	py::str py_sentence(const size_t p_index) const {
+		const Sentence &s = m_sentences.at(p_index);
+		if (s.n_tokens > 0) {
+			const auto &tokens = *m_tokens.get();
+			const auto &t0 = tokens[s.token_at];
 
-				int32_t i1;
-				if (s.token_at + s.n_tokens < static_cast<int32_t>(tokens.size())) {
-					i1 = tokens[s.token_at + s.n_tokens].idx;
-				} else {
-					const auto &t1 = tokens[s.token_at + s.n_tokens - 1];
-					i1 = t1.idx + t1.len;
-				}
-
-				py_sentences.append(py::str(m_text.substr(t0.idx, i1 - t0.idx)));
+			int32_t i1;
+			if (s.token_at + s.n_tokens < static_cast<int32_t>(tokens.size())) {
+				i1 = tokens[s.token_at + s.n_tokens].idx;
 			} else {
-				py_sentences.append(py::str(""));
+				const auto &t1 = tokens[s.token_at + s.n_tokens - 1];
+				i1 = t1.idx + t1.len;
 			}
+
+			return m_text.substr(t0.idx, i1 - t0.idx);
+		} else {
+			return py::str("");
 		}
-		return py_sentences;
+	}
+
+	py::list py_sentences() const {
+		py::list py_sents;
+		for (size_t i = 0; i < m_sentences.size(); i++) {
+			py_sents.append(py_sentence(i));
+		}
+		return py_sents;
 	}
 
 };

@@ -52,7 +52,7 @@ Region = namedtuple('Region', [
 	's', 'match', 'gap_penalty'])
 
 
-RegionMatch = namedtuple('TokenMatch', [
+TokenMatch = namedtuple('TokenMatch', [
 	't', 'pos_s', 'pos_t', 'similarity', 'weight', 'metric'])
 
 
@@ -72,9 +72,9 @@ class Match:
 			if r.matched:
 				regions.append(Region(
 					s=r.s.decode('utf-8', errors='ignore'),
-					pos_s=r.pos_s.decode('utf-8', errors='ignore'),
 					match=TokenMatch(
 						t=r.t.decode('utf-8', errors='ignore'),
+						pos_s=r.pos_s.decode('utf-8', errors='ignore'),
 						pos_t=r.pos_t.decode('utf-8', errors='ignore'),
 						similarity=r.similarity,
 						weight=r.weight,
@@ -83,7 +83,6 @@ class Match:
 			else:
 				regions.append(Region(
 					s=r.s.decode('utf-8', errors='ignore'),
-					pos_s=None,
 					match=None,
 					gap_penalty=r.mismatch_penalty))
 
@@ -123,7 +122,7 @@ class Index:
 
 	def find(
 		self, doc: spacy.tokens.doc.Doc,
-		n=100, min_score=0.2,
+		n=10, min_score=0.2,
 		options: dict = dict()):
 
 		if not isinstance(doc, spacy.tokens.doc.Doc):
@@ -176,6 +175,11 @@ class BruteForceIndex(Index):
 		return [Match.from_core(m) for m in results.best_n(-1)]
 
 
+def chunks(x, n):
+	for i in range(0, len(x), n):
+		yield x[i:i + n]
+
+
 class SentenceEmbeddingIndex(Index):
 	def __init__(self, session, metric, encoder):
 		super().__init__(session, metric)
@@ -183,12 +187,11 @@ class SentenceEmbeddingIndex(Index):
 		self._encoder = encoder
 		self._metric = metric
 
-		import faiss
-
 		corpus_vec = []
 		doc_starts = [0]
 		for i, doc in enumerate(tqdm(session.documents, "encoding")):
 			sents = doc.sentences
+			# FIXME filter empty sentences
 			doc_vec = encoder(sents)
 			n_dims = doc_vec.shape[-1]
 			corpus_vec.append(doc_vec)
@@ -197,16 +200,15 @@ class SentenceEmbeddingIndex(Index):
 		corpus_vec = np.vstack(corpus_vec)
 		corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
 
-		for v in corpus_vec:
-			print("?", np.linalg.norm(v))
-
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
+
+		try:
+			import faiss
+		except ImportError:
+			raise
 
 		# https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
 		# https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
-
-		#n_bits = 2 * n_dims
-		#index = faiss.IndexLSH(n_dims, n_bits)
 
 		pca_dim = 128
 		if corpus_vec.shape[0] < pca_dim:
@@ -234,20 +236,25 @@ class SentenceEmbeddingIndex(Index):
 				break
 
 			doc_index = bisect.bisect_left(self._doc_starts, i)
+			if doc_index > 0 and self._doc_starts[doc_index] > i:
+				doc_index -= 1
 			sent_index = i - self._doc_starts[doc_index]
 
-			#print(i, doc_index, self._doc_starts)
+			#print(i, doc_index, sent_index, self._doc_starts)
 
 			c_doc = self._session.documents[doc_index]
-			score = 1 - (d + 1) * 0.5
+			score = (d + 1) * 0.5
 
 			#print(c_doc, sentence_id)
 			#print(c_doc.sentence(sentence_id))
-			print(score, d)
+			#print(score, d)
 
-			sents = c_doc.sentences  # FIXME
+			if len(c_doc.sentence(sent_index).strip()) == 0:
+				continue  # FIXME
+
 			regions = [Region(
-				s=sents[sent_index], match=None, gap_penalty=0)]
+				s=c_doc.sentence(sent_index),
+				match=None, gap_penalty=0)]
 
 			matches.append(Match(
 				c_doc,
@@ -257,5 +264,4 @@ class SentenceEmbeddingIndex(Index):
 				regions=regions
 			))
 
-		print(matches)
 		return matches

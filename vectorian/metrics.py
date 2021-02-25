@@ -1,3 +1,5 @@
+import numpy as np
+
 from vectorian.alignment import WatermanSmithBeyer
 from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
@@ -6,6 +8,12 @@ class VectorSpaceMetric:
 	def to_args(self):
 		raise NotImplementedError()
 
+	def index(self, vectors, options):
+		def find(u, k):
+			for i, v in enumerate(vectors):
+				self.score(u, v)
+		return find
+
 
 class CosineMetric(VectorSpaceMetric):
 	def to_args(self):
@@ -13,6 +21,9 @@ class CosineMetric(VectorSpaceMetric):
 			'metric': 'cosine',
 			'options': {}
 		}
+
+	def index(self, vectors):
+		vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
 
 
 class ZhuCosineMetric(VectorSpaceMetric):
@@ -44,6 +55,11 @@ class PNormMetric(VectorSpaceMetric):
 				'scale': self._scale
 			}
 		}
+
+
+class EuclideanMetric(PNormMetric):
+	def __init__(self, scale=1):
+		super().__init__(p=2, scale=scale)
 
 
 class LerpMetric(VectorSpaceMetric):

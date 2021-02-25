@@ -132,8 +132,9 @@ PYBIND11_MODULE(core, m) {
 	document.def_property_readonly("tokens", &Document::py_tokens);
 	document.def_property_readonly("path", &Document::path);
 	document.def_property_readonly("metadata", &Document::metadata);
+	document.def("sentence_info", &Document::py_sentence_info);
 	document.def("sentence", &Document::py_sentence);
-	document.def_property_readonly("sentences", &Document::py_sentences_as_text);
+	document.def_property_readonly("sentences", &Document::py_sentences);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);
 	document.def_property_readonly("n_sentences", &Document::n_sentences);
 	document.def_property_readonly("max_sentence_len", &Document::max_len_s);

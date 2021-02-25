@@ -107,14 +107,20 @@ class Renderer:
 					# FIXME annotateDebug
 
 			with tag('div', klass='media-content'):
-				with tag('span', style='font-variant: small-caps;'):
-					text(match['location']['speaker'])
+				speaker = match['location']['speaker']
+				title = match['location']['title']
+
+				if speaker:
+					with tag('span', style='font-variant: small-caps;'):
+						text(match['location']['speaker'])
 
 				with tag('div', klass='is-pulled-right'):
-					with tag('small'):
-						text(match['location']['author'] + ', ')
-					with tag('small', klass='is-italic'):
-						text(match['location']['title'] + ', ')
+					if speaker:
+						with tag('small'):
+							text(match['location']['author'] + ', ')
+					if title:
+						with tag('small', klass='is-italic'):
+							text(title + ', ')
 					with tag('small'):
 						text(match['location']['location'])
 

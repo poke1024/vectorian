@@ -14,7 +14,7 @@ def get_location_desc(metadata, location):
 	book = location["book"]
 	chapter = location["chapter"]
 	speaker = location["speaker"]
-	paragraph = location["paragraph"]
+	paragraph = location["paragraph"] + 1
 
 	if speaker > 0:  # we have an act-scene-speakers structure.
 		speaker = metadata["speakers"].get(str(speaker), "")
@@ -39,7 +39,7 @@ def matches_to_json(items):
 	for i, m in enumerate(items):
 		regions = []
 		doc = m.document
-		sentence = doc.sentence(m.sentence)
+		sentence = doc.sentence_info(m.sentence)
 
 		try:
 			for r in m.regions:
