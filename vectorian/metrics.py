@@ -186,4 +186,8 @@ class SentenceEmbeddingMetric(SentenceSimilarityMetric):
 		return SentenceEmbeddingIndex(session, self, self._encoder)
 
 	def to_args(self, session):
-		return {}
+		return None
+
+	@property
+	def name(self):
+		return "SentenceEmbeddingMetric"

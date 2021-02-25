@@ -3,6 +3,9 @@ python >= 3.7
 https://github.com/src-d/wmd-relax
 https://github.com/src-d/wmd-relax/blob/master/emd_relaxed.h
 
+Close reading vs high level view: Vectorian is a good tool, as you can dive into
+specific search results very easily and fast.
+
 A plethora of methods available to the researcher, but it can be
 cumbersome to try out these methods on an actual corpus of texts.
 

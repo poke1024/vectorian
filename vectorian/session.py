@@ -34,7 +34,7 @@ def get_location_desc(metadata, location):
 		return "", "par. %d" % paragraph
 
 
-def result_set_to_json(items):
+def matches_to_json(items):
 	matches = []
 	for i, m in enumerate(items):
 		regions = []
@@ -43,19 +43,20 @@ def result_set_to_json(items):
 
 		try:
 			for r in m.regions:
-				s = r.s.decode('utf-8', errors='ignore')
-				if r.matched:
-					t = r.t.decode('utf-8', errors='ignore')
+				s = r.s
+				rm = r.match
+				if rm:
+					t = rm.t
 					regions.append(dict(
 						s=s,
 						t=t,
-						similarity=r.similarity,
-						weight=r.weight,
-						pos_s=r.pos_s.decode('utf-8', errors='ignore'),
-						pos_t=r.pos_t.decode('utf-8', errors='ignore'),
-						metric=r.metric.decode('utf-8', errors='ignore')))
+						similarity=rm.similarity,
+						weight=rm.weight,
+						pos_s=rm.pos_s,
+						pos_t=rm.pos_t,
+						metric=rm.metric))
 				else:
-					regions.append(dict(s=s, mismatch_penalty=r.mismatch_penalty))
+					regions.append(dict(s=s, gap_penalty=r.gap_penalty))
 
 			metadata = m.document.metadata
 			speaker, loc_desc = get_location_desc(metadata, sentence)
@@ -91,7 +92,7 @@ class Result:
 
 	@lru_cache(1)
 	def to_json(self):
-		return result_set_to_json(self._matches)
+		return matches_to_json(self._matches)
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])

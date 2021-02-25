@@ -144,6 +144,7 @@ PYBIND11_MODULE(core, m) {
 	result_set.def("extend", &ResultSet::extend);
 
 	py::class_<ExternalMetric, ExternalMetricRef> ext_metric(m, "ExternalMetric");
+	ext_metric.def(py::init<const std::string&>());
 
 	/*py::class_<LargeMatrix, LargeMatrixRef> matrix(m, "LargeMatrix");
 	matrix.def(py::init<const std::string &>());

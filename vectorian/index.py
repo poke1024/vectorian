@@ -4,7 +4,9 @@ import multiprocessing
 import multiprocessing.pool
 import time
 import numpy as np
+import bisect
 
+from collections import namedtuple
 from tqdm import tqdm
 from vectorian.corpus.document import TokenTable
 
@@ -46,6 +48,74 @@ class Query:
 			**self._options)
 
 
+Region = namedtuple('Region', [
+	's', 'match', 'gap_penalty'])
+
+
+RegionMatch = namedtuple('TokenMatch', [
+	't', 'pos_s', 'pos_t', 'similarity', 'weight', 'metric'])
+
+
+class Match:
+	def __init__(self, document, sentence, score, metric=None, omitted=None, regions=None):
+		self._document = document
+		self._sentence = sentence
+		self._score = score
+		self._metric = metric or ""
+		self._omitted = omitted or []
+		self._regions = regions or []
+
+	@staticmethod
+	def from_core(c_match):
+		regions = []
+		for r in c_match.regions:
+			if r.matched:
+				regions.append(Region(
+					s=r.s.decode('utf-8', errors='ignore'),
+					pos_s=r.pos_s.decode('utf-8', errors='ignore'),
+					match=TokenMatch(
+						t=r.t.decode('utf-8', errors='ignore'),
+						pos_t=r.pos_t.decode('utf-8', errors='ignore'),
+						similarity=r.similarity,
+						weight=r.weight,
+						metric=r.metric.decode('utf-8', errors='ignore')),
+					gap_penalty=r.mismatch_penalty))
+			else:
+				regions.append(Region(
+					s=r.s.decode('utf-8', errors='ignore'),
+					pos_s=None,
+					match=None,
+					gap_penalty=r.mismatch_penalty))
+
+		return Match(
+			c_match.document, c_match.sentence, c_match.score,
+			c_match.metric, c_match.omitted, regions)
+
+	@property
+	def document(self):
+		return self._document
+
+	@property
+	def sentence(self):
+		return self._sentence
+
+	@property
+	def score(self):
+		return self._score
+
+	@property
+	def metric(self):
+		return self._metric
+
+	@property
+	def omitted(self):
+		return self._omitted
+
+	@property
+	def regions(self):
+		return self._regions
+
+
 class Index:
 	def __init__(self, session, metric):
 		self._session = session
@@ -59,8 +129,11 @@ class Index:
 		if not isinstance(doc, spacy.tokens.doc.Doc):
 			raise TypeError("please specify a spaCy document as query")
 
+		metric_args = self._metric.to_args(self._session)
+
 		options = options.copy()
-		options["metric"] = self._metric.to_args(self._session)
+		if metric_args:
+			options["metric"] = metric_args
 		options["max_matches"] = n
 		options["min_score"] = min_score
 
@@ -100,25 +173,32 @@ class BruteForceIndex(Index):
 				if progress:
 					progress(done / total)
 
-		return results.best_n(-1)
+		return [Match.from_core(m) for m in results.best_n(-1)]
 
 
 class SentenceEmbeddingIndex(Index):
 	def __init__(self, session, metric, encoder):
 		super().__init__(session, metric)
+
 		self._encoder = encoder
+		self._metric = metric
 
 		import faiss
 
 		corpus_vec = []
-		doc_starts = []
+		doc_starts = [0]
 		for i, doc in enumerate(tqdm(session.documents, "encoding")):
 			sents = doc.sentences
 			doc_vec = encoder(sents)
 			n_dims = doc_vec.shape[-1]
 			corpus_vec.append(doc_vec)
 			doc_starts.append(len(sents))
+
 		corpus_vec = np.vstack(corpus_vec)
+		corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
+
+		for v in corpus_vec:
+			print("?", np.linalg.norm(v))
 
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
 
@@ -133,9 +213,9 @@ class SentenceEmbeddingIndex(Index):
 			pca_dim = None
 
 		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
-		#index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
+		index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
 		#index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
-		index = faiss.index_factory(n_dims, "LSH", faiss.METRIC_INNER_PRODUCT)
+		#index = faiss.index_factory(n_dims, "LSH", faiss.METRIC_INNER_PRODUCT)
 		index.train(corpus_vec)
 		index.add(corpus_vec)
 
@@ -143,36 +223,39 @@ class SentenceEmbeddingIndex(Index):
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder([query.text])
+		query_vec /= np.linalg.norm(query_vec)
+
 		distance, index = self._index.search(
 			query_vec, query.options["max_matches"])
 
-		c_query = query.to_core()
-		c_metric = core.ExternalMetric("SentenceEmbeddingMetric")
-
 		matches = []
 		for d, i in zip(distance[0], index[0]):
-			if index < 0:
+			if i < 0:
 				break
 
-			doc_index = 0
-			sentence_id = i
-			# doc.sentence(i)
+			doc_index = bisect.bisect_left(self._doc_starts, i)
+			sent_index = i - self._doc_starts[doc_index]
 
-			score = 1 - (d + 1) * 0.5
+			#print(i, doc_index, self._doc_starts)
 
 			c_doc = self._session.documents[doc_index]
-			c_matcher = core.ExternalMatcher(
-				c_query, c_doc, c_metric)
+			score = 1 - (d + 1) * 0.5
 
-			c_match = core.Match(
-				c_matcher,
+			#print(c_doc, sentence_id)
+			#print(c_doc.sentence(sentence_id))
+			print(score, d)
+
+			sents = c_doc.sentences  # FIXME
+			regions = [Region(
+				s=sents[sent_index], match=None, gap_penalty=0)]
+
+			matches.append(Match(
 				c_doc,
-				sentence_id,
-				[],
-				score)
+				sent_index,
+				score,
+				self._metric.name,
+				regions=regions
+			))
 
-			matches.append(c_match)
-
-			#print(d, i)
-
+		print(matches)
 		return matches
