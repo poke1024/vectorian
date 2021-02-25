@@ -6,6 +6,8 @@ from tqdm import tqdm
 from pathlib import Path
 from collections import namedtuple
 
+from vectorian.embeddings import ContextualEmbedding
+
 
 def normalize_dashes(s):
 	s = re.sub(r"(\w)\-(\s)", r"\1 -\2", s)
@@ -22,13 +24,23 @@ class Importer:
 		'normalize-dashes': normalize_dashes
 	}
 
-	def __init__(self, nlp, transforms=["normalize-dashes"], batch_size=1):
+	def __init__(self, nlp, embeddings=None, preprocessors=None, batch_size=1):
+		if embeddings is None:
+			embeddings = []
+		if preprocessors is None:
+			preprocessors = ["normalize-dashes"]
+
+		for embedding in embeddings:
+			if not isinstance(embedding, ContextualEmbedding):
+				raise TypeError(f"expected ContextualEmbedding, got {embedding}")
+
 		self._nlp = nlp
+		self._embeddings = embeddings
 		self._batch_size = batch_size
 		# batch_size == 1 needed for https://github.com/explosion/spaCy/issues/3607
-		self._transforms = transforms
+		self._transforms = preprocessors
 
-	def _transform_text(self, text):
+	def _preprocess_text(self, text):
 		for x in self._transforms:
 			if callable(x):
 				text = x(text)
@@ -51,6 +63,10 @@ class Importer:
 				'l': location[3]		# line
 			}
 			json_partitions.append(doc_json)
+
+			for embedding in self._embeddings:
+				v = embedding.encode(doc)
+				print('??', v.shape, len(doc))
 
 		json = {
 			"version": md.version,
@@ -80,7 +96,7 @@ class TextImporter(Importer):
 			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
-			text = self._transform_text(f.read())
+			text = self._preprocess_text(f.read())
 
 		locations = []
 
@@ -118,7 +134,7 @@ class NovelImporter(Importer):
 			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
-			text = self._transform_text(f.read())
+			text = self._preprocess_text(f.read())
 
 		chapter_breaks = []
 		expected_chapter = 1
@@ -203,4 +219,4 @@ class StringImporter(Importer):
 			title=title,
 			speakers={})
 
-		return self._make_doc(md, [s], locations)
+		return self._make_doc(md, [self._preprocess_text(s)], locations)

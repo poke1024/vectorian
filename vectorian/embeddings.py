@@ -20,7 +20,7 @@ def _make_table(tokens, embeddings):
 		['token'] + vecs_name)
 
 
-class Embedding:
+class StaticEmbedding:
 	pass
 
 
@@ -74,7 +74,7 @@ def _load_glove_txt(csv_path):
 	return tokens, embeddings
 
 
-class Glove(Embedding):
+class Glove(StaticEmbedding):
 	def __init__(self, name="6B"):
 		"""
 		:param name: one of "6B", "42B.300d", "840B.300d",
@@ -116,7 +116,7 @@ class Glove(Embedding):
 		return embedding
 
 
-class FastText(Embedding):
+class FastText(StaticEmbedding):
 	def __init__(self, lang):
 		"""
 		:param lang: language code of fasttext encodings, see
@@ -164,3 +164,14 @@ class FastText(Embedding):
 		embedding = core.StaticEmbedding(self.name, self._table)
 		self._table = None  # free up memory
 		return embedding
+
+
+class ContextualEmbedding:
+	def encode(self, doc):
+		raise NotImplementedError()
+
+
+class TransformerEmbedding(ContextualEmbedding):
+	def encode(self, doc):
+		# https://spacy.io/usage/embeddings-transformers#transformers
+		return doc._.trf_data.tensors[-1]

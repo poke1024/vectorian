@@ -117,7 +117,7 @@ public:
 		return d;
 	}
 
-	py::list py_sentences_as_tokens() const {
+	/*py::list py_sentences_as_tokens() const {
 		size_t k = 0;
 		py::list py_doc;
 		const auto &tokens = *m_tokens.get();
@@ -130,7 +130,7 @@ public:
 			py_doc.append(py_sent);
 		}
 		return py_doc;
-	}
+	}*/
 
 	py::list py_sentences_as_text() const {
 		py::list py_sentences;

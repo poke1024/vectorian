@@ -3,7 +3,9 @@ import spacy
 import multiprocessing
 import multiprocessing.pool
 import time
+import numpy as np
 
+from tqdm import tqdm
 from vectorian.corpus.document import TokenTable
 
 
@@ -12,6 +14,10 @@ class Query:
 		self._vocab = vocab
 		self._doc = doc
 		self._options = options
+
+	@property
+	def options(self):
+		return self._options
 
 	def _filter(self, tokens, name, k):
 		f = self._options.get(name, None)
@@ -57,10 +63,10 @@ class Index:
 		start_time = time.time()
 
 		query = Query(self._session.vocab, doc, options)
-		result_class, r = self._session.run_query(self._find, query)
+		result_class, matches = self._session.run_query(self._find, query)
 
 		return result_class(
-			r.best_n(-1),
+			matches,
 			duration=time.time() - start_time)
 
 
@@ -90,4 +96,51 @@ class BruteForceIndex(Index):
 				if progress:
 					progress(done / total)
 
-		return results
+		return results.best_n(-1)
+
+
+class SentenceEmbeddingIndex(Index):
+	def __init__(self, session, metric, encoder):
+		super().__init__(session, metric)
+		self._encoder = encoder
+
+		import faiss
+
+		corpus_vec = []
+		doc_starts = []
+		for i, doc in enumerate(tqdm(list(session.documents))):
+			sents = doc.sentences
+			doc_vec = encoder(sents)
+			print(doc_vec.shape)
+			n_dims = doc_vec.shape[-1]
+			corpus_vec.append(doc_vec)
+			doc_starts.append(len(sents))
+		corpus_vec = np.vstack(corpus_vec)
+
+		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
+
+		# https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
+		# https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
+
+		#n_bits = 2 * n_dims
+		#index = faiss.IndexLSH(n_dims, n_bits)
+
+		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
+		#index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
+		index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
+		index.train(corpus_vec)
+		index.add(corpus_vec)
+
+		self._index = index
+
+	def _find(self, query, progress=None):
+		query_vec = self._encoder([query.text])
+		distance, index = self._index.search(
+			query_vec, query.options["max_matches"])
+		for i in index:
+			# self._doc_starts
+			doc_id = 0
+			sent_id = i
+			# doc.sentence(i)
+			print()
+

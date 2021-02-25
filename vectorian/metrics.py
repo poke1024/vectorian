@@ -1,5 +1,5 @@
 from vectorian.alignment import WatermanSmithBeyer
-from vectorian.index import BruteForceIndex
+from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
 class WordMetric:
@@ -167,15 +167,19 @@ class TagWeightedSentenceMetric(SentenceMetric):
 
 
 class SentenceEmbeddingMetric(SentenceMetric):
-	def __init__(self, base_metric):
+	def __init__(self, encoder, base_metric):
+		self._encoder = encoder
 		self._base_metric = base_metric
 
+		'''
+		example:
+		from sentence_transformers import SentenceTransformer
+		model = SentenceTransformer('paraphrase-distilroberta-base-v1')
+		SentenceEmbeddingMetric(model.encode)
+		'''
+
 	def create_index(self, session):
-		return SentenceEmbeddingIndex(session, self)
+		return SentenceEmbeddingIndex(session, self, self._encoder)
 
 	def to_args(self, session):
-		return {
-			'metric': 'sentence-embedding',
-			'base_metric': self._base_metric.to_args()
-		}
-
+		return {}

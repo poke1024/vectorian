@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from vectorian.render import Renderer
 from vectorian.metrics import CosineMetric, AlignmentSentenceMetric, SentenceMetric
-from vectorian.importers import StringImporter
+from vectorian.embeddings import StaticEmbedding
 
 
 def get_location_desc(metadata, location):
@@ -148,6 +148,8 @@ class Session:
 		self._vocab = core.Vocabulary()
 		self._default_metrics = []
 		for embedding in embeddings:
+			if not isinstance(embedding, StaticEmbedding):
+				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(
 				AlignmentSentenceMetric(CosineMetric(embedding)))
