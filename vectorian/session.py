@@ -6,7 +6,7 @@ from cached_property import cached_property
 from functools import lru_cache
 
 from vectorian.render import Renderer
-from vectorian.metrics import CosineMetric, AlignmentSentenceMetric, SentenceMetric
+from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
 
 
@@ -152,7 +152,9 @@ class Session:
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			self._vocab.add_embedding(embedding.to_core())
 			self._default_metrics.append(
-				AlignmentSentenceMetric(CosineMetric(embedding)))
+				AlignmentSentenceMetric(
+					WordSimilarityMetric(
+						embedding, CosineMetric())))
 		self._collection = Collection(self._vocab, docs, import_filter)
 
 	@property
@@ -174,7 +176,7 @@ class Session:
 	def make_index(self, metric=None):
 		if metric is None:
 			metric = self._default_metrics[0]
-		assert isinstance(metric, SentenceMetric)
+		assert isinstance(metric, SentenceSimilarityMetric)
 		return metric.create_index(self)
 
 	def run_query(self, find, query):

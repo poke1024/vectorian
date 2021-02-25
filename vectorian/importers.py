@@ -54,7 +54,7 @@ class Importer:
 			batch_size=self._batch_size)
 
 		json_partitions = []
-		for location, doc in tqdm(zip(locations, pipe), total=len(locations)):
+		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=md.title):
 			doc_json = doc.to_json()
 			doc_json['loc'] = {
 				'bk': location[0],  	# book

@@ -2,59 +2,42 @@ from vectorian.alignment import WatermanSmithBeyer
 from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
-class WordMetric:
-	pass
+class VectorSpaceMetric:
+	def to_args(self):
+		raise NotImplementedError()
 
 
-class CosineMetric(WordMetric):
-	def __init__(self, embedding):
-		self._embedding = embedding
-
+class CosineMetric(VectorSpaceMetric):
 	def to_args(self):
 		return {
-			'name': self._embedding.name + "-cosine",
-			'embedding': self._embedding.name,
 			'metric': 'cosine',
 			'options': {}
 		}
 
 
-class ZhuCosineMetric(WordMetric):
-	def __init__(self, embedding):
-		self._embedding = embedding
-
+class ZhuCosineMetric(VectorSpaceMetric):
 	def to_args(self):
 		return {
-			'name': self._embedding.name + "-zhu-cosine",
-			'embedding': self._embedding.name,
 			'metric': 'zhu-cosine',
 			'options': {}
 		}
 
 
-class SohangirCosineMetric(WordMetric):
-	def __init__(self, embedding):
-		self._embedding = embedding
-
+class SohangirCosineMetric(VectorSpaceMetric):
 	def to_args(self):
 		return {
-			'name': self._embedding.name + "-sohangir-cosine",
-			'embedding': self._embedding.name,
 			'metric': 'sohangir-cosine',
 			'options': {}
 		}
 
 
-class PNormMetric(WordMetric):
-	def __init__(self, embedding, p=2, scale=1):
-		self._embedding = embedding
+class PNormMetric(VectorSpaceMetric):
+	def __init__(self, p=2, scale=1):
 		self._p = p
 		self._scale = scale
 
 	def to_args(self):
 		return {
-			'name': self._embedding.name + "-p-norm",
-			'embedding': self._embedding.name,
 			'metric': 'p-norm',
 			'options': {
 				'p': self._p,
@@ -63,8 +46,8 @@ class PNormMetric(WordMetric):
 		}
 
 
-class LerpMetric(WordMetric):
-	def __init__(self, a: WordMetric, b: WordMetric, t: float):
+class LerpMetric(VectorSpaceMetric):
+	def __init__(self, a: VectorSpaceMetric, b: VectorSpaceMetric, t: float):
 		self._a = a
 		self._b = b
 		self._t = t
@@ -82,8 +65,8 @@ class LerpMetric(WordMetric):
 		}
 
 
-class MinMetric(WordMetric):
-	def __init__(self, a: WordMetric, b: WordMetric):
+class MinMetric(VectorSpaceMetric):
+	def __init__(self, a: VectorSpaceMetric, b: VectorSpaceMetric):
 		self._a = a
 		self._b = b
 
@@ -99,8 +82,8 @@ class MinMetric(WordMetric):
 		}
 
 
-class MaxMetric(WordMetric):
-	def __init__(self, a: WordMetric, b: WordMetric):
+class MaxMetric(VectorSpaceMetric):
+	def __init__(self, a: VectorSpaceMetric, b: VectorSpaceMetric):
 		self._a = a
 		self._b = b
 
@@ -116,7 +99,22 @@ class MaxMetric(WordMetric):
 		}
 
 
-class SentenceMetric:
+class WordSimilarityMetric:
+	def __init__(self, embedding, metric: VectorSpaceMetric):
+		self._embedding = embedding
+		self._metric = metric
+
+	def to_args(self):
+		args = self._metric.to_args()
+		return {
+			'name': self._embedding.name + "-" + args['metric'],
+			'embedding': self._embedding.name,
+			'metric': args['metric'],
+			'options': args['options']
+		}
+
+
+class SentenceSimilarityMetric:
 	def create_index(self, session):
 		raise NotImplementedError()
 
@@ -124,9 +122,9 @@ class SentenceMetric:
 		raise NotImplementedError()
 
 
-class AlignmentSentenceMetric(SentenceMetric):
-	def __init__(self, word_metric, alignment=None):
-		assert isinstance(word_metric, WordMetric)
+class AlignmentSentenceMetric(SentenceSimilarityMetric):
+	def __init__(self, word_metric: WordSimilarityMetric, alignment=None):
+		assert isinstance(word_metric, WordSimilarityMetric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -145,9 +143,10 @@ class AlignmentSentenceMetric(SentenceMetric):
 		}
 
 
-class TagWeightedSentenceMetric(SentenceMetric):
-	def __init__(self, word_metric, alignment, tag_weights, pos_mismatch_penalty, similarity_threshold):
-		assert isinstance(word_metric, WordMetric)
+class TagWeightedSentenceMetric(SentenceSimilarityMetric):
+	def __init__(self, word_metric: WordSimilarityMetric, alignment,
+				 tag_weights, pos_mismatch_penalty, similarity_threshold):
+		assert isinstance(word_metric, WordSimilarityMetric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -166,17 +165,22 @@ class TagWeightedSentenceMetric(SentenceMetric):
 		}
 
 
-class SentenceEmbeddingMetric(SentenceMetric):
-	def __init__(self, encoder, base_metric):
-		self._encoder = encoder
-		self._base_metric = base_metric
+class SentenceEmbeddingMetric(SentenceSimilarityMetric):
+	"""
+	example usage:
+	from sentence_transformers import SentenceTransformer
+	model = SentenceTransformer('paraphrase-distilroberta-base-v1')
+	metric = SentenceEmbeddingMetric(model.encode)
+	"""
 
-		'''
-		example:
-		from sentence_transformers import SentenceTransformer
-		model = SentenceTransformer('paraphrase-distilroberta-base-v1')
-		SentenceEmbeddingMetric(model.encode)
-		'''
+	def __init__(self, encoder, metric=None):
+		if metric is None:
+			metric = CosineMetric()
+		assert isinstance(metric, VectorSpaceMetric)
+		if not isinstance(metric, CosineMetric):
+			raise NotImplementedError()
+		self._encoder = encoder
+		self._metric = metric
 
 	def create_index(self, session):
 		return SentenceEmbeddingIndex(session, self, self._encoder)
