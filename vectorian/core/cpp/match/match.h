@@ -16,8 +16,8 @@ public:
 	struct compare;
 
 	inline MatchDigest(
-		DocumentRef p_document,
-		int32_t p_sentence_id,
+		const DocumentRef &p_document,
+		const int32_t p_sentence_id,
 		const std::vector<int16_t> &p_match) :
 
 		document(p_document),
@@ -34,7 +34,6 @@ struct TokenScore {
 class Match {
 private:
 	MatcherRef m_matcher;
-	const int16_t m_scores_id;
 
 	const MatchDigest m_digest;
 	float m_score; // overall score
@@ -43,9 +42,15 @@ private:
 public:
 	Match(
 		const MatcherRef &p_matcher,
-		const int p_scores_id,
 		MatchDigest &&p_digest,
 		float p_score);
+
+	Match(
+		const MatcherRef &p_matcher,
+		const DocumentRef &p_document,
+		const int32_t p_sentence_id,
+		const std::vector<int16_t> &p_match,
+		const float p_score);
 
 	inline const QueryRef &query() const {
 		return m_matcher->query();
@@ -78,10 +83,6 @@ public:
 	py::list regions() const;
 
 	py::list omitted() const;
-
-	inline const int scores_variant_id() const {
-		return m_scores_id;
-	}
 
 	inline const DocumentRef &document() const {
 		return m_digest.document;

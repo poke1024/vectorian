@@ -16,6 +16,10 @@ class Query:
 		self._options = options
 
 	@property
+	def text(self):
+		return self._doc.text
+
+	@property
 	def options(self):
 		return self._options
 
@@ -108,10 +112,9 @@ class SentenceEmbeddingIndex(Index):
 
 		corpus_vec = []
 		doc_starts = []
-		for i, doc in enumerate(tqdm(list(session.documents))):
+		for i, doc in enumerate(tqdm(session.documents, "encoding")):
 			sents = doc.sentences
 			doc_vec = encoder(sents)
-			print(doc_vec.shape)
 			n_dims = doc_vec.shape[-1]
 			corpus_vec.append(doc_vec)
 			doc_starts.append(len(sents))
@@ -125,9 +128,14 @@ class SentenceEmbeddingIndex(Index):
 		#n_bits = 2 * n_dims
 		#index = faiss.IndexLSH(n_dims, n_bits)
 
+		pca_dim = 128
+		if corpus_vec.shape[0] < pca_dim:
+			pca_dim = None
+
 		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
 		#index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
-		index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
+		#index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
+		index = faiss.index_factory(n_dims, "LSH", faiss.METRIC_INNER_PRODUCT)
 		index.train(corpus_vec)
 		index.add(corpus_vec)
 
@@ -137,10 +145,34 @@ class SentenceEmbeddingIndex(Index):
 		query_vec = self._encoder([query.text])
 		distance, index = self._index.search(
 			query_vec, query.options["max_matches"])
-		for i in index:
-			# self._doc_starts
-			doc_id = 0
-			sent_id = i
-			# doc.sentence(i)
-			print()
 
+		c_query = query.to_core()
+		c_metric = core.ExternalMetric("SentenceEmbeddingMetric")
+
+		matches = []
+		for d, i in zip(distance[0], index[0]):
+			if index < 0:
+				break
+
+			doc_index = 0
+			sentence_id = i
+			# doc.sentence(i)
+
+			score = 1 - (d + 1) * 0.5
+
+			c_doc = self._session.documents[doc_index]
+			c_matcher = core.ExternalMatcher(
+				c_query, c_doc, c_metric)
+
+			c_match = core.Match(
+				c_matcher,
+				c_doc,
+				sentence_id,
+				[],
+				score)
+
+			matches.append(c_match)
+
+			#print(d, i)
+
+		return matches

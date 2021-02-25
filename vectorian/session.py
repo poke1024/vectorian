@@ -144,10 +144,10 @@ class DefaultImportFilter:
 
 
 class Session:
-	def __init__(self, docs, embeddings, import_filter=DefaultImportFilter()):
+	def __init__(self, docs, static_embeddings=[], import_filter=DefaultImportFilter()):
 		self._vocab = core.Vocabulary()
 		self._default_metrics = []
-		for embedding in embeddings:
+		for embedding in static_embeddings:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			self._vocab.add_embedding(embedding.to_core())
@@ -173,7 +173,7 @@ class Session:
 	def result_class(self):
 		return Result
 
-	def make_index(self, metric=None):
+	def index_for_metric(self, metric=None):
 		if metric is None:
 			metric = self._default_metrics[0]
 		assert isinstance(metric, SentenceSimilarityMetric)

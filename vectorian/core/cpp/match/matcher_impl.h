@@ -75,7 +75,6 @@ protected:
 	inline MatchRef optimal_match(
 		const int32_t sentence_id,
 		const Slice &slice,
-		const int16_t scores_variant_id,
 		const float p_min_score,
 		const REVERSE &reverse) {
 
@@ -104,7 +103,6 @@ protected:
 
 			return std::make_shared<Match>(
 				this->shared_from_this(),
-				scores_variant_id,
 				MatchDigest(m_document, sentence_id, m_aligner.match()),
 				best_final_score);
 		} else {
@@ -131,7 +129,6 @@ public:
 	virtual void initialize() {
 		m_no_match = std::make_shared<Match>(
 			this->shared_from_this(),
-			-1,
 			MatchDigest(m_document, -1, std::vector<int16_t>()),
 			m_query->min_score()
 		);
@@ -219,7 +216,6 @@ public:
 			MatchRef m = this->optimal_match(
 				slice_id,
 				slice,
-				0, // variant
 				p_matches->worst_score(),
 				[] (std::vector<int16_t> &match, int len_s) {});
 
@@ -227,7 +223,6 @@ public:
 				const MatchRef m_reverse = this->optimal_match(
 					slice_id,
 					ReversedSlice(slice),
-					0, // variant
 					p_matches->worst_score(),
 					reverse_alignment);
 

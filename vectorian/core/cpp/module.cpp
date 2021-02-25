@@ -75,7 +75,17 @@ PYBIND11_MODULE(core, m) {
 	matched_region.def_property_readonly("pos_t", &MatchedRegion::pos_t);
 	matched_region.def_property_readonly("metric", &MatchedRegion::metric);
 
+	py::class_<ExternalMatcher, ExternalMatcherRef> matcher(m, "ExternalMatcher");
+	matcher.def(py::init<const QueryRef&,
+		const DocumentRef&,
+		const MetricRef&>());
+
 	py::class_<Match, MatchRef> match(m, "Match");
+	match.def(py::init<const MatcherRef&,
+		const DocumentRef&,
+		const int32_t,
+		const std::vector<int16_t>&,
+		const float>());
 	match.def_property_readonly("query", &Match::query);
 	match.def_property_readonly("document", &Match::document);
 	match.def_property_readonly("assignment", &Match::py_assignment);
@@ -132,6 +142,8 @@ PYBIND11_MODULE(core, m) {
 	result_set.def_property_readonly("size", &ResultSet::size);
 	result_set.def("best_n", &ResultSet::best_n);
 	result_set.def("extend", &ResultSet::extend);
+
+	py::class_<ExternalMetric, ExternalMetricRef> ext_metric(m, "ExternalMetric");
 
 	/*py::class_<LargeMatrix, LargeMatrixRef> matrix(m, "LargeMatrix");
 	matrix.def(py::init<const std::string &>());

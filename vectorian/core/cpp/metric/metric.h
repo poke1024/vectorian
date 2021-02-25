@@ -26,6 +26,28 @@ public:
 
 typedef std::shared_ptr<Metric> MetricRef;
 
+class ExternalMetric : public Metric {
+	const std::string m_name;
+
+public:
+	ExternalMetric(const std::string &p_name) : m_name(p_name) {
+	}
+
+	virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const DocumentRef &p_document) {
+
+		throw std::runtime_error(
+			"ExternalMetric cannot create matchers");
+	}
+
+	virtual const std::string &name() const {
+		return m_name;
+	}
+};
+
+typedef std::shared_ptr<ExternalMetric> ExternalMetricRef;
+
 inline MetricRef lookup_metric(
 	const std::map<std::string, MetricRef> &p_metrics,
 	const std::string &p_name) {

@@ -33,13 +33,23 @@ struct MatchDigest::compare {
 
 Match::Match(
 	const MatcherRef &p_matcher,
-	const int p_scores_id,
 	MatchDigest &&p_digest,
 	const float p_score) :
 
 	m_matcher(p_matcher),
-	m_scores_id(p_scores_id),
 	m_digest(p_digest),
+	m_score(p_score) {
+}
+
+Match::Match(
+	const MatcherRef &p_matcher,
+	const DocumentRef &p_document,
+	const int32_t p_sentence_id,
+	const std::vector<int16_t> &p_match,
+	const float p_score) :
+
+	m_matcher(p_matcher),
+	m_digest(MatchDigest(p_document, p_sentence_id, p_match)),
 	m_score(p_score) {
 }
 

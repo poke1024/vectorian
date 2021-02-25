@@ -43,4 +43,28 @@ public:
 
 typedef std::shared_ptr<Matcher> MatcherRef;
 
+class ExternalMatcher : public Matcher {
+public:
+	ExternalMatcher(const QueryRef &p_query,
+		const DocumentRef &p_document,
+		const MetricRef &p_metric) : Matcher(p_query, p_document, p_metric) {
+	}
+
+	virtual void initialize() {
+		throw std::runtime_error(
+			"ExternalMatcher::initialize is not allowed");
+	}
+
+	virtual void match(const ResultSetRef &p_matches) {
+		throw std::runtime_error(
+			"ExternalMatcher::match is not allowed");
+	}
+
+	virtual float gap_cost(size_t len) const {
+		return 0.0f;
+	}
+};
+
+typedef std::shared_ptr<ExternalMatcher> ExternalMatcherRef;
+
 #endif // __VECTORIAN_MATCHER_H__
