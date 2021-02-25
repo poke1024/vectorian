@@ -195,11 +195,11 @@ class LabResult(Result):
 			r.add_match(match)
 		return r.to_html()
 
-	def annotate(self, tags=True, metric=True, **kwargs):
+	def annotate(self, tags=True, metric=True, penalties=True, **kwargs):
 		return LabResult(
 			self._matches,
 			self._duration,
-			annotate=dict(tags=tags, metric=metric, **kwargs))
+			annotate=dict(tags=tags, metric=metric, penalties=penalties, **kwargs))
 
 	def _repr_html_(self):
 		return self._render(Renderer(annotate=self._annotate))

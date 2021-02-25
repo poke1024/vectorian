@@ -78,8 +78,17 @@ class Renderer:
 	def add_region(self, region):
 		if len(region.get('t', '')) > 0 and region['similarity'] * region['weight'] > 0:
 			self.add_match_region(region)
+		elif self._annotate.get('penalties'):
+			doc, tag, text = self._html
+			with tag('span', style='display:inline-table;'):
+				with tag('span', style='display:table-row;'):
+					self.add_light_text(region['s'])
+				with tag('span', klass='tag is-danger', style='display:table-row;'):
+					if region['gap_penalty'] > 0:
+						text('-%.1f' % (region['gap_penalty'] * 100))
+					else:
+						text('')
 		else:
-			# FIXME annotate POS here.
 			self.add_light_text(region['s'])
 
 	def add_match_score(self, match):
@@ -160,20 +169,20 @@ class Renderer:
 		iframe_id = f"vectorian-iframe-{time.time_ns()}"
 
 		iframe = string.Template("""
-		        <iframe
-		        	id="$id"
-		            width="$width"
-		            height="$height"
-		            srcdoc="$srcdoc"
-		            frameborder="0"
-		            allowfullscreen
-		        ></iframe>
-		        <script>
-		        	var f = document.getElementById("$id");
-		        	f.onload = function() {
-			        	f.height = f.contentWindow.document.body.scrollHeight + "px";
-			        };
-		        </script>
+<iframe
+	id="$id"
+	width="$width"
+	height="$height"
+	srcdoc="$srcdoc"
+	frameborder="0"
+	allowfullscreen
+></iframe>
+<script>
+	var f = document.getElementById("$id");
+	f.onload = function() {
+		f.height = f.contentWindow.document.body.scrollHeight + "px";
+	};
+</script>
 		""")
 
 		s = ''.join([prolog, doc.getvalue(), epilog])

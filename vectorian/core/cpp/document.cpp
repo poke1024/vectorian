@@ -16,7 +16,7 @@ std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_ta
 	std::vector<Sentence> sentences;
 	sentences.reserve(n);
 
-	int32_t token_at = 0;
+	size_t token_at = 0;
 	for (size_t i = 0; i < n; i++) {
 		 Sentence s;
 		 s.book = book[i];
@@ -36,13 +36,13 @@ std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_ta
 
 Document::Document(
 	const py::object &p_py_doc,
-	int64_t p_document_id,
+	const int64_t p_document_id,
 	VocabularyRef p_vocab,
 	const std::string &p_text,
 	const py::object &p_sentences,
 	const py::object &p_tokens,
 	const py::dict &p_metadata,
-	const std::string &p_cache_path = std::string()):
+	const std::string p_cache_path):
 
 	m_py_doc(p_py_doc),
 	m_id(p_document_id),

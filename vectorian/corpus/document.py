@@ -9,6 +9,7 @@ class LocationTable:
 		self._loc = [[] for _ in range(5)]
 
 	def extend(self, location, tokens):
+		assert len(tokens) > 0
 		loc = self._loc
 
 		loc[0].append(location['bk'])
@@ -43,8 +44,8 @@ class TokenTable:
 	def __len__(self):
 		return len(self._token_idx)
 
-	def extend(self, text, tokens):
-		last_idx = 0
+	def extend(self, text, sent, tokens):
+		last_idx = sent["start"]
 
 		for token in tokens:
 			idx = token["start"]
@@ -52,13 +53,15 @@ class TokenTable:
 			last_idx = idx
 
 			token_text = text[token["start"]:token["end"]]
+			#if len(token_text.encode('utf8')) == 0:
+			#	print("BUG", token_text, len(token_text), token)
 			self._token_idx.append(self._utf8_idx)
 			self._token_len.append(len(token_text.encode('utf8')))
 
 			self._token_pos.append(token["pos"])
 			self._token_tag.append(token["tag"])
 
-		self._utf8_idx += len(text[last_idx:].encode('utf8'))
+		self._utf8_idx += len(text[last_idx:sent["end"]].encode('utf8'))
 
 	def to_pandas(self):
 		return pd.DataFrame({
@@ -165,11 +168,10 @@ class Document:
 				token_i = token_j
 
 				sent_text = text[sent["start"]:sent["end"]]
-
-				token_table.extend(sent_text, sent_tokens)
-				location_table.extend(loc, sent_tokens)
-
-				texts.append(sent_text)
+				if sent_tokens and sent_text.strip():
+					token_table.extend(text, sent, sent_tokens)
+					location_table.extend(loc, sent_tokens)
+					texts.append(sent_text)
 
 		return core.Document(
 			self,

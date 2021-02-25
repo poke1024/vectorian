@@ -39,7 +39,8 @@ class Query:
 		tokens = self._filter(tokens, 'tag_filter', 'tag')
 
 		token_table = TokenTable()
-		token_table.extend(self._doc.text, tokens)
+		text = self._doc.text
+		token_table.extend(text, {'start': 0, 'end': len(text)}, tokens)
 
 		return core.Query(
 			self._vocab,
@@ -189,9 +190,8 @@ class SentenceEmbeddingIndex(Index):
 
 		corpus_vec = []
 		doc_starts = [0]
-		for i, doc in enumerate(tqdm(session.documents, "encoding")):
+		for i, doc in enumerate(tqdm(session.documents, "Encoding")):
 			sents = doc.sentences
-			# FIXME filter empty sentences
 			doc_vec = encoder(sents)
 			n_dims = doc_vec.shape[-1]
 			corpus_vec.append(doc_vec)
@@ -249,11 +249,11 @@ class SentenceEmbeddingIndex(Index):
 			#print(c_doc.sentence(sentence_id))
 			#print(score, d)
 
-			if len(c_doc.sentence(sent_index).strip()) == 0:
-				continue  # FIXME
+			sent_text = c_doc.sentence(sent_index)
+			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
 
 			regions = [Region(
-				s=c_doc.sentence(sent_index),
+				s=sent_text.strip(),
 				match=None, gap_penalty=0)]
 
 			matches.append(Match(

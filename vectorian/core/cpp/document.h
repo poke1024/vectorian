@@ -42,7 +42,7 @@ public:
 		const py::object &p_sentences,
 		const py::object &p_tokens,
 		const py::dict &p_metadata,
-		const std::string &p_cache_path);
+		const std::string p_cache_path);
 
 	ResultSetRef find(const QueryRef &p_query);
 
@@ -138,8 +138,8 @@ public:
 			const auto &tokens = *m_tokens.get();
 			const auto &t0 = tokens[s.token_at];
 
-			int32_t i1;
-			if (s.token_at + s.n_tokens < static_cast<int32_t>(tokens.size())) {
+			size_t i1;
+			if (static_cast<size_t>(s.token_at + s.n_tokens) < tokens.size()) {
 				i1 = tokens[s.token_at + s.n_tokens].idx;
 			} else {
 				const auto &t1 = tokens[s.token_at + s.n_tokens - 1];

@@ -39,15 +39,20 @@ TokenVectorRef _unpack_tokens(
         }
     }
 
-    py::object sub = (py::object) py::module::import("re").attr("sub");
+    py::object sub = (py::object)py::module::import("re").attr("sub");
 
-    auto pattern = py::str("[^\\w]");
-    auto repl = py::str("");
+    const auto pattern = py::str("[^\\w]");
+    const auto repl = py::str("");
 
     for (size_t i = 0; i < n; i++) {
         auto &t = token_texts[i];
-        auto s = py::str(py::str(t).attr("lower")());
-		t = py::str(sub(pattern, repl, s));
+	    try {
+	        auto s = py::str(py::str(t).attr("lower")());
+			t = py::str(sub(pattern, repl, s));
+		} catch (...) {
+			std::cerr << "an error occured when processing string: '" << t << "'\n";
+			throw;
+		}
     }
 
     {
