@@ -2,31 +2,45 @@ import json
 import pyarrow as pa
 import pandas as pd
 import vectorian.core as core
+import collections
+
+from cached_property import cached_property
 
 
 class LocationTable:
-	def __init__(self):
-		self._loc = [[] for _ in range(5)]
+	_types = {
+		'book': 'uint8',
+		'chapter': 'uint8',
+		'speaker': 'uint8',
+		'paragraph': 'uint16',
+		'token_at': 'uint32',
+		'n_tokens': 'uint16'
+	}
+
+	def __init__(self, loc_keys):
+		self._loc = collections.defaultdict(list)
+		self._loc_keys = loc_keys
 
 	def extend(self, location, tokens):
 		assert len(tokens) > 0
 		loc = self._loc
 
-		loc[0].append(location['bk'])
-		loc[1].append(location['ch'])
-		loc[2].append(location['sp'])
-		loc[3].append(location['l'])
+		for k, v in zip(self._loc_keys, location):
+			loc[k].append(v)
 
-		loc[4].append(len(tokens))
+		if loc['token_at']:
+			token_at = loc['token_at'][-1] + loc['n_tokens'][-1]
+		else:
+			token_at = 0
+
+		loc['n_tokens'].append(len(tokens))
+		loc['token_at'].append(token_at)
 
 	def to_pandas(self):
-		loc = self._loc
-		return pd.DataFrame({
-			'book': pd.Series(loc[0], dtype='int8'),
-			'chapter': pd.Series(loc[1], dtype='int8'),
-			'speaker': pd.Series(loc[2], dtype='int8'),
-			'location': pd.Series(loc[3], dtype='uint16'),
-			'n_tokens': pd.Series(loc[4], dtype='uint16')})
+		data = dict()
+		for k, v in self._loc.items():
+			data[k] = pd.Series(v, dtype=self._types[k])
+		return pd.DataFrame(data)
 
 	def to_arrow(self):
 		return pa.Table.from_pandas(self.to_pandas())
@@ -87,14 +101,6 @@ class Document:
 	def __init__(self, json):
 		self._json = json
 
-	def free_up_memory(self):
-		self._json = {
-			'unique_id': self._json['unique_id'],
-			'origin': self._json['origin'],
-			'author': self._json['author'],
-			'title': self._json['title']
-		}
-
 	@staticmethod
 	def load(path):
 		with open(path, "r") as f:
@@ -132,13 +138,18 @@ class Document:
 	def title(self):
 		return self._json['title']
 
-	def to_core(self, index, vocab, filter_):
+	def prepare(self, token_filter):
+		return PreparedDocument(self._json, token_filter)
+
+
+class PreparedDocument:
+	def __init__(self, json, token_filter):
 		texts = []
 
 		token_table = TokenTable()
-		location_table = LocationTable()
+		sentence_table = LocationTable(json['loc_keys'])
 
-		partitions = self._json['partitions']
+		partitions = json['partitions']
 		for partition_i, partition in enumerate(partitions):
 			text = partition["text"]
 			tokens = partition["tokens"]
@@ -161,27 +172,82 @@ class Document:
 					token_j += 1
 
 				for t0 in tokens[token_i:token_j]:
-					t = filter_(t0)
+					t = token_filter(t0)
 					if t:
 						sent_tokens.append(t)
 
 				token_i = token_j
 
 				sent_text = text[sent["start"]:sent["end"]]
-				if sent_tokens and sent_text.strip():
+				if sent_text.strip() and sent_tokens:
 					token_table.extend(text, sent, sent_tokens)
-					location_table.extend(loc, sent_tokens)
+					sentence_table.extend(loc, sent_tokens)
 					texts.append(sent_text)
 
+		self._text = "".join(texts)
+		self._sentence_table = sentence_table.to_arrow()
+		self._token_table = token_table.to_arrow()
+
+		self._metadata = {
+			'unique_id': json['unique_id'],
+			'author': json['author'],
+			'title': json['title']
+		}
+
+	@property
+	def metadata(self):
+		return self._metadata
+
+	@property
+	def n_tokens(self):
+		return self._token_table.num_rows
+
+	@property
+	def n_sentences(self):
+		return self._sentence_table.num_rows
+
+	@cached_property
+	def _sentences(self):
+		col_tok_idx = self._token_table["idx"]
+		col_tok_len = self._token_table["len"]
+		n_tokens = self._token_table.num_rows
+
+		col_token_at = self._sentence_table.column('token_at')
+		col_n_tokens = self._sentence_table.column('n_tokens')
+
+		def get(i):
+			start = col_token_at[i].as_py()
+			end = start + col_n_tokens[i].as_py()
+			if end < n_tokens:
+				i1 = col_tok_idx[end].as_py()
+			else:
+				i1 = col_tok_idx[end - 1].as_py() + col_tok_len[end - 1].as_py()
+			return self._text[col_tok_idx[start].as_py():i1]
+
+		return get
+
+	@property
+	def sentences(self):
+		get = self._sentences
+		for i in range(self._sentence_table.num_rows):
+			yield get(i)
+
+	def sentence(self, i):
+		return self._sentences(i)
+
+	def sentence_info(self, index):
+		info = dict()
+		for k in self._sentence_table.column_names:
+			col = self._sentence_table.column(k)
+			info[k] = col[index].as_py()
+		return info
+
+	def to_core(self, index, vocab):
 		return core.Document(
-			self,
 			index,
 			vocab,
-			"".join(texts).encode("utf8"),
-			location_table.to_arrow(),
-			token_table.to_arrow(),
-			{
-				'author': self._json['author'],
-				'title': self._json['title']
-			},
+			self._text.encode("utf8"),
+			self._sentence_table,
+			self._token_table,
+			self._metadata,
 			"")

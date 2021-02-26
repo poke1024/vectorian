@@ -48,7 +48,7 @@ class Importer:
 				text = Importer._t[x](text)
 		return text
 
-	def _make_doc(self, md, partitions, locations):
+	def _make_doc(self, md, partitions, loc_keys, locations):
 		pipe = self._nlp.pipe(
 			partitions,
 			batch_size=self._batch_size)
@@ -56,12 +56,7 @@ class Importer:
 		json_partitions = []
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc='Importing: ' + md.title):
 			doc_json = doc.to_json()
-			doc_json['loc'] = {
-				'bk': location[0],  	# book
-				'ch': location[1], 		# chapter
-				'sp': location[2], 		# speaker
-				'l': location[3]		# line
-			}
+			doc_json['loc'] = location
 			json_partitions.append(doc_json)
 
 			for embedding in self._embeddings:
@@ -75,7 +70,8 @@ class Importer:
 			'author': md.author,
 			'title': md.title,
 			'speakers': md.speakers,
-			'partitions': json_partitions
+			'partitions': json_partitions,
+			'loc_keys': loc_keys
 		}
 
 		from vectorian.corpus import Document
@@ -105,7 +101,7 @@ class TextImporter(Importer):
 		paragraphs = [x + paragraph_sep for x in paragraphs[:-1]] + paragraphs[-1:]
 
 		for j, p in enumerate(paragraphs):
-			locations.append((-1, -1, -1, j))
+			locations.append((j,))
 
 		md = Metadata(
 			version="1.0",
@@ -115,7 +111,8 @@ class TextImporter(Importer):
 			title=title,
 			speakers={})
 
-		return self._make_doc(md, paragraphs, locations)
+		return self._make_doc(
+			md, paragraphs, ['paragraph'], locations)
 
 
 class NovelImporter(Importer):
@@ -187,7 +184,7 @@ class NovelImporter(Importer):
 			paragraphs.extend(chapter_paragraphs)
 
 			for j, p in enumerate(chapter_paragraphs):
-				locations.append((book, chapter, -1, j))
+				locations.append((book + 1, chapter + 1, j + 1))
 
 		md = Metadata(
 			version="1.0",
@@ -197,7 +194,8 @@ class NovelImporter(Importer):
 			title=title,
 			speakers={})
 
-		return self._make_doc(md, paragraphs, locations)
+		return self._make_doc(
+			md, paragraphs, ['book', 'chapter', 'paragraph'], locations)
 
 
 class StringImporter(Importer):
@@ -208,7 +206,7 @@ class StringImporter(Importer):
 			unique_id = str(datetime.datetime.now())
 
 		locations = [
-			(-1, -1, -1, 0)
+			[]
 		]
 
 		md = Metadata(
@@ -219,4 +217,4 @@ class StringImporter(Importer):
 			title=title,
 			speakers={})
 
-		return self._make_doc(md, [self._preprocess_text(s)], locations)
+		return self._make_doc(md, [self._preprocess_text(s)], [], locations)

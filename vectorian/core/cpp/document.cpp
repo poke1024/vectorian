@@ -5,10 +5,10 @@
 std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_table) {
 	py::gil_scoped_release release;
 
-	const auto book = numeric_column<arrow::Int8Type, int8_t>(p_table, "book");
+	/*const auto book = numeric_column<arrow::Int8Type, int8_t>(p_table, "book");
 	const auto chapter = numeric_column<arrow::Int8Type, int8_t>(p_table, "chapter");
 	const auto speaker = numeric_column<arrow::Int8Type, int8_t>(p_table, "speaker");
-	const auto location = numeric_column<arrow::UInt16Type, uint16_t>(p_table, "location");
+	const auto location = numeric_column<arrow::UInt16Type, uint16_t>(p_table, "location");*/
 
 	const auto n_tokens_values = numeric_column<arrow::UInt16Type, uint16_t>(p_table, "n_tokens");
 
@@ -19,10 +19,10 @@ std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_ta
 	size_t token_at = 0;
 	for (size_t i = 0; i < n; i++) {
 		 Sentence s;
-		 s.book = book[i];
+		 /*s.book = book[i];
 		 s.chapter = chapter[i];
 		 s.speaker = speaker[i];
-		 s.paragraph = location[i];
+		 s.paragraph = location[i];*/
 		 s.n_tokens = n_tokens_values[i];
 
 		 s.token_at = token_at;
@@ -35,7 +35,6 @@ std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_ta
 }
 
 Document::Document(
-	const py::object &p_py_doc,
 	const int64_t p_document_id,
 	VocabularyRef p_vocab,
 	const std::string &p_text,
@@ -44,7 +43,6 @@ Document::Document(
 	const py::dict &p_metadata,
 	const std::string p_cache_path):
 
-	m_py_doc(p_py_doc),
 	m_id(p_document_id),
 	m_vocab(p_vocab),
 	m_text(p_text),

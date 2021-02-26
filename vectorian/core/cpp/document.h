@@ -20,7 +20,6 @@ inline void add_dummy_token(std::vector<Token> &tokens) {
 
 class Document : public std::enable_shared_from_this<Document> {
 private:
-	const py::object m_py_doc;
 	const int64_t m_id;
 	const VocabularyRef m_vocab;
 	const std::string m_text;
@@ -35,7 +34,6 @@ private:
 
 public:
 	Document(
-		const py::object &p_py_doc,
 		int64_t p_document_id,
 		VocabularyRef p_vocab,
 		const std::string &p_text,
@@ -108,10 +106,6 @@ public:
 	py::dict py_sentence_info(const size_t p_index) const {
 		const Sentence &s = m_sentences.at(p_index);
 		py::dict d;
-		d["book"] = s.book;
-		d["chapter"] = s.chapter;
-		d["speaker"] = s.speaker;
-		d["paragraph"] = s.paragraph;
 		d["token_at"] = s.token_at;
 		d["n_tokens"] = s.n_tokens;
 		return d;

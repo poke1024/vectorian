@@ -11,10 +11,10 @@ from vectorian.embeddings import StaticEmbedding
 
 
 def get_location_desc(metadata, location):
-	book = location["book"]
-	chapter = location["chapter"]
-	speaker = location["speaker"]
-	paragraph = location["paragraph"] + 1
+	book = location.get("book", 0)
+	chapter = location.get("chapter", 0)
+	speaker = location.get("speaker", 0)
+	paragraph = location.get("paragraph", 0)
 
 	if speaker > 0:  # we have an act-scene-speakers structure.
 		speaker = metadata["speakers"].get(str(speaker), "")
@@ -30,8 +30,10 @@ def get_location_desc(metadata, location):
 		else:
 			return "", "Book %d, Chapter %d, par. %d" % (
 				book, chapter, paragraph)
-	else:
+	elif paragraph > 0:
 		return "", "par. %d" % paragraph
+	else:
+		return "", ""
 
 
 def matches_to_json(items):
@@ -39,7 +41,7 @@ def matches_to_json(items):
 	for i, m in enumerate(items):
 		regions = []
 		doc = m.document
-		sentence = doc.sentence_info(m.sentence)
+		sentence_info = doc.sentence_info(m.sentence)
 
 		try:
 			for r in m.regions:
@@ -59,10 +61,10 @@ def matches_to_json(items):
 					regions.append(dict(s=s, gap_penalty=r.gap_penalty))
 
 			metadata = m.document.metadata
-			speaker, loc_desc = get_location_desc(metadata, sentence)
+			speaker, loc_desc = get_location_desc(metadata, sentence_info)
 
 			matches.append(dict(
-				debug=dict(document=m.document.id, sentence=m.sentence),
+				debug=dict(document=metadata["unique_id"], sentence=m.sentence),
 				score=m.score,
 				metric=m.metric,
 				location=dict(
@@ -102,15 +104,28 @@ class Result:
 		return self._duration
 
 
+class CompiledDoc:
+	def __init__(self, p_doc, args):
+		self._p_doc = p_doc
+		self._args = args
+
+	@property
+	def p_doc(self):
+		return self._p_doc
+
+	@cached_property
+	def c_doc(self):
+		return self._p_doc.to_core(*self._args)
+
+
 class Collection:
-	def __init__(self, vocab, corpus, filter_):
+	def __init__(self, vocab, corpus, token_filter):
 		self._vocab = vocab
 		self._docs = []
 		for doc in corpus:
-			self._docs.append(
-				doc.to_core(len(self._docs), self._vocab, filter_)
-			)
-			doc.free_up_memory()
+			p_doc = doc.prepare(token_filter)
+			self._docs.append(CompiledDoc(
+				p_doc, (len(self._docs), self._vocab)))
 
 	@property
 	def documents(self):
@@ -118,7 +133,7 @@ class Collection:
 
 	@cached_property
 	def max_sentence_len(self):
-		return max([doc.max_sentence_len for doc in self._docs])
+		return max([doc.c_doc.max_sentence_len for doc in self._docs])
 
 
 class DefaultImportFilter:
@@ -158,9 +173,13 @@ class Session:
 						embedding, CosineMetric())))
 		self._collection = Collection(self._vocab, docs, import_filter)
 
-	@property
+	@cached_property
 	def documents(self):
-		return self._collection.documents
+		return [x.p_doc for x in self._collection.documents]
+
+	@cached_property
+	def c_documents(self):
+		return [x.c_doc for x in self._collection.documents]
 
 	@property
 	def vocab(self):

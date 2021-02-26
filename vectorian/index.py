@@ -154,7 +154,7 @@ class BruteForceIndex(Index):
 		def find_in_doc(x):
 			return x, x.find(c_query)
 
-		docs = self._session.documents
+		docs = self._session.c_documents
 
 		total = sum([x.n_tokens for x in docs])
 		done = 0
@@ -191,7 +191,7 @@ class SentenceEmbeddingIndex(Index):
 		corpus_vec = []
 		doc_starts = [0]
 		for i, doc in enumerate(tqdm(session.documents, "Encoding")):
-			sents = doc.sentences
+			sents = list(doc.sentences)
 			doc_vec = encoder(sents)
 			n_dims = doc_vec.shape[-1]
 			corpus_vec.append(doc_vec)
@@ -242,14 +242,14 @@ class SentenceEmbeddingIndex(Index):
 
 			#print(i, doc_index, sent_index, self._doc_starts)
 
-			c_doc = self._session.documents[doc_index]
+			doc = self._session.documents[doc_index]
 			score = (d + 1) * 0.5
 
 			#print(c_doc, sentence_id)
 			#print(c_doc.sentence(sentence_id))
 			#print(score, d)
 
-			sent_text = c_doc.sentence(sent_index)
+			sent_text = doc.sentence(sent_index)
 			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
 
 			regions = [Region(
@@ -257,7 +257,7 @@ class SentenceEmbeddingIndex(Index):
 				match=None, gap_penalty=0)]
 
 			matches.append(Match(
-				c_doc,
+				doc,
 				sent_index,
 				score,
 				self._metric.name,

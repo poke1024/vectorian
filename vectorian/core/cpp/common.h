@@ -33,14 +33,7 @@ typedef int32_t token_t;
 typedef int32_t wvec_t;
 
 #pragma pack(push, 1)
-struct Location {
-	int16_t paragraph;
-	int8_t book;
-	int8_t chapter;
-	int8_t speaker;
-};
-
-struct Sentence : public Location {
+struct Sentence {
 	int32_t token_at;
 	int16_t n_tokens;
 };

@@ -78,12 +78,13 @@ protected:
 		const float p_min_score,
 		const REVERSE &reverse) {
 
-		const int len_s = slice.len_s();
 		const int len_t = slice.len_t();
-
-		if (len_t < 1 || len_s < 1) {
+		if (len_t <= 0) {
 			return m_no_match;
 		}
+
+		const int len_s = slice.len_s();
+		PPK_ASSERT(len_s > 0);
 
 		m_aligner(m_query, slice, len_s, len_t);
 
