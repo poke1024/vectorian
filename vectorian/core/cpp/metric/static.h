@@ -11,6 +11,8 @@ protected:
 	MatrixXf m_similarity;
 
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 	StaticEmbeddingMetric(
 		const EmbeddingRef &p_embedding,
 		const py::dict &p_sent_metric_def) :

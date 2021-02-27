@@ -12,7 +12,8 @@ from vectorian.corpus.document import TokenTable, extract_token_str
 
 
 class Query:
-	def __init__(self, vocab, doc, options):
+	def __init__(self, index, vocab, doc, options):
+		self._index = index
 		self._vocab = vocab
 		self._doc = doc
 		self._options = options
@@ -46,7 +47,10 @@ class Query:
 		return core.Query(
 			self._vocab,
 			token_table_pa,
-			extract_token_str(token_table_pa, self.text),
+			extract_token_str(
+				token_table_pa,
+				self.text,
+				self._index.session.options.token_normalizer),
 			**self._options)
 
 
@@ -95,9 +99,11 @@ class Match:
 					match=None,
 					gap_penalty=r.mismatch_penalty))
 
+		omitted = [s_text[slice(*s)] for s in c_match.omitted]
+
 		return Match(
 			query, document, c_match.sentence, c_match.score,
-			c_match.metric, c_match.omitted, regions)
+			c_match.metric, omitted, regions)
 
 	@property
 	def document(self):
@@ -198,7 +204,7 @@ class Index:
 
 		start_time = time.time()
 
-		query = Query(self._session.vocab, doc, options)
+		query = Query(self, self._session.vocab, doc, options)
 		result_class, matches = self._session.run_query(self._find, query)
 
 		return result_class(
@@ -289,6 +295,9 @@ class SentenceEmbeddingIndex(Index):
 		index.add(corpus_vec)
 
 		self._index = index
+
+	def save(self, path):
+		pass
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder([query.text])

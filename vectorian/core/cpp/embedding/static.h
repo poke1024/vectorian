@@ -12,6 +12,8 @@ class StaticEmbedding : public Embedding {
 	std::map<std::string, EmbeddingSimilarityRef> m_similarity_measures;
 
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 	StaticEmbedding(
 		const std::string &p_name,
 		py::object p_table) : Embedding(p_name) {
@@ -48,13 +50,19 @@ public:
 		// note: these "raw" tables were already normalized in preprocessing.
 
 		m_embeddings.raw.resize(m_tokens.size(), table->num_columns() - 1);
+		std::cout << "table size: " << table->num_rows() << " x " << table->num_columns() << "\n";
+		std::cout << "m_tokens.size(): " << m_tokens.size() << "\n";
+		std::cout << std::flush;
+
+		PPK_ASSERT(m_tokens.size() == static_cast<size_t>(table->num_rows()));
 
 		try {
 			/*printf("loading embedding vectors parquet table.\n");
 			fflush(stdout);*/
 
-			for_each_column<arrow::FloatType, float>(table, [this] (int i, auto v, auto offset) {
-				m_embeddings.raw.col(i - 1)(Eigen::seq(offset, v.size())) = v.max(0);
+			for_each_column<arrow::FloatType, float>(table, [this] (size_t i, auto v, size_t offset) {
+				PPK_ASSERT(i > 0 && offset + v.size() <= m_tokens.size());
+				m_embeddings.raw.col(i - 1)(Eigen::seq(offset, v.size())) = v;
 			}, 1);
 		} catch(...) {
 			printf("failed to load embedding vectors parquet table.\n");

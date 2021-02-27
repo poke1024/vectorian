@@ -54,11 +54,11 @@ class CompiledDoc:
 
 
 class Collection:
-	def __init__(self, vocab, corpus, token_filter):
+	def __init__(self, session, vocab, corpus):
 		self._vocab = vocab
 		self._docs = []
 		for doc in corpus:
-			p_doc = doc.prepare(token_filter)
+			p_doc = doc.prepare(session)
 			self._docs.append(CompiledDoc(
 				p_doc, (len(self._docs), self._vocab)))
 
@@ -95,35 +95,72 @@ class DefaultImportFilter:
 
 
 class TokenNormalizer:
+	@property
+	def name(self):
+		raise NotImplementedError()
+
+	def cache_path(self, path):
+		return path.parent / (path.stem + "." + self.name + path.suffix)
+
+
+class NopTokenNormalizer(TokenNormalizer):
+	@property
+	def name(self):
+		return "unmodified"
+
+	def __call__(self, token):
+		return token
+
+
+class LowerCaseTokenNormalizer(TokenNormalizer):
 	def __init__(self):
 		self._pattern = re.compile(r"[^\w]")
 
+	@property
+	def name(self):
+		return "alpha_lowercase"
+
 	def __call__(self, token):
-		return self._pattern.sub("", token.lower())
+		token = self._pattern.sub("", token.lower())
+		return token if token.isalpha() else None
+
+
+class SessionOptions:
+	def __init__(self):
+		self.import_filter = DefaultImportFilter()
+		self.token_normalizer = LowerCaseTokenNormalizer()
+		self.location_formatter = LocationFormatter()
 
 
 class Session:
-	def __init__(
-			self, docs, static_embeddings=[],
-			import_filter=None, location_formatter=None):
-
-		if import_filter is None:
-			import_filter = DefaultImportFilter()
-		if location_formatter is None:
-			location_formatter = LocationFormatter()
+	def __init__(self, docs, static_embeddings=[], options=None):
+		if options is None:
+			options = SessionOptions()
+		self._options = options
 
 		self._vocab = core.Vocabulary()
-		self._default_metrics = []
+
 		for embedding in static_embeddings:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
-			self._vocab.add_embedding(embedding.to_core())
+			self._vocab.add_embedding(
+				embedding.create_instance(options.token_normalizer).to_core())
+
+		self._default_metrics = []
+		for embedding in static_embeddings:
 			self._default_metrics.append(
 				AlignmentSentenceMetric(
 					WordSimilarityMetric(
 						embedding, CosineMetric())))
-		self._collection = Collection(self._vocab, docs, import_filter)
-		self._location_formatter = location_formatter
+
+		self._collection = Collection(
+			self, self._vocab, docs)
+
+		self._location_formatter = options.location_formatter
+
+	@property
+	def options(self):
+		return self._options
 
 	@cached_property
 	def documents(self):

@@ -97,15 +97,13 @@ class TokenTable:
 			['idx', 'len', 'pos', 'tag'])
 
 
-def extract_token_str(table, text):
+def extract_token_str(table, text, normalizer):
 	col_tok_idx = table["idx"].to_numpy()
 	col_tok_len = table["len"].to_numpy()
 	tokens = []
-	pattern = re.compile(r"[^\w]")
 	for idx, len_ in zip(col_tok_idx, col_tok_len):
-		t = text[idx:idx + len_].lower()
-		t = pattern.sub("", t)
-		tokens.append(t)
+		t = normalizer(text[idx:idx + len_])
+		tokens.append(t or "")
 	return tokens
 
 
@@ -150,12 +148,15 @@ class Document:
 	def title(self):
 		return self._json['title']
 
-	def prepare(self, token_filter):
-		return PreparedDocument(self._json, token_filter)
+	def prepare(self, session):
+		return PreparedDocument(session, self._json)
 
 
 class PreparedDocument:
-	def __init__(self, json, token_filter):
+	def __init__(self, session, json):
+		self._session = session
+		token_filter = session.options.import_filter
+
 		texts = []
 
 		token_table = TokenTable()
@@ -264,6 +265,9 @@ class PreparedDocument:
 			vocab,
 			self._sentence_table,
 			self._token_table,
-			extract_token_str(self._token_table, self._text),
+			extract_token_str(
+				self._token_table,
+				self._text,
+				self._session.options.token_normalizer),
 			self._metadata,
 			"")

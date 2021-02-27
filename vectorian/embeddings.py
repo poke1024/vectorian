@@ -9,19 +9,41 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import os
 import download
+import logging
 
 
-def _make_table(tokens, embeddings):
+def _make_table(tokens, embeddings, normalizer):
+	embeddings = embeddings.astype(np.float32)
+
+	f_mask = np.zeros((embeddings.shape[0],), dtype=np.bool)
+	f_tokens = []
+	tok_to_id = dict()
+	n_dup = 0
+	for i, t in enumerate(tqdm(tokens, desc="Normalizing Tokens")):
+		nt = normalizer(t)
+		if nt:
+			j = None  # tok_to_id.get(nt)
+			if j is None:
+				tok_to_id[nt] = i
+				f_tokens.append(nt)
+				f_mask[i] = True
+			else:
+				# FIXME
+				n_dup += 1
+
+	embeddings = embeddings[f_mask]
+	assert embeddings.shape[0] == len(f_tokens)
+
 	vecs = [pa.array(embeddings[:, i]) for i in range(embeddings.shape[1])]
 	vecs_name = [('v%d' % i) for i in range(embeddings.shape[1])]
 
+	print("embeddings matrix shape", embeddings.shape)
+	print("n_tokens", len(f_tokens))
+	print("duplicates", n_dup)
+
 	return pa.Table.from_arrays(
-		[pa.array(tokens, type=pa.string())] + vecs,
+		[pa.array(f_tokens, type=pa.string())] + vecs,
 		['token'] + vecs_name)
-
-
-class StaticEmbedding:
-	pass
 
 
 def _load_fasttext_txt(csv_path):
@@ -30,26 +52,23 @@ def _load_fasttext_txt(csv_path):
 		n_rows, n_cols = map(int, f.readline().strip().split())
 
 		embeddings = np.empty(
-			shape=(n_rows, n_cols), dtype=np.float64)
+			shape=(n_rows, n_cols), dtype=np.float32)
 
-		for _ in tqdm(range(n_rows)):
+		for _ in tqdm(range(n_rows), desc="Importing " + csv_path):
 			values = f.readline().strip().split()
 			if values:
 				t = values[0]
-				if t and t.isalpha() and t.lower() == t:
+				if t:
 					embeddings[len(tokens), :] = values[1:]
 					tokens.append(t)
 
 	embeddings = embeddings[:len(tokens), :]
-	embeddings = embeddings.astype(np.float32)
 
 	return tokens, embeddings
 
 
 def _load_glove_txt(csv_path):
 	tokens = []
-
-	print(f"Loading {csv_path}")
 	with open(csv_path, "r") as f:
 		text = f.read()
 
@@ -58,20 +77,93 @@ def _load_glove_txt(csv_path):
 	n_cols = len(lines[0].strip().split()) - 1
 
 	embeddings = np.empty(
-		shape=(n_rows, n_cols), dtype=np.float64)
+		shape=(n_rows, n_cols), dtype=np.float32)
 
-	for line in tqdm(lines):
+	for line in tqdm(lines, desc="Importing " + csv_path):
 		values = line.strip().split()
 		if values:
 			t = values[0]
-			if t and t.isalpha() and t.lower() == t:
+			if t:
 				embeddings[len(tokens), :] = values[1:]
 				tokens.append(t)
 
 	embeddings = embeddings[:len(tokens), :]
-	embeddings = embeddings.astype(np.float32)
 
 	return tokens, embeddings
+
+
+class StaticEmbedding:
+	def __init__(self, path, name):
+		self._path = path
+		self._name = name
+
+		self._loaded = {}
+
+	def _load(self):
+		raise NotImplementedError()
+
+	@property
+	def name(self):
+		return self._name
+
+	def create_instance(self, normalizer):
+		loaded = self._loaded.get(normalizer.name)
+		if loaded is None:
+			if self._path:
+				path = normalizer.cache_path(self._path)
+			else:
+				path = None
+			if path and path.exists():
+				table = pq.read_table(path)
+			else:
+				tokens, vectors = self._load()
+				table = _make_table(
+					tokens, vectors, normalizer)
+
+			loaded = StaticEmbeddingInstance(self._name, table)
+			self._loaded[normalizer.name] = loaded
+
+			if path and not path.exists():
+				loaded.save(path)
+
+		return loaded
+
+
+class StaticEmbeddingFromFile(StaticEmbedding):
+	def __init__(self, embeddings=None, tokens=None, vectors=None, name=None):
+		if embeddings:
+			self._tokens = list(embeddings.keys())
+			self._vectors = np.vstack(embeddings.values())
+			self._path = None
+
+	@staticmethod
+	def import_from_file(path, **kwargs):
+		tokens, vectors = _load_glove_txt(path)
+		return StaticEmbedding(tokens=tokens, vectors=vectors, **kwargs)
+
+	def _load(self):
+		raise NotImplementedError()
+
+
+class StaticEmbeddingInstance:
+	def __init__(self, name, table):
+		self._name = name
+		self._table = table
+
+	def save(self, path):
+		logging.info(f"writing {path}")
+		pq.write_table(
+			self._table,
+			path,
+			compression='snappy',
+			version='2.0')
+		logging.info("done.")
+
+	@lru_cache(1)
+	def to_core(self):
+		embedding = core.StaticEmbedding(self._name, self._table)
+		self._table = None  # free up memory
+		return embedding
 
 
 class Glove(StaticEmbedding):
@@ -81,39 +173,24 @@ class Glove(StaticEmbedding):
 		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
 		"""
 
-		self._name = name
+		self._glove_name = name
 
 		self._base_path = Path.home() / ".vectorian" / "embeddings" / "glove"
 		self._base_path.mkdir(exist_ok=True, parents=True)
 		pq_path = self._base_path / f"{name}.parquet"
 
-		if not pq_path.exists():
-			txt_data_path = self._base_path / name
+		super().__init__(path=pq_path, name=f"glove-{name}")
 
-			if not txt_data_path.exists():
-				url = f"http://nlp.stanford.edu/data/glove.{name}.zip"
-				download.download(url, txt_data_path, kind="zip", progressbar=True)
+	def _load(self):
+		name = self._glove_name
+		txt_data_path = self._base_path / name
 
-			tokens, embeddings = _load_glove_txt(
-				txt_data_path / f"glove.{name}.300d.txt")
+		if not txt_data_path.exists():
+			url = f"http://nlp.stanford.edu/data/glove.{name}.zip"
+			download.download(url, txt_data_path, kind="zip", progressbar=True)
 
-			pq.write_table(
-				_make_table(tokens, embeddings),
-				pq_path,
-				compression='snappy',
-				version='2.0')
-
-		self._table = pq.read_table(pq_path)
-
-	@property
-	def name(self):
-		return f"glove-{self._name}"
-
-	@lru_cache(1)
-	def to_core(self):
-		embedding = core.StaticEmbedding(self.name, self._table)
-		self._table = None  # free up memory
-		return embedding
+		return _load_glove_txt(
+			txt_data_path / f"glove.{name}.300d.txt")
 
 
 class FastText(StaticEmbedding):
@@ -128,17 +205,7 @@ class FastText(StaticEmbedding):
 		self._base_path.mkdir(exist_ok=True, parents=True)
 		pq_path = self._base_path / f"{lang}.parquet"
 
-		if not pq_path.exists():
-			tokens, embeddings = self._load()
-			embeddings = embeddings.astype(np.float32)
-
-			pq.write_table(
-				_make_table(tokens, embeddings),
-				pq_path,
-				compression='snappy',
-				version='2.0')
-
-		self._table = pq.read_table(pq_path)
+		super().__init__(path=pq_path, name=f"fasttext-{self._lang}")
 
 	def _load(self):
 		import fasttext.util
@@ -150,20 +217,10 @@ class FastText(StaticEmbedding):
 
 		words = ft.get_words()
 		ndims = ft.get_dimension()
-		embeddings = np.empty((len(words), ndims), dtype=np.float64)
-		for i, w in enumerate(tqdm(words)):
+		embeddings = np.empty((len(words), ndims), dtype=np.float32)
+		for i, w in enumerate(tqdm(words, desc=f"Importing fasttext ({lang})")):
 			embeddings[i] = ft.get_word_vector(w)
 		return words, embeddings
-
-	@property
-	def name(self):
-		return f"fasttext-{self._lang}"
-
-	@lru_cache(1)
-	def to_core(self):
-		embedding = core.StaticEmbedding(self.name, self._table)
-		self._table = None  # free up memory
-		return embedding
 
 
 class ContextualEmbedding:

@@ -27,9 +27,10 @@ void run_sanity_checks() {
 			a(i) = 2.5 * i;
 		}
 
-		auto array = to_py_array(a);
+		py::array_t<float> array = to_py_array(a);
+		auto r = array.unchecked<1>();
 		for (int i = 0; i < a.rows(); i++) {
-			PPK_ASSERT(array(i).cast<float>() == a(i));
+			PPK_ASSERT(r(i) == a(i));
 		}
 	}
 
@@ -41,10 +42,11 @@ void run_sanity_checks() {
 				v(i, j) = 7.5 * i + j * 2.25;
 			}
 		}
-		auto array = to_py_array(v);
+		py::array_t<float> array = to_py_array(v);
+		auto r = array.unchecked<2>();
 		for (int i = 0; i < v.rows(); i++) {
 			for (int j = 0; j < v.cols(); j++) {
-				PPK_ASSERT(array(i, j).cast<float>() == v(i, j));
+				PPK_ASSERT(r(i, j) == v(i, j));
 			}
 		}
 	}

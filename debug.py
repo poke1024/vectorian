@@ -15,19 +15,18 @@ vectorian.compile_for_debugging()
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
-from vectorian.alignment import WordMoversDistance
 
 embedding = FastText("en")
 
 im = NovelImporter(nlp)
-doc = im("/Users/arbeit/A Child's Dream of a Star.txt")
+doc = im("/Users/arbeit/Wise Children.txt")
 
 session = Session(
     [doc],
     [embedding])
 
-#query = nlp("literal")
-#r = session.find(query, n=3)
-
+index = session.index_for_metric()
 query = nlp("large")
-r = session.find(query, n=5, alignment=WordMoversDistance(relaxed=True))
+r = index.find(query)
+
+print(r)

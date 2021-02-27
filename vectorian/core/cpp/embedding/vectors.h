@@ -16,6 +16,8 @@ struct WordVectors {
 			normalized.row(j) = raw.row(j) / len;
 		}
 	}
+
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 inline py::array_t<float> to_py_array(const WordVectors::V &p_matrix) {

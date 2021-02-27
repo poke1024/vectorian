@@ -16,6 +16,7 @@
 #include <vector>
 #include <set>
 
+#define PPK_ASSERT_ENABLED 1
 #include <ppk_assert.h>
 
 
