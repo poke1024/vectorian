@@ -2,6 +2,8 @@ import math
 import html
 import time
 import string
+import collections
+import roman
 
 from yattag import Doc
 
@@ -138,10 +140,16 @@ class Renderer:
 					doc.stag('br')
 					with tag('span'):
 						regions = trim_regions(match['regions'])
-						for i, r in enumerate(regions):
-							self.add_region(r)
-							if i < len(regions) - 1:
-								text(" ")
+						if match['level'] == 'sentence':
+							for i, r in enumerate(regions):
+								text(r['s'])
+								if i < len(regions) - 1:
+									text(" ")
+						else:
+							for i, r in enumerate(regions):
+								self.add_region(r)
+								if i < len(regions) - 1:
+									text(" ")
 
 	def to_html(self):
 		doc, tag, text = self._html
@@ -188,3 +196,72 @@ class Renderer:
 		s = ''.join([prolog, doc.getvalue(), epilog])
 		return iframe.safe_substitute(dict(
 			id=iframe_id, width="100%", height="100%", srcdoc=html.escape(s)))
+
+
+Location = collections.namedtuple("Location", ["speaker", "location"])
+
+
+class PlayLocationFormatter:
+	def __call__(self, document, location):
+		speaker = location.get("speaker", 0)
+		if speaker > 0:  # we have an act-scene-speakers structure.
+			metadata = document.metadata
+			book = location.get("book", 0)
+			chapter = location.get("chapter", 0)
+			paragraph = location.get("paragraph", 0)
+
+			speaker = metadata["speakers"].get(str(speaker), "")
+			if book >= 0:
+				act = roman.toRoman(book)
+				scene = chapter
+				return Location(speaker, "%s.%d, line %d" % (act, scene, paragraph))
+			else:
+				return Location(speaker, "line %d" % paragraph)
+		else:
+			return None
+
+
+class BookLocationFormatter:
+	def __call__(self, document, location):
+		chapter = location.get("chapter", 0)
+
+		if chapter > 0:  # book, chapter and paragraphs
+			book = location.get("book", 0)
+			chapter = location.get("chapter", 0)
+			paragraph = location.get("paragraph", 0)
+
+			if book <= 0:  # do we have a book?
+				return Location("", "Chapter %d, par. %d" % (chapter, paragraph))
+			else:
+				return Location("", "Book %d, Chapter %d, par. %d" % (
+					book, chapter, paragraph))
+		else:
+			return None
+
+
+class TextLocationFormatter:
+	def __call__(self, document, location):
+		paragraph = location.get("paragraph", 0)
+		if paragraph > 0:
+			return Location("", "par. %d" % paragraph)
+		else:
+			return None
+
+
+class LocationFormatter:
+	def __init__(self):
+		self._formatters = [
+			PlayLocationFormatter(),
+			BookLocationFormatter(),
+			TextLocationFormatter()]
+
+	def add(self, formatter):
+		self._formatters.append(formatter)
+
+	def __call__(self, document, location):
+		for f in self._formatters:
+			x = f(document, location)
+			# print(f, "returned", x, "on", location)
+			if x:
+				return x
+		return None

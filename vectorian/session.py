@@ -1,90 +1,25 @@
 import vectorian.core as core
 import logging
 import roman
+import re
 
 from cached_property import cached_property
 from functools import lru_cache
 
-from vectorian.render import Renderer
+from vectorian.render import Renderer, LocationFormatter
 from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
 
 
-def get_location_desc(metadata, location):
-	book = location.get("book", 0)
-	chapter = location.get("chapter", 0)
-	speaker = location.get("speaker", 0)
-	paragraph = location.get("paragraph", 0)
-
-	if speaker > 0:  # we have an act-scene-speakers structure.
-		speaker = metadata["speakers"].get(str(speaker), "")
-		if book >= 0:
-			act = roman.toRoman(book)
-			scene = chapter
-			return speaker, "%s.%d, line %d" % (act, scene, paragraph)
-		else:
-			return speaker, "line %d" % paragraph
-	elif chapter > 0:  # book, chapter and paragraphs
-		if book < 0:  # do we have a book?
-			return "", "Chapter %d, par. %d" % (chapter, paragraph)
-		else:
-			return "", "Book %d, Chapter %d, par. %d" % (
-				book, chapter, paragraph)
-	elif paragraph > 0:
-		return "", "par. %d" % paragraph
-	else:
-		return "", ""
-
-
-def matches_to_json(items):
-	matches = []
-	for i, m in enumerate(items):
-		regions = []
-		doc = m.document
-		sentence_info = doc.sentence_info(m.sentence)
-
-		try:
-			for r in m.regions:
-				s = r.s
-				rm = r.match
-				if rm:
-					t = rm.t
-					regions.append(dict(
-						s=s,
-						t=t,
-						similarity=rm.similarity,
-						weight=rm.weight,
-						pos_s=rm.pos_s,
-						pos_t=rm.pos_t,
-						metric=rm.metric))
-				else:
-					regions.append(dict(s=s, gap_penalty=r.gap_penalty))
-
-			metadata = m.document.metadata
-			speaker, loc_desc = get_location_desc(metadata, sentence_info)
-
-			matches.append(dict(
-				debug=dict(document=metadata["unique_id"], sentence=m.sentence),
-				score=m.score,
-				metric=m.metric,
-				location=dict(
-					speaker=speaker,
-					author=metadata["author"],
-					title=metadata["title"],
-					location=loc_desc
-				),
-				regions=regions,
-				omitted=m.omitted))
-		except UnicodeDecodeError:
-			logging.exception("unicode conversion issue")
-
-	return matches
-
-
 class Result:
-	def __init__(self, matches, duration):
+	def __init__(self, index, matches, duration):
+		self._index = index
 		self._matches = matches
 		self._duration = duration
+
+	@property
+	def index(self):
+		return self._index
 
 	def __iter__(self):
 		return self._matches
@@ -94,7 +29,7 @@ class Result:
 
 	@lru_cache(1)
 	def to_json(self):
-		return matches_to_json(self._matches)
+		return [m.to_json(self._index.session) for m in self._matches]
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])
@@ -151,7 +86,7 @@ class DefaultImportFilter:
 			return False
 
 		# spaCy is very generous with labeling things as PROPN,
-		# which really breaks pos_mimatch_penalty often. we re-
+		# which really breaks pos_mismatch_penalty often. we re-
 		# classify PROPN as NOUN.
 		t_new = t.copy()
 		t_new["pos"] = self._pos.get(t["pos"], t["pos"])
@@ -159,8 +94,24 @@ class DefaultImportFilter:
 		return t_new
 
 
+class TokenNormalizer:
+	def __init__(self):
+		self._pattern = re.compile(r"[^\w]")
+
+	def __call__(self, token):
+		return self._pattern.sub("", token.lower())
+
+
 class Session:
-	def __init__(self, docs, static_embeddings=[], import_filter=DefaultImportFilter()):
+	def __init__(
+			self, docs, static_embeddings=[],
+			import_filter=None, location_formatter=None):
+
+		if import_filter is None:
+			import_filter = DefaultImportFilter()
+		if location_formatter is None:
+			location_formatter = LocationFormatter()
+
 		self._vocab = core.Vocabulary()
 		self._default_metrics = []
 		for embedding in static_embeddings:
@@ -172,6 +123,7 @@ class Session:
 					WordSimilarityMetric(
 						embedding, CosineMetric())))
 		self._collection = Collection(self._vocab, docs, import_filter)
+		self._location_formatter = location_formatter
 
 	@cached_property
 	def documents(self):
@@ -202,10 +154,14 @@ class Session:
 	def run_query(self, find, query):
 		return Result, find(query)
 
+	@property
+	def location_formatter(self):
+		return self._location_formatter
+
 
 class LabResult(Result):
-	def __init__(self, matches, duration, annotate=None):
-		super().__init__(matches, duration)
+	def __init__(self, index, matches, duration, annotate=None):
+		super().__init__(index, matches, duration)
 		self._annotate = annotate
 
 	def _render(self, r):
@@ -216,6 +172,7 @@ class LabResult(Result):
 
 	def annotate(self, tags=True, metric=True, penalties=True, **kwargs):
 		return LabResult(
+			self.index,
 			self._matches,
 			self._duration,
 			annotate=dict(tags=tags, metric=metric, penalties=penalties, **kwargs))

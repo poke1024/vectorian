@@ -59,7 +59,7 @@ TokenMatch = namedtuple('TokenMatch', [
 
 
 class Match:
-	def __init__(self, query, document, sentence, score, metric=None, omitted=None, regions=None):
+	def __init__(self, query, document, sentence, score, metric=None, omitted=None, regions=None, level="word"):
 		self._query = query
 		self._document = document
 		self._sentence = sentence
@@ -67,6 +67,7 @@ class Match:
 		self._metric = metric or ""
 		self._omitted = omitted or []
 		self._regions = regions or []
+		self._level = level
 
 	@staticmethod
 	def from_core(session, query, c_match):
@@ -122,11 +123,62 @@ class Match:
 	def regions(self):
 		return self._regions
 
+	@property
+	def level(self):
+		return self._level
+
+	def to_json(self, session):
+		regions = []
+		doc = self.document
+		sentence_info = doc.sentence_info(self.sentence)
+
+		for r in self.regions:
+			s = r.s
+			rm = r.match
+			if rm:
+				t = rm.t
+				regions.append(dict(
+					s=s,
+					t=t,
+					similarity=rm.similarity,
+					weight=rm.weight,
+					pos_s=rm.pos_s,
+					pos_t=rm.pos_t,
+					metric=rm.metric))
+			else:
+				regions.append(dict(s=s, gap_penalty=r.gap_penalty))
+
+		metadata = doc.metadata
+		loc = session.location_formatter(doc, sentence_info)
+		if loc:
+			speaker, loc_desc = loc
+		else:
+			speaker = ""
+			loc_desc = ""
+
+		return dict(
+			debug=dict(document=metadata["unique_id"], sentence=self.sentence),
+			score=self.score,
+			metric=self.metric,
+			location=dict(
+				speaker=speaker,
+				author=metadata["author"],
+				title=metadata["title"],
+				location=loc_desc
+			),
+			regions=regions,
+			omitted=self.omitted,
+			level=self.level)
+
 
 class Index:
 	def __init__(self, session, metric):
 		self._session = session
 		self._metric = metric
+
+	@property
+	def session(self):
+		return self._session
 
 	def find(
 		self, doc: spacy.tokens.doc.Doc,
@@ -150,6 +202,7 @@ class Index:
 		result_class, matches = self._session.run_query(self._find, query)
 
 		return result_class(
+			self,
 			matches,
 			duration=time.time() - start_time)
 
@@ -197,12 +250,18 @@ class SentenceEmbeddingIndex(Index):
 
 		corpus_vec = []
 		doc_starts = [0]
-		for i, doc in enumerate(tqdm(session.documents, "Encoding")):
-			sents = list(doc.sentences)
-			doc_vec = encoder(sents)
-			n_dims = doc_vec.shape[-1]
-			corpus_vec.append(doc_vec)
-			doc_starts.append(len(sents))
+
+		chunk_size = 50
+		n_sentences = sum(doc.n_sentences for doc in session.documents)
+
+		with tqdm(desc="Encoding", total=n_sentences) as pbar:
+			for i, doc in enumerate(session.documents):
+				sentences = list(doc.sentences)
+				for chunk in chunks(sentences, chunk_size):
+					doc_vec = encoder(chunk)
+					corpus_vec.append(doc_vec)
+					pbar.update(len(chunk))
+				doc_starts.append(len(sentences))
 
 		corpus_vec = np.vstack(corpus_vec)
 		corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
@@ -222,6 +281,7 @@ class SentenceEmbeddingIndex(Index):
 			pca_dim = None
 
 		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
+		n_dims = corpus_vec.shape[-1]
 		index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
 		#index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
 		#index = faiss.index_factory(n_dims, "LSH", faiss.METRIC_INNER_PRODUCT)
@@ -269,7 +329,8 @@ class SentenceEmbeddingIndex(Index):
 				sent_index,
 				score,
 				self._metric.name,
-				regions=regions
+				regions=regions,
+				level="sentence"
 			))
 
 		return matches
