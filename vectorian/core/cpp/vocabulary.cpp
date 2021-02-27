@@ -4,8 +4,8 @@
 template<typename VocabularyRef>
 TokenVectorRef _unpack_tokens(
 	VocabularyRef p_vocab,
-	const std::string p_text,
-	const std::shared_ptr<arrow::Table> &p_table) {
+	const std::shared_ptr<arrow::Table> &p_table,
+	const py::list &p_token_strings) {
 
 	const auto idx = numeric_column<arrow::UInt32Type, uint32_t>(p_table, "idx");
 	const auto len = numeric_column<arrow::UInt8Type, uint8_t>(p_table, "len");
@@ -20,8 +20,12 @@ TokenVectorRef _unpack_tokens(
 
 	std::vector<Token> &tokens = *tokens_ref.get();
 	std::vector<std::string> token_texts;
+	token_texts.reserve(p_token_strings.size());
+	for (const auto &s : p_token_strings) {
+		token_texts.push_back(s.cast<py::str>());
+	}
 
-	{
+	/*{
     	py::gil_scoped_release release;
 
     	tokens.reserve(n);
@@ -53,7 +57,7 @@ TokenVectorRef _unpack_tokens(
 			std::cerr << "an error occured when processing string: '" << t << "'\n";
 			throw;
 		}
-    }
+    }*/
 
     {
     	py::gil_scoped_release release;
@@ -88,14 +92,14 @@ TokenVectorRef _unpack_tokens(
 
 TokenVectorRef unpack_tokens(
 	const VocabularyRef &p_vocab,
-	const std::string p_text,
-	const std::shared_ptr<arrow::Table> &p_table) {
-	return _unpack_tokens(p_vocab, p_text, p_table);
+	const std::shared_ptr<arrow::Table> &p_table,
+	const py::list &p_token_strings) {
+	return _unpack_tokens(p_vocab, p_table, p_token_strings);
 }
 
 TokenVectorRef unpack_tokens(
 	const QueryVocabularyRef &p_vocab,
-	const std::string p_text,
-	const std::shared_ptr<arrow::Table> &p_table) {
-	return _unpack_tokens(p_vocab, p_text, p_table);
+	const std::shared_ptr<arrow::Table> &p_table,
+	const py::list &p_token_strings) {
+	return _unpack_tokens(p_vocab, p_table, p_token_strings);
 }

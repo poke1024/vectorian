@@ -3,23 +3,23 @@
 #include "match/match.h"
 
 class Region {
-	const std::string m_s;
+	const TextSlice m_s;
 	const float m_mismatch_penalty;
 
 public:
 	Region(
-		std::string &&s,
+		const TextSlice &p_s,
 		float p_mismatch_penalty = 0.0f):
 
-		m_s(s),
+		m_s(p_s),
 		m_mismatch_penalty(p_mismatch_penalty) {
 	}
 
 	virtual ~Region() {
 	}
 
-	py::bytes s() const {
-		return m_s;
+	py::tuple s() const {
+		return m_s.to_py();
 	}
 
 	float mismatch_penalty() const {
@@ -45,7 +45,7 @@ struct TokenRef {
 
 class MatchedRegion : public Region {
 	const TokenScore m_score; // score between s and t
-	const std::string m_t;
+	const TextSlice m_t;
 
 	const QueryVocabularyRef m_vocab;
 	const TokenRef m_s_token;
@@ -56,16 +56,16 @@ class MatchedRegion : public Region {
 public:
 	MatchedRegion(
 		const TokenScore &p_score,
-		std::string &&s,
-		std::string &&t,
+		const TextSlice &p_s,
+		const TextSlice &p_t,
 		const QueryVocabularyRef &p_vocab,
 		const TokenRef &p_s_token,
 		const TokenRef &p_t_token,
 		const std::string &p_metric) :
 
-		Region(std::move(s)),
+		Region(p_s),
 		m_score(p_score),
-		m_t(t),
+		m_t(p_t),
 
 		m_vocab(p_vocab),
 		m_s_token(p_s_token),
@@ -86,8 +86,8 @@ public:
 			return m_score.weight;
 		}
 
-		py::bytes t() const {
-			return m_t;
+		py::tuple t() const {
+			return m_t.to_py();
 		}
 
 		py::bytes pos_s() const {

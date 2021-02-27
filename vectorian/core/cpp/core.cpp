@@ -75,6 +75,8 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'match/match.cpp',
+	'match/matcher.cpp',
 	'metric/contextual.cpp',
 	'metric/static.cpp',
 	'module.cpp',
@@ -82,8 +84,6 @@ cfg['sources'] = [
 	'result_set.cpp',
 	'document.cpp',
 	'query.cpp',
-	'match/match.cpp',
-	'match/matcher.cpp',
 	'vocabulary.cpp',
 	'embedding/sim.cpp',
 	'../../../lib/ppk_assert/src/ppk_assert.cpp']

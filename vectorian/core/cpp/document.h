@@ -22,7 +22,6 @@ class Document : public std::enable_shared_from_this<Document> {
 private:
 	const int64_t m_id;
 	const VocabularyRef m_vocab;
-	const std::string m_text;
 
 	TokenVectorRef m_tokens;
 	py::dict m_py_tokens;
@@ -36,9 +35,9 @@ public:
 	Document(
 		int64_t p_document_id,
 		VocabularyRef p_vocab,
-		const std::string &p_text,
 		const py::object &p_sentences,
-		const py::object &p_tokens,
+		const py::object &p_tokens_table,
+		const py::list &p_tokens_strings,
 		const py::dict &p_metadata,
 		const std::string p_cache_path);
 
@@ -49,7 +48,7 @@ public:
 	}
 
 	std::string __str__() const {
-		return "<cpp.vcore.Document " +
+		return "<vectorian.core.Document " +
 			m_metadata["author"].cast<std::string>() +
 			", " +
 			m_metadata["title"].cast<std::string>() + ">";
@@ -61,14 +60,6 @@ public:
 
 	const std::string &path() const {
 		return m_cache_path;
-	}
-
-	const std::string &text() const {
-		return m_text;
-	}
-
-	std::string substr(ssize_t p_start, ssize_t p_end) const {
-		return m_text.substr(p_start, std::max(ssize_t(0), p_end - p_start));
 	}
 
 	const py::dict &metadata() const {
@@ -102,58 +93,6 @@ public:
 	inline const Sentence &sentence(size_t p_index) const {
 		return m_sentences.at(p_index);
 	}
-
-	py::dict py_sentence_info(const size_t p_index) const {
-		const Sentence &s = m_sentences.at(p_index);
-		py::dict d;
-		d["token_at"] = s.token_at;
-		d["n_tokens"] = s.n_tokens;
-		return d;
-	}
-
-	/*py::list py_sentences_as_tokens() const {
-		size_t k = 0;
-		py::list py_doc;
-		const auto &tokens = *m_tokens.get();
-		for (const Sentence &s : m_sentences) {
-			py::list py_sent;
-			for (int i = 0; i < s.n_tokens; i++) {
-				const auto &t = tokens[k++];
-				py_sent.append(py::str(m_text.substr(t.idx, t.len)));
-			}
-			py_doc.append(py_sent);
-		}
-		return py_doc;
-	}*/
-
-	py::str py_sentence(const size_t p_index) const {
-		const Sentence &s = m_sentences.at(p_index);
-		if (s.n_tokens > 0) {
-			const auto &tokens = *m_tokens.get();
-			const auto &t0 = tokens[s.token_at];
-
-			size_t i1;
-			if (static_cast<size_t>(s.token_at + s.n_tokens) < tokens.size()) {
-				i1 = tokens[s.token_at + s.n_tokens].idx;
-			} else {
-				const auto &t1 = tokens[s.token_at + s.n_tokens - 1];
-				i1 = t1.idx + t1.len;
-			}
-
-			return m_text.substr(t0.idx, i1 - t0.idx);
-		} else {
-			return py::str("");
-		}
-	}
-
-	py::list py_sentences() const {
-		py::list py_sents;
-		for (size_t i = 0; i < m_sentences.size(); i++) {
-			py_sents.append(py_sentence(i));
-		}
-		return py_sents;
-	}
-
 };
 
 typedef std::shared_ptr<Document> DocumentRef;

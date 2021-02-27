@@ -52,6 +52,15 @@ struct TokenSpan {
 	int32_t len;
 };
 
+struct TextSlice {
+	int32_t idx;
+	int32_t len;
+
+	py::tuple to_py() const {
+		return py::make_tuple(idx, idx + len); // usable as slice()
+	}
+};
+
 typedef Eigen::Array<token_t, Eigen::Dynamic, 1> TokenIdArray;
 typedef Eigen::Map<Eigen::Array<token_t, Eigen::Dynamic, 1>> MappedTokenIdArray;
 

@@ -8,7 +8,7 @@ import bisect
 
 from collections import namedtuple
 from tqdm import tqdm
-from vectorian.corpus.document import TokenTable
+from vectorian.corpus.document import TokenTable, extract_token_str
 
 
 class Query:
@@ -42,10 +42,11 @@ class Query:
 		text = self._doc.text
 		token_table.extend(text, {'start': 0, 'end': len(text)}, tokens)
 
+		token_table_pa = token_table.to_arrow()
 		return core.Query(
 			self._vocab,
-			self._doc.text,
-			token_table.to_arrow(),
+			token_table_pa,
+			extract_token_str(token_table_pa, self.text),
 			**self._options)
 
 
@@ -58,7 +59,8 @@ TokenMatch = namedtuple('TokenMatch', [
 
 
 class Match:
-	def __init__(self, document, sentence, score, metric=None, omitted=None, regions=None):
+	def __init__(self, query, document, sentence, score, metric=None, omitted=None, regions=None):
+		self._query = query
 		self._document = document
 		self._sentence = sentence
 		self._score = score
@@ -67,28 +69,33 @@ class Match:
 		self._regions = regions or []
 
 	@staticmethod
-	def from_core(c_match):
+	def from_core(session, query, c_match):
+		document = session.documents[c_match.document.id]
+
+		s_text = document.text
+		t_text = query.text
+
 		regions = []
 		for r in c_match.regions:
 			if r.matched:
 				regions.append(Region(
-					s=r.s.decode('utf-8', errors='ignore'),
+					s=s_text[slice(*r.s)],
 					match=TokenMatch(
-						t=r.t.decode('utf-8', errors='ignore'),
-						pos_s=r.pos_s.decode('utf-8', errors='ignore'),
-						pos_t=r.pos_t.decode('utf-8', errors='ignore'),
+						t=t_text[slice(*r.t)],
+						pos_s=r.pos_s.decode('utf-8'),
+						pos_t=r.pos_t.decode('utf-8'),
 						similarity=r.similarity,
 						weight=r.weight,
-						metric=r.metric.decode('utf-8', errors='ignore')),
+						metric=r.metric.decode('utf-8')),
 					gap_penalty=r.mismatch_penalty))
 			else:
 				regions.append(Region(
-					s=r.s.decode('utf-8', errors='ignore'),
+					s=s_text[slice(*r.s)],
 					match=None,
 					gap_penalty=r.mismatch_penalty))
 
 		return Match(
-			c_match.document, c_match.sentence, c_match.score,
+			query, document, c_match.sentence, c_match.score,
 			c_match.metric, c_match.omitted, regions)
 
 	@property
@@ -173,7 +180,7 @@ class BruteForceIndex(Index):
 				if progress:
 					progress(done / total)
 
-		return [Match.from_core(m) for m in results.best_n(-1)]
+		return [Match.from_core(self._session, query, m) for m in results.best_n(-1)]
 
 
 def chunks(x, n):
@@ -257,6 +264,7 @@ class SentenceEmbeddingIndex(Index):
 				match=None, gap_penalty=0)]
 
 			matches.append(Match(
+				query,
 				doc,
 				sent_index,
 				score,

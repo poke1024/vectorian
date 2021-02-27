@@ -408,7 +408,6 @@ public:
 	}
 
 	MetricRef create_metric(
-		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const py::dict &p_sent_metric_def,
 		const py::dict &p_word_metric_def) {
@@ -422,21 +421,21 @@ public:
 		if (metric_def.name == "lerp") {
 
 			return std::make_shared<LerpMetric>(
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
 				metric_def.options["t"].cast<float>());
 
 		} else if (metric_def.name == "min") {
 
 			return std::make_shared<MinMetric>(
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 		} else if (metric_def.name == "max") {
 
 			return std::make_shared<MaxMetric>(
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-				create_metric(p_needle_text, p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+				create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 		} else {
 
@@ -458,7 +457,6 @@ public:
 				metric_def,
 				p_sent_metric_def,
 				vocabulary_ids,
-				p_needle_text,
 				p_needle);
 		}
 	}
@@ -485,12 +483,12 @@ typedef std::shared_ptr<QueryVocabulary> QueryVocabularyRef;
 
 TokenVectorRef unpack_tokens(
 	const VocabularyRef &p_vocab,
-	const std::string p_text,
-	const std::shared_ptr<arrow::Table> &p_table);
+	const std::shared_ptr<arrow::Table> &p_table,
+	const py::list &p_token_strings);
 
 TokenVectorRef unpack_tokens(
 	const QueryVocabularyRef &p_vocab,
-	const std::string p_text,
-	const std::shared_ptr<arrow::Table> &p_table);
+	const std::shared_ptr<arrow::Table> &p_table,
+	const py::list &p_token_strings);
 
 #endif // __VECTORIAN_VOCABULARY_H__

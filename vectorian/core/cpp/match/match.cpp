@@ -87,8 +87,6 @@ const Sentence &Match::sentence() const {
 py::list Match::regions() const {
 	PPK_ASSERT(document().get() != nullptr);
 
-	const std::string &s_text = document()->text();
-	const std::string &t_text = query()->text();
 	const auto &s_tokens_ref = document()->tokens();
 	const auto &t_tokens_ref = query()->tokens();
 	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
@@ -176,13 +174,13 @@ py::list Match::regions() const {
 			}
 
 			regions.append(std::make_shared<Region>(
-				s_text.substr(idx0, s.idx - idx0), p));
+				TextSlice{idx0, s.idx - idx0}, p));
 		}
 
 		regions.append(std::make_shared<MatchedRegion>(
 			scores[i],
-			s_text.substr(s.idx, s.len),
-			t_text.substr(t.idx, t.len),
+			TextSlice{s.idx, s.len},
+			TextSlice{t.idx, t.len},
 			query()->vocabulary(),
 			TokenRef{s_tokens_ref, token_at + match_at_i},
 			TokenRef{t_tokens_ref, i},
@@ -197,7 +195,7 @@ py::list Match::regions() const {
 	if (up_to > last_anchor) {
 		const int32_t idx0 = s_tokens.at(last_anchor).idx;
 		regions.append(std::make_shared<Region>(
-			s_text.substr(idx0, s_tokens.at(up_to).idx - idx0)));
+			TextSlice{idx0, s_tokens.at(up_to).idx - idx0}));
 	}
 
 	return regions;
@@ -207,7 +205,6 @@ py::list Match::omitted() const {
 
 	const auto &t_tokens_ref = query()->tokens();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
-	const std::string &t_text = query()->text();
 
 	py::list not_used;
 
@@ -215,7 +212,7 @@ py::list Match::omitted() const {
 	for (int i = 0; i < int(match.size()); i++) {
 		if (match[i] < 0) {
 			const auto &t = t_tokens.at(i);
-			not_used.append(py::str(t_text.substr(t.idx, t.len)));
+			not_used.append(TextSlice{t.idx, t.len}.to_py());
 		}
 	}
 

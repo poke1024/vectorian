@@ -74,7 +74,6 @@ public:
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
 		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
-		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle) {
 
 		const auto m = std::make_shared<StaticEmbeddingMetric>(
@@ -85,7 +84,6 @@ public:
 
 		build_similarity_matrix(
 			p_vocabulary_to_embedding,
-			p_needle_text,
 			p_needle,
 			s,
 			m->w_similarity());
@@ -164,7 +162,6 @@ public:
 private:
 	void build_similarity_matrix(
 		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
-		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle,
 		const EmbeddingSimilarityRef &p_embedding_similarity,
 		MatrixXf &r_matrix) const {
@@ -200,13 +197,8 @@ private:
 				PPK_ASSERT(mapped >= 0);
 				needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
 			} else {
-				// that word is not in our current Vocabulary, it might be in the Embedding though.
-				// (with new two-stage QueryVocabulary this case should no longer occur).
-				//const auto word = p_needle_text.substr(p_needle.at(i).idx, p_needle.at(i).len);
-				//std::string lower = py::str(py::str(word).attr("lower")());
-				needle_embedding_token_ids[i] = -1; //lookup(lower);
+				needle_embedding_token_ids[i] = -1;
 			}
-			//std::cout << "xx mapped " << t << " -> " << p_a[t] << std::endl;
 		}
 
 		py::gil_scoped_release release;

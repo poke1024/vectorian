@@ -23,7 +23,6 @@ public:
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
 		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
-		const std::string &p_needle_text,
 		const std::vector<Token> &p_needle) = 0;
 
 	const std::string &name() const {

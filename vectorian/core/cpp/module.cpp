@@ -113,28 +113,21 @@ PYBIND11_MODULE(core, m) {
 	vocabulary.def("add_embedding", &Vocabulary::add_embedding);
 
 	py::class_<Query, QueryRef> query(m, "Query");
-	query.def(py::init<VocabularyRef, const std::string &, py::handle, py::kwargs>());
-	query.def_property_readonly("text", &Query::text);
-	query.def("substr", &Query::substr);
+	query.def(py::init<VocabularyRef, py::object, py::list, py::kwargs>());
 	query.def_property_readonly("tokens", &Query::py_tokens);
 	query.def("abort", &Query::abort);
 
 	py::class_<Document, DocumentRef> document(m, "Document");
 	document.def(py::init<
-		int64_t, VocabularyRef, const std::string&, py::object,
-		py::object, py::dict, const std::string>());
+		int64_t, VocabularyRef, py::object,
+		py::object, py::list, py::dict, const std::string>());
 	document.def("find", &Document::find);
 	document.def("__str__", &Document::__str__);
 	document.def("__repr__", &Document::__str__);
 	document.def_property_readonly("id", &Document::id);
-	document.def_property_readonly("text", &Document::text);
-	document.def("substr", &Document::substr);
 	document.def_property_readonly("tokens", &Document::py_tokens);
 	document.def_property_readonly("path", &Document::path);
 	document.def_property_readonly("metadata", &Document::metadata);
-	document.def("sentence_info", &Document::py_sentence_info);
-	document.def("sentence", &Document::py_sentence);
-	document.def_property_readonly("sentences", &Document::py_sentences);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);
 	document.def_property_readonly("n_sentences", &Document::n_sentences);
 	document.def_property_readonly("max_sentence_len", &Document::max_len_s);

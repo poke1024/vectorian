@@ -44,7 +44,6 @@ uint64_t parse_filter_mask(
 class Query : public std::enable_shared_from_this<Query> {
 	const QueryVocabularyRef m_vocab;
 	std::vector<MetricRef> m_metrics;
-	const std::string m_text;
 	TokenVectorRef m_t_tokens;
 	py::dict m_py_t_tokens;
 	float m_submatch_weight;
@@ -59,12 +58,11 @@ class Query : public std::enable_shared_from_this<Query> {
 public:
 	Query(
 		VocabularyRef p_vocab,
-		const std::string &p_text,
-		py::handle p_tokens_table,
+		const py::object &p_tokens_table,
+		const py::list &p_tokens_strings,
 		py::kwargs p_kwargs) :
 
 		m_vocab(std::make_shared<QueryVocabulary>(p_vocab)),
-		m_text(p_text),
 		m_aborted(false) {
 
 		// FIXME: assert that we are in main thread here.
@@ -73,7 +71,7 @@ public:
 		    unwrap_table(p_tokens_table.ptr()));
 
 		m_t_tokens = unpack_tokens(
-			p_vocab, p_text, table);
+			p_vocab, table, p_tokens_strings);
 
 		m_py_t_tokens = to_py_array(m_t_tokens);
 
@@ -132,7 +130,6 @@ public:
 			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
 			m_metrics.push_back(m_vocab->create_metric(
-				m_text,
 				*m_t_tokens.get(),
 				metric_def_dict,
 				metric_def_dict["word_metric"]));
@@ -145,14 +142,6 @@ public:
 
 	const QueryVocabularyRef &vocabulary() const {
 		return m_vocab;
-	}
-
-	const std::string &text() const {
-		return m_text;
-	}
-
-	std::string substr(ssize_t p_start, ssize_t p_end) const {
-		return m_text.substr(p_start, std::max(ssize_t(0), p_end - p_start));
 	}
 
 	inline const TokenVectorRef &tokens() const {

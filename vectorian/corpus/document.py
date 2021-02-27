@@ -3,16 +3,13 @@ import pyarrow as pa
 import pandas as pd
 import vectorian.core as core
 import collections
+import re
 
 from cached_property import cached_property
 
 
 class LocationTable:
 	_types = {
-		'book': 'uint8',
-		'chapter': 'uint8',
-		'speaker': 'uint8',
-		'paragraph': 'uint16',
 		'token_at': 'uint32',
 		'n_tokens': 'uint16'
 	}
@@ -39,7 +36,12 @@ class LocationTable:
 	def to_pandas(self):
 		data = dict()
 		for k, v in self._loc.items():
-			data[k] = pd.Series(v, dtype=self._types[k])
+			dtype = LocationTable._types.get(k)
+			if dtype is None:
+				series = pd.Series(v)
+			else:
+				series = pd.Series(v, dtype=dtype)
+			data[k] = series
 		return pd.DataFrame(data)
 
 	def to_arrow(self):
@@ -48,7 +50,7 @@ class LocationTable:
 
 class TokenTable:
 	def __init__(self):
-		self._utf8_idx = 0
+		self._idx = 0
 
 		self._token_idx = []
 		self._token_len = []
@@ -63,19 +65,17 @@ class TokenTable:
 
 		for token in tokens:
 			idx = token["start"]
-			self._utf8_idx += len(text[last_idx:idx].encode('utf8'))
+			self._idx += len(text[last_idx:idx])
 			last_idx = idx
 
 			token_text = text[token["start"]:token["end"]]
-			#if len(token_text.encode('utf8')) == 0:
-			#	print("BUG", token_text, len(token_text), token)
-			self._token_idx.append(self._utf8_idx)
-			self._token_len.append(len(token_text.encode('utf8')))
+			self._token_idx.append(self._idx)
+			self._token_len.append(len(token_text))
 
 			self._token_pos.append(token["pos"])
 			self._token_tag.append(token["tag"])
 
-		self._utf8_idx += len(text[last_idx:sent["end"]].encode('utf8'))
+		self._idx += len(text[last_idx:sent["end"]])
 
 	def to_pandas(self):
 		return pd.DataFrame({
@@ -95,6 +95,18 @@ class TokenTable:
 		return pa.Table.from_arrays(
 			tokens_table_data,
 			['idx', 'len', 'pos', 'tag'])
+
+
+def extract_token_str(table, text):
+	col_tok_idx = table["idx"].to_numpy()
+	col_tok_len = table["len"].to_numpy()
+	tokens = []
+	pattern = re.compile(r"[^\w]")
+	for idx, len_ in zip(col_tok_idx, col_tok_len):
+		t = text[idx:idx + len_].lower()
+		t = pattern.sub("", t)
+		tokens.append(t)
+	return tokens
 
 
 class Document:
@@ -195,6 +207,10 @@ class PreparedDocument:
 		}
 
 	@property
+	def text(self):
+		return self._text
+
+	@property
 	def metadata(self):
 		return self._metadata
 
@@ -246,8 +262,8 @@ class PreparedDocument:
 		return core.Document(
 			index,
 			vocab,
-			self._text.encode("utf8"),
 			self._sentence_table,
 			self._token_table,
+			extract_token_str(self._token_table, self._text),
 			self._metadata,
 			"")

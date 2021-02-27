@@ -32,7 +32,7 @@ if __name__ == '__main__':
     im = NovelImporter(nlp)
 
     corpus = Corpus()
-    doc = im("/Users/arbeit/A Child's Dream of a Star.txt")
+    doc = im("/Users/arbeit/Wise Children.txt")
     corpus.add(doc)
     corpus.save("/Users/arbeit/Desktop/my-corpus")
 
