@@ -64,12 +64,7 @@ class Importer:
 				print('??', v.shape, len(doc))
 
 		json = {
-			"version": md.version,
-			'unique_id': md.unique_id,
-			'origin': str(md.origin),
-			'author': md.author,
-			'title': md.title,
-			'speakers': md.speakers,
+			'metadata': md._asdict(),
 			'partitions': json_partitions,
 			'loc_keys': loc_keys
 		}
@@ -196,6 +191,64 @@ class NovelImporter(Importer):
 
 		return self._make_doc(
 			md, paragraphs, ['book', 'chapter', 'paragraph'], locations)
+
+
+class ShakespeareImporter(Importer):
+	# an importer for the PlayShakespeare.com Shakespeare XMLs available at
+	# https://github.com/severdia/PlayShakespeare.com-XML
+
+	def __call__(self, path, unique_id=None, author="Anonymous", title=None):
+		import xml.etree.ElementTree as ET
+		from collections import defaultdict
+
+		path = Path(path)
+		tree = ET.parse(path)
+		root = tree.getroot()
+		speakers = defaultdict(int)
+		full_speaker_names = dict()
+
+		for persname in root.findall(".//persname"):
+			full_speaker_names[persname.attrib["short"]] = persname.text
+
+		locations = []
+		texts = []
+
+		scenes = list(root.findall(".//scene"))
+
+		for scene_index, scene in enumerate(scenes):
+			actnum = int(scene.attrib["actnum"])
+			scenenum = int(scene.attrib["num"])
+
+			for speech in scene.findall(".//speech"):
+				speaker = speech.find("speaker")
+
+				speaker_no = speakers.get(speaker.text)
+				if speaker_no is None:
+					speaker_no = len(speakers) + 1
+					speakers[speaker.text] = speaker_no
+
+				line_no = None
+				lines = []
+				for line in speech.findall("line"):
+					if line.text:
+						if line_no is None:
+							line_no = int(line.attrib["globalnumber"])
+						lines.append(line.text)
+
+				if lines:
+					locations.append((actnum, scenenum, speaker_no, line_no))
+					texts.append(normalize_dashes(" ".join(lines)))
+
+		md = Metadata(
+			version="1.0",
+			unique_id="William Shakespeare/" + root.find(".//title").text,
+			origin=path,
+			author="William Shakespeare",
+			title=root.find(".//title").text,
+			speakers={v: full_speaker_names.get(k, k) for k, v in speakers.items()})
+
+		return self._make_doc(
+			md, texts, ['act', 'scene', 'speaker', 'line'], locations)
 
 
 class StringImporter(Importer):

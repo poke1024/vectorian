@@ -5,6 +5,7 @@ import multiprocessing.pool
 import time
 import numpy as np
 import bisect
+import json
 
 from collections import namedtuple
 from tqdm import tqdm
@@ -295,9 +296,25 @@ class SentenceEmbeddingIndex(Index):
 		index.add(corpus_vec)
 
 		self._index = index
+		self._corpus_vec = corpus_vec
+
+	@staticmethod
+	def load(path):
+		pass
 
 	def save(self, path):
-		pass
+		path.mkdir(exist_ok=True)
+		offset = 0
+		for doc in tqdm(self._session.documents, desc="Saving"):
+			size = doc.n_sentences
+			np.save(
+				str(path / (doc.unique_id + ".npy")),
+				self._corpus_vec[offset:size],
+				allow_pickle=False)
+			offset += size
+		with open(path / "index.json") as f:
+			f.write(json.dumps(
+				{'type': 'sentence_embedding_index'}))
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder([query.text])

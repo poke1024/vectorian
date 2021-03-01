@@ -114,9 +114,9 @@ class Document:
 	@staticmethod
 	def load(path):
 		with open(path, "r") as f:
-			doc = Document(json.loads(f.read()))
-			doc['origin'] = path
-			return doc
+			data = json.loads(f.read())
+			data['metadata']['origin'] = path
+			return Document(data)
 
 	def save(self, path):
 		with open(path, "w") as f:
@@ -137,16 +137,20 @@ class Document:
 		return "\n".join(lines)
 
 	@property
+	def metadata(self):
+		return self._json['metadata']
+
+	@property
 	def unique_id(self):
-		return self._json['unique_id']
+		return self.metadata['unique_id']
 
 	@property
 	def origin(self):
-		return self._json['origin']
+		return self.metadata['origin']
 
 	@property
 	def title(self):
-		return self._json['title']
+		return self.metadata['title']
 
 	def prepare(self, session):
 		return PreparedDocument(session, self._json)
@@ -201,11 +205,7 @@ class PreparedDocument:
 		self._sentence_table = sentence_table.to_arrow()
 		self._token_table = token_table.to_arrow()
 
-		self._metadata = {
-			'unique_id': json['unique_id'],
-			'author': json['author'],
-			'title': json['title']
-		}
+		self._metadata = json['metadata']
 
 	@property
 	def text(self):

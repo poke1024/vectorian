@@ -206,17 +206,15 @@ class PlayLocationFormatter:
 		speaker = location.get("speaker", 0)
 		if speaker > 0:  # we have an act-scene-speakers structure.
 			metadata = document.metadata
-			book = location.get("book", 0)
-			chapter = location.get("chapter", 0)
-			paragraph = location.get("paragraph", 0)
+			act = location.get("act", 0)
+			scene = location.get("scene", 0)
+			line = location.get("line", 0)
 
-			speaker = metadata["speakers"].get(str(speaker), "")
-			if book >= 0:
-				act = roman.toRoman(book)
-				scene = chapter
-				return Location(speaker, "%s.%d, line %d" % (act, scene, paragraph))
+			speaker = metadata["speakers"].get(speaker, "")
+			if act > 0:
+				return Location(speaker, "%s.%d, line %d" % (roman.toRoman(act), scene, line))
 			else:
-				return Location(speaker, "line %d" % paragraph)
+				return Location(speaker, "line %d" % line)
 		else:
 			return None
 
