@@ -193,6 +193,19 @@ class NovelImporter(Importer):
 			md, paragraphs, ['book', 'chapter', 'paragraph'], locations)
 
 
+class BodleianImporter(Importer):
+	# import for the TEI format files used in the Bodleian library.
+	pass
+
+'''
+
+         <div n="CI" type="chapter">
+            <head>VARIATION UNDER
+DOMESTICATION</head>
+
+'''
+
+
 class ShakespeareImporter(Importer):
 	# an importer for the PlayShakespeare.com Shakespeare XMLs available at
 	# https://github.com/severdia/PlayShakespeare.com-XML

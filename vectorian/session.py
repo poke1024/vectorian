@@ -3,6 +3,7 @@ import vectorian.utils as utils
 import logging
 
 from cached_property import cached_property
+from pathlib import Path
 from vectorian.render import Renderer, LocationFormatter
 from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
@@ -120,11 +121,21 @@ class Session:
 	def result_class(self):
 		return Result
 
-	def index_for_metric(self, metric=None):
-		if metric is None:
+	def index_for_metric(self, metric, nlp=None, path=None, **kwargs):
+		if isinstance(metric, str) and metric == "auto":
 			metric = self._default_metrics[0]
 		assert isinstance(metric, SentenceSimilarityMetric)
-		return metric.create_index(self)
+
+		if nlp:
+			kwargs = kwargs.copy()
+			kwargs['nlp'] = nlp
+
+		if path:
+			path = Path(path)
+		if path and path.exists():
+			return metric.load_index(self, path, **kwargs)
+		else:
+			return metric.create_index(self, **kwargs)
 
 	def run_query(self, find, query):
 		return Result, find(query)

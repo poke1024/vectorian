@@ -1,5 +1,4 @@
 import vectorian.core as core
-import spacy
 import multiprocessing
 import multiprocessing.pool
 import time
@@ -9,19 +8,20 @@ import json
 
 from collections import namedtuple
 from tqdm import tqdm
+from pathlib import Path
 from vectorian.corpus.document import TokenTable, extract_token_str
 
 
 class Query:
-	def __init__(self, index, vocab, doc, options):
+	def __init__(self, index, vocab, text, options):
 		self._index = index
 		self._vocab = vocab
-		self._doc = doc
+		self._text = text
 		self._options = options
 
 	@property
 	def text(self):
-		return self._doc.text
+		return self._text
 
 	@property
 	def options(self):
@@ -35,14 +35,15 @@ class Query:
 		else:
 			return tokens
 
-	def to_core(self):
-		tokens = self._doc.to_json()["tokens"]
+	def to_core(self, nlp):
+		doc = nlp(self._text)
+
+		tokens = doc.to_json()["tokens"]
 		tokens = self._filter(tokens, 'pos_filter', 'pos')
 		tokens = self._filter(tokens, 'tag_filter', 'tag')
 
 		token_table = TokenTable()
-		text = self._doc.text
-		token_table.extend(text, {'start': 0, 'end': len(text)}, tokens)
+		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
 		token_table_pa = token_table.to_arrow()
 		return core.Query(
@@ -188,12 +189,9 @@ class Index:
 		return self._session
 
 	def find(
-		self, doc: spacy.tokens.doc.Doc,
+		self, text,
 		n=10, min_score=0.2,
 		options: dict = dict()):
-
-		if not isinstance(doc, spacy.tokens.doc.Doc):
-			raise TypeError("please specify a spaCy document as query")
 
 		metric_args = self._metric.to_args(self._session)
 
@@ -205,7 +203,7 @@ class Index:
 
 		start_time = time.time()
 
-		query = Query(self, self._session.vocab, doc, options)
+		query = Query(self, self._session.vocab, text, options)
 		result_class, matches = self._session.run_query(self._find, query)
 
 		return result_class(
@@ -215,8 +213,12 @@ class Index:
 
 
 class BruteForceIndex(Index):
+	def __init__(self, *args, nlp, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._nlp = nlp
+
 	def _find(self, query, n_threads=None, progress=None):
-		c_query = query.to_core()
+		c_query = query.to_core(self._nlp)
 
 		def find_in_doc(x):
 			return x, x.find(c_query)
@@ -249,31 +251,35 @@ def chunks(x, n):
 
 
 class SentenceEmbeddingIndex(Index):
-	def __init__(self, session, metric, encoder):
+	def __init__(self, session, metric, encoder, vectors=None):
 		super().__init__(session, metric)
 
 		self._encoder = encoder
 		self._metric = metric
 
-		corpus_vec = []
 		doc_starts = [0]
-
-		chunk_size = 50
-		n_sentences = sum(doc.n_sentences for doc in session.documents)
-
-		with tqdm(desc="Encoding", total=n_sentences) as pbar:
-			for i, doc in enumerate(session.documents):
-				sentences = list(doc.sentences)
-				for chunk in chunks(sentences, chunk_size):
-					doc_vec = encoder(chunk)
-					corpus_vec.append(doc_vec)
-					pbar.update(len(chunk))
-				doc_starts.append(len(sentences))
-
-		corpus_vec = np.vstack(corpus_vec)
-		corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
-
+		for i, doc in enumerate(session.documents):
+			doc_starts.append(doc.n_sentences)
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
+
+		if vectors is not None:
+			corpus_vec = vectors
+		else:
+			corpus_vec = []
+
+			chunk_size = 50
+			n_sentences = self._doc_starts[-1]
+
+			with tqdm(desc="Encoding", total=n_sentences) as pbar:
+				for i, doc in enumerate(session.documents):
+					sentences = list(doc.sentences)
+					for chunk in chunks(sentences, chunk_size):
+						doc_vec = encoder(chunk)
+						corpus_vec.append(doc_vec)
+						pbar.update(len(chunk))
+
+			corpus_vec = np.vstack(corpus_vec)
+			corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
 
 		try:
 			import faiss
@@ -299,20 +305,29 @@ class SentenceEmbeddingIndex(Index):
 		self._corpus_vec = corpus_vec
 
 	@staticmethod
-	def load(path):
-		pass
+	def load(session, metric, encoder, path):
+		corpus_vec = []
+		for i, doc in enumerate(session.documents):
+			p = path / (doc.caching_name + ".npy")
+			if not p.exists():
+				raise FileNotFoundError(p)
+			corpus_vec.append(np.load(p))
+		corpus_vec = np.vstack(corpus_vec)
+		return SentenceEmbeddingIndex(
+			session, metric, encoder, corpus_vec)
 
 	def save(self, path):
+		path = Path(path)
 		path.mkdir(exist_ok=True)
 		offset = 0
 		for doc in tqdm(self._session.documents, desc="Saving"):
 			size = doc.n_sentences
 			np.save(
-				str(path / (doc.unique_id + ".npy")),
+				str(path / (doc.caching_name + ".npy")),
 				self._corpus_vec[offset:size],
 				allow_pickle=False)
 			offset += size
-		with open(path / "index.json") as f:
+		with open(path / "index.json", "w") as f:
 			f.write(json.dumps(
 				{'type': 'sentence_embedding_index'}))
 

@@ -5,7 +5,6 @@ from vectorian.importers import Importer
 from pathlib import Path
 from tqdm import tqdm
 from collections import namedtuple
-from slugify import slugify
 
 
 class Corpus:
@@ -33,7 +32,7 @@ class Corpus:
 		path = Path(path)
 		path.mkdir(exist_ok=True)
 		for doc in self._docs:
-			doc.save(path / (slugify(doc.unique_id) + ".json"))
+			doc.save(path / (doc.caching_name + ".json"))
 
 	def __iter__(self):
 		for doc in self._docs:
@@ -70,7 +69,7 @@ class LazyCorpus:
 
 	def _compile(self):
 		for src in tqdm(self._src):
-			p = self._path / (slugify(src.unique_id) + ".json")
+			p = self._path / (src.caching_name + ".json")
 			if p.exists():
 				continue
 			doc = src.importer(src.path)

@@ -5,7 +5,7 @@ import vectorian.core as core
 import collections
 
 from cached_property import cached_property
-from vectorian.utils import CachableCallable
+from slugify import slugify
 
 
 class LocationTable:
@@ -145,6 +145,10 @@ class Document:
 		return self.metadata['unique_id']
 
 	@property
+	def caching_name(self):
+		return slugify(self.unique_id)
+
+	@property
 	def origin(self):
 		return self.metadata['origin']
 
@@ -214,6 +218,14 @@ class PreparedDocument:
 	@property
 	def metadata(self):
 		return self._metadata
+
+	@property
+	def unique_id(self):
+		return self.metadata['unique_id']
+
+	@property
+	def caching_name(self):
+		return slugify(self.unique_id)
 
 	@property
 	def n_tokens(self):

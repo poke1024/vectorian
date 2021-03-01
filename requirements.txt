@@ -13,3 +13,4 @@ jupyterlab>=3.0.7
 ipywidgets>=7.6.3
 cached-property>=1.5.2
 matplotlib>=3.3.4
+faiss>=1.7.0
