@@ -101,7 +101,7 @@ class TextImporter(Importer):
 		md = Metadata(
 			version="1.0",
 			unique_id=unique_id,
-			origin=path,
+			origin=str(path),
 			author=author,
 			title=title,
 			speakers={})
@@ -184,7 +184,7 @@ class NovelImporter(Importer):
 		md = Metadata(
 			version="1.0",
 			unique_id=unique_id,
-			origin=path,
+			origin=str(path),
 			author=author,
 			title=title,
 			speakers={})
@@ -242,7 +242,7 @@ class ShakespeareImporter(Importer):
 		md = Metadata(
 			version="1.0",
 			unique_id="William Shakespeare/" + root.find(".//title").text,
-			origin=path,
+			origin=str(path),
 			author="William Shakespeare",
 			title=root.find(".//title").text,
 			speakers={v: full_speaker_names.get(k, k) for k, v in speakers.items()})
