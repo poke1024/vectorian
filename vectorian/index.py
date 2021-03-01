@@ -50,7 +50,7 @@ class Query:
 			extract_token_str(
 				token_table_pa,
 				self.text,
-				self._index.session.options.token_normalizer),
+				self._index.session.token_mapper('tokenizer')),
 			**self._options)
 
 
@@ -133,7 +133,7 @@ class Match:
 	def level(self):
 		return self._level
 
-	def to_json(self, session):
+	def to_json(self, location_formatter):
 		regions = []
 		doc = self.document
 		sentence_info = doc.sentence_info(self.sentence)
@@ -155,7 +155,7 @@ class Match:
 				regions.append(dict(s=s, gap_penalty=r.gap_penalty))
 
 		metadata = doc.metadata
-		loc = session.location_formatter(doc, sentence_info)
+		loc = location_formatter(doc, sentence_info)
 		if loc:
 			speaker, loc_desc = loc
 		else:

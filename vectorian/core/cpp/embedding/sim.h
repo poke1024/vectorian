@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "embedding/vectors.h"
+#include <iostream>
 
 
 class EmbeddingSimilarity {
@@ -55,6 +56,10 @@ public:
 
 		const size_t n = p_a.rows();
 		const size_t m = p_b.rows();
+
+		/*std::cout << "r_matrix: (" << r_matrix.rows() << ", " << r_matrix.cols() << ")\n";
+		std::cout << "i0, n, i0 + n: " << i0 << ", " << n << ", " << (i0 + n) << "\n";
+		std::cout << "j0, m, j0 + m: " << j0 << ", " << m << ", " << (j0 + m) << "\n";*/
 
 		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.rows()));
 		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.cols()));

@@ -3,9 +3,9 @@ import pyarrow as pa
 import pandas as pd
 import vectorian.core as core
 import collections
-import re
 
 from cached_property import cached_property
+from vectorian.utils import CachableCallable
 
 
 class LocationTable:
@@ -155,7 +155,7 @@ class Document:
 class PreparedDocument:
 	def __init__(self, session, json):
 		self._session = session
-		token_filter = session.options.import_filter
+		token_mapper = session.token_mapper('tagger')
 
 		texts = []
 
@@ -185,7 +185,7 @@ class PreparedDocument:
 					token_j += 1
 
 				for t0 in tokens[token_i:token_j]:
-					t = token_filter(t0)
+					t = token_mapper(t0)
 					if t:
 						sent_tokens.append(t)
 
@@ -268,6 +268,6 @@ class PreparedDocument:
 			extract_token_str(
 				self._token_table,
 				self._text,
-				self._session.options.token_normalizer),
+				self._session.token_mapper('tokenizer')),
 			self._metadata,
 			"")

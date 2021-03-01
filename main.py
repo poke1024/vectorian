@@ -1,12 +1,14 @@
 # This is a sample Python script.
 
 import vectorian.core as core
+import vectorian.utils as utils
 import vectorian
 
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
 from vectorian.corpus import Corpus
+from vectorian.render import LocationFormatter
 
 import spacy
 import json
@@ -36,9 +38,19 @@ if __name__ == '__main__':
     corpus.add(doc)
     corpus.save("/Users/arbeit/Desktop/my-corpus")
 
+    token_mappings = {
+        "tokenizer": [],
+        "tagger": []
+    }
+
+    token_mappings["tokenizer"].append(utils.lowercase())
+    token_mappings["tokenizer"].append(utils.erase("W"))
+    token_mappings["tokenizer"].append(utils.alpha())
+
     session = Session(
         corpus,
-        [embedding])
+        [embedding],
+        token_mappings)
 
     #doc.save("/Users/arbeit/temp.json")
     #cdoc = doc.to_core(0, vocab)
@@ -46,11 +58,13 @@ if __name__ == '__main__':
 
     #session.add_document(doc)
 
+    formatter = LocationFormatter()
+
     query = nlp("company")
     index = session.index_for_metric()
     matches = index.find(query)
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
-        f.write(json.dumps(matches.to_json(), indent=4))
+        f.write(json.dumps(matches.to_json(formatter), indent=4))
 
 
 

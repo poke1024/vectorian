@@ -3,6 +3,7 @@ import vectorian.core as core
 from tqdm import tqdm
 from pathlib import Path
 from functools import lru_cache
+from vectorian.utils import CachableCallable
 
 import numpy as np
 import pyarrow as pa
@@ -17,29 +18,29 @@ def _make_table(tokens, embeddings, normalizer):
 
 	f_mask = np.zeros((embeddings.shape[0],), dtype=np.bool)
 	f_tokens = []
-	tok_to_id = dict()
-	n_dup = 0
+	token_to_ids = dict()
+
 	for i, t in enumerate(tqdm(tokens, desc="Normalizing Tokens")):
 		nt = normalizer(t)
 		if nt:
-			j = None  # tok_to_id.get(nt)
-			if j is None:
-				tok_to_id[nt] = i
+			indices = token_to_ids.get(nt)
+			if indices is None:
+				token_to_ids[nt] = [i]
 				f_tokens.append(nt)
 				f_mask[i] = True
 			else:
-				# FIXME
-				n_dup += 1
+				indices.append(i)
+
+	for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
+		if len(indices) > 1:
+			i = indices[0]
+			embeddings[i] = np.mean(embeddings[indices], axis=0)
 
 	embeddings = embeddings[f_mask]
 	assert embeddings.shape[0] == len(f_tokens)
 
 	vecs = [pa.array(embeddings[:, i]) for i in range(embeddings.shape[1])]
 	vecs_name = [('v%d' % i) for i in range(embeddings.shape[1])]
-
-	print("embeddings matrix shape", embeddings.shape)
-	print("n_tokens", len(f_tokens))
-	print("duplicates", n_dup)
 
 	return pa.Table.from_arrays(
 		[pa.array(f_tokens, type=pa.string())] + vecs,
@@ -92,6 +93,13 @@ def _load_glove_txt(csv_path):
 	return tokens, embeddings
 
 
+def cache_path(path, name):
+	if name:
+		return path.parent / (path.stem + "." + name + path.suffix)
+	else:
+		return path
+
+
 class StaticEmbedding:
 	def __init__(self, path, name):
 		self._path = path
@@ -110,7 +118,7 @@ class StaticEmbedding:
 		loaded = self._loaded.get(normalizer.name)
 		if loaded is None:
 			if self._path:
-				path = normalizer.cache_path(self._path)
+				path = cache_path(self._path, normalizer.name)
 			else:
 				path = None
 			if path and path.exists():
@@ -118,7 +126,7 @@ class StaticEmbedding:
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
-					tokens, vectors, normalizer)
+					tokens, vectors, normalizer.unpack())
 
 			loaded = StaticEmbeddingInstance(self._name, table)
 			self._loaded[normalizer.name] = loaded

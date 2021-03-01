@@ -50,9 +50,9 @@ public:
 		// note: these "raw" tables were already normalized in preprocessing.
 
 		m_embeddings.raw.resize(m_tokens.size(), table->num_columns() - 1);
-		std::cout << "table size: " << table->num_rows() << " x " << table->num_columns() << "\n";
+		/*std::cout << "table size: " << table->num_rows() << " x " << table->num_columns() << "\n";
 		std::cout << "m_tokens.size(): " << m_tokens.size() << "\n";
-		std::cout << std::flush;
+		std::cout << std::flush;*/
 
 		PPK_ASSERT(m_tokens.size() == static_cast<size_t>(table->num_rows()));
 
@@ -224,8 +224,8 @@ private:
 				m_embeddings,
 				x,
 				needle_embedding_token_ids,
-				0,
 				offset,
+				0,
 				r_matrix);
 			offset += x.rows();
 		}

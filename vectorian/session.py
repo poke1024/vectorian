@@ -1,11 +1,8 @@
 import vectorian.core as core
+import vectorian.utils as utils
 import logging
-import roman
-import re
 
 from cached_property import cached_property
-from functools import lru_cache
-
 from vectorian.render import Renderer, LocationFormatter
 from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
@@ -27,9 +24,8 @@ class Result:
 	def __getitem__(self, i):
 		return self._matches[i]
 
-	@lru_cache(1)
-	def to_json(self):
-		return [m.to_json(self._index.session) for m in self._matches]
+	def to_json(self, location_formatter):
+		return [m.to_json(location_formatter) for m in self._matches]
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])
@@ -71,80 +67,28 @@ class Collection:
 		return max([doc.c_doc.max_sentence_len for doc in self._docs])
 
 
-class DefaultImportFilter:
-	_pos = {
-		'PROPN': 'NOUN'
-	}
-
-	_tag = {
-		'NNP': 'NN',
-		'NNPS': 'NNS',
-	}
-
-	def __call__(self, t):
-		if t["pos"] == "PUNCT":
-			return False
-
-		# spaCy is very generous with labeling things as PROPN,
-		# which really breaks pos_mismatch_penalty often. we re-
-		# classify PROPN as NOUN.
-		t_new = t.copy()
-		t_new["pos"] = self._pos.get(t["pos"], t["pos"])
-		t_new["tag"] = self._tag.get(t["tag"], t["tag"])
-		return t_new
-
-
-class TokenNormalizer:
-	@property
-	def name(self):
-		raise NotImplementedError()
-
-	def cache_path(self, path):
-		return path.parent / (path.stem + "." + self.name + path.suffix)
-
-
-class NopTokenNormalizer(TokenNormalizer):
-	@property
-	def name(self):
-		return "unmodified"
-
-	def __call__(self, token):
-		return token
-
-
-class LowerCaseTokenNormalizer(TokenNormalizer):
-	def __init__(self):
-		self._pattern = re.compile(r"[^\w]")
-
-	@property
-	def name(self):
-		return "alpha_lowercase"
-
-	def __call__(self, token):
-		token = self._pattern.sub("", token.lower())
-		return token if token.isalpha() else None
-
-
-class SessionOptions:
-	def __init__(self):
-		self.import_filter = DefaultImportFilter()
-		self.token_normalizer = LowerCaseTokenNormalizer()
-		self.location_formatter = LocationFormatter()
-
-
 class Session:
-	def __init__(self, docs, static_embeddings=[], options=None):
-		if options is None:
-			options = SessionOptions()
-		self._options = options
-
+	def __init__(self, docs, static_embeddings=None, token_mappings=None):
 		self._vocab = core.Vocabulary()
 
+		if static_embeddings and not token_mappings:
+			logging.warn("got static embeddings but not token mappings.")
+
+		if token_mappings is None:
+			token_mappings = {}
+		self._token_mappings = token_mappings
+
+		if any(k not in ("tokenizer", "tagger") for k in token_mappings):
+			raise ValueError(token_mappings)
+
+		if static_embeddings is None:
+			static_embeddings = []
 		for embedding in static_embeddings:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			self._vocab.add_embedding(
-				embedding.create_instance(options.token_normalizer).to_core())
+				embedding.create_instance(
+					self.token_mapper("tokenizer")).to_core())
 
 		self._default_metrics = []
 		for embedding in static_embeddings:
@@ -155,12 +99,6 @@ class Session:
 
 		self._collection = Collection(
 			self, self._vocab, docs)
-
-		self._location_formatter = options.location_formatter
-
-	@property
-	def options(self):
-		return self._options
 
 	@cached_property
 	def documents(self):
@@ -191,19 +129,25 @@ class Session:
 	def run_query(self, find, query):
 		return Result, find(query)
 
-	@property
-	def location_formatter(self):
-		return self._location_formatter
+	def token_mapper(self, stage):
+		if stage not in ('tokenizer', 'tagger'):
+			raise ValueError(stage)
+		if stage == 'tokenizer':
+			return utils.CachableCallable.chain(
+				self._token_mappings.get('tokenizer', []))
+		else:
+			return utils.chain(self._token_mappings.get(stage, []))
 
 
 class LabResult(Result):
-	def __init__(self, index, matches, duration, annotate=None):
+	def __init__(self, index, matches, duration, location_formatter, annotate=None):
 		super().__init__(index, matches, duration)
 		self._annotate = annotate
+		self._location_formatter = location_formatter
 
 	def _render(self, r):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
-		for match in self.to_json():
+		for match in self.to_json(self._location_formatter):
 			r.add_match(match)
 		return r.to_html()
 
@@ -219,6 +163,10 @@ class LabResult(Result):
 
 
 class LabSession(Session):
+	def __init__(self, *args, location_formatter=None, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._location_formatter = location_formatter or LocationFormatter()
+
 	def run_query(self, find, query):
 		import ipywidgets as widgets
 		from IPython.display import display
@@ -239,4 +187,7 @@ class LabSession(Session):
 		finally:
 			progress.close()
 
-		return LabResult, result
+		def make_result(*args, **kwargs):
+			return LabResult(*args, **kwargs, location_formatter=self._location_formatter)
+
+		return make_result, result
