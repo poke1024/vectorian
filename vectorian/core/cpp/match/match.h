@@ -80,7 +80,7 @@ public:
 
 	Slice slice() const;
 
-	py::list regions() const;
+	py::list regions(const int window_size) const;
 
 	py::list omitted() const;
 

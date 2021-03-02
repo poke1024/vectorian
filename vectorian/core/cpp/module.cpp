@@ -94,7 +94,7 @@ PYBIND11_MODULE(core, m) {
 	match.def_property_readonly("score", &Match::score);
 	match.def_property_readonly("metric", &Match::metric_name);
 	match.def_property_readonly("slice_id", &Match::slice_id);
-	match.def_property_readonly("regions", &Match::regions);
+	match.def("regions", &Match::regions);
 	match.def_property_readonly("omitted", &Match::omitted);
 
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");

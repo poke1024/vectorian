@@ -85,7 +85,7 @@ Slice Match::slice() const {
 	return document()->spans(level)->slice(slice_id());
 }
 
-py::list Match::regions() const {
+py::list Match::regions(const int window_size) const {
 	PPK_ASSERT(document().get() != nullptr);
 
 	const auto &s_tokens_ref = document()->tokens();
@@ -109,7 +109,6 @@ py::list Match::regions() const {
 		}
 	}
 
-	constexpr int window_size = 10;
 	int32_t last_anchor = std::max(0, token_at + match_0 - window_size);
 	bool last_matched = false;
 

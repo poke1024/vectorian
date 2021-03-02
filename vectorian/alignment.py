@@ -75,7 +75,9 @@ class CustomGapCost(GapCost):
 
 
 class WatermanSmithBeyer:
-	def __init__(self, gap: GapCost = ConstantGapCost(np.inf), zero: float = 0.5):
+	def __init__(self, gap: GapCost = None, zero: float = 0.5):
+		if gap is None:
+			gap = ConstantGapCost(0)
 		self._gap = gap
 		self._zero = zero
 

@@ -60,8 +60,11 @@ if __name__ == '__main__':
 
     formatter = LocationFormatter()
 
-    index = session.index_for_metric("auto", nlp=nlp)
-    matches = index.find("company")
+    index = session.index_for_metric("auto", nlp)
+    matches = index.find("write female", n=3, on="token", window=(25, 1))
+
+    #index = session.index_for_metric("auto", nlp=nlp)
+    #matches = index.find("company")
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
         f.write(json.dumps(matches.to_json(formatter), indent=4))
 

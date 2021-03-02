@@ -215,12 +215,19 @@ public:
 		const Token *t_tokens = this->m_query->tokens()->data();
 		const int len_t =  this->m_query->tokens()->size();
 
+		/*std::ofstream debug("/Users/arbeit/Desktop/debug.txt");
+
+		debug << "slice on " << slice_strategy.level <<
+			" with window (" << slice_strategy.window_size << ", " << slice_strategy.window_step << ")\n";*/
+
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
 			slice_id += slice_strategy.window_step) {
 
 			const int len_s = spans->safe_len(
 				slice_id, slice_strategy.window_size);
+
+			//debug << "(" << token_at << ", " << len_s << ")\n";
 
 			if (len_s < 1) {
 				continue;

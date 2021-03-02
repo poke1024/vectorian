@@ -83,7 +83,7 @@ class Match:
 		t_text = query.text
 
 		regions = []
-		for r in c_match.regions:
+		for r in c_match.regions(10):
 			if r.matched:
 				regions.append(Region(
 					s=s_text[slice(*r.s)],
