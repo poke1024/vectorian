@@ -30,7 +30,7 @@ struct SohangirCosine { // Sohangir & Wang
 		const token_t p_s,
 		const token_t p_t) const {
 
-		const float num = (p_vectors.raw.row(p_s) * p_vectors.raw.row(p_t)).array().sqrt().sum();
+		const float num = (p_vectors.unmodified.row(p_s) * p_vectors.unmodified.row(p_t)).array().sqrt().sum();
 		const float denom = std::sqrt(p_vectors.normalized.row(p_s).sum()) * std::sqrt(p_vectors.normalized.row(p_t).sum());
 		return num / denom;
 	}
@@ -48,7 +48,7 @@ struct PNorm {
 		const token_t p_s,
 		const token_t p_t) const {
 
-		const auto uv = p_vectors.raw.row(p_s) - p_vectors.raw.row(p_t);
+		const auto uv = p_vectors.unmodified.row(p_s) - p_vectors.unmodified.row(p_t);
 		const float distance = pow(uv.cwiseAbs().array().pow(m_p).sum(), 1.0f / m_p);
 		return std::max(0.0f, 1.0f - distance * m_distance_scale);
 	}

@@ -130,9 +130,7 @@ public:
 		TokenIdArray filtered_a = filter_token_ids(p_a);
 		TokenIdArray filtered_b = filter_token_ids(p_b);
 
-		py::dict vectors;
-		vectors[py::str("raw")] = to_py_array(p_embeddings.raw);
-		vectors[py::str("normalized")] = to_py_array(p_embeddings.normalized);
+		py::dict vectors = p_embeddings.to_py();
 
 		py::array_t<float> output;
 		output.resize({filtered_a.rows(), filtered_b.rows()});

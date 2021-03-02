@@ -49,7 +49,7 @@ public:
 
 		// note: these "raw" tables were already normalized in preprocessing.
 
-		m_embeddings.raw.resize(m_tokens.size(), table->num_columns() - 1);
+		m_embeddings.unmodified.resize(m_tokens.size(), table->num_columns() - 1);
 		/*std::cout << "table size: " << table->num_rows() << " x " << table->num_columns() << "\n";
 		std::cout << "m_tokens.size(): " << m_tokens.size() << "\n";
 		std::cout << std::flush;*/
@@ -62,7 +62,7 @@ public:
 
 			for_each_column<arrow::FloatType, float>(table, [this] (size_t i, auto v, size_t offset) {
 				PPK_ASSERT(i > 0 && offset + v.size() <= m_tokens.size());
-				m_embeddings.raw.col(i - 1)(Eigen::seq(offset, v.size())) = v;
+				m_embeddings.unmodified.col(i - 1)(Eigen::seq(offset, v.size())) = v;
 			}, 1);
 		} catch(...) {
 			printf("failed to load embedding vectors parquet table.\n");
@@ -102,6 +102,19 @@ public:
 		}
 
 		return m;
+	}
+
+	py::dict py_vectors() const {
+		return m_embeddings.to_py();
+	}
+
+	ssize_t token_to_id(const std::string &p_token) const {
+		const auto i = m_tokens.find(p_token);
+		if (i != m_tokens.end()) {
+			return i->second;
+		} else {
+			return -1;
+		}
 	}
 
 	/*float cosine_similarity(const std::string &p_a, const std::string &p_b) const {
@@ -156,7 +169,7 @@ public:
 	}
 
 	size_t n_tokens() const {
-		return m_embeddings.raw.rows();
+		return m_embeddings.unmodified.rows();
 	}
 
 	py::list measures() const {

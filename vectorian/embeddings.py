@@ -156,7 +156,12 @@ class StaticEmbeddingFromFile(StaticEmbedding):
 class StaticEmbeddingInstance:
 	def __init__(self, name, table):
 		self._name = name
-		self._table = table
+		self._core = core.StaticEmbedding(self._name, table)
+		self._vec = self._core.vectors
+
+	@property
+	def name(self):
+		return self._name
 
 	def save(self, path):
 		logging.info(f"writing {path}")
@@ -167,11 +172,16 @@ class StaticEmbeddingInstance:
 			version='2.0')
 		logging.info("done.")
 
-	@lru_cache(1)
+	def tok2vec(self, token, normalized=True):
+		i = self._core.token_to_id(token)
+		if i < 0:
+			return None
+		else:
+			cat = "normalized" if normalized else "unmodified"
+			return self._vec[cat][i]
+
 	def to_core(self):
-		embedding = core.StaticEmbedding(self._name, self._table)
-		self._table = None  # free up memory
-		return embedding
+		return self._core
 
 
 class Glove(StaticEmbedding):

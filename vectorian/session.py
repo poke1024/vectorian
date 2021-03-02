@@ -85,12 +85,14 @@ class Session:
 
 		if static_embeddings is None:
 			static_embeddings = []
+		self._embeddings = {}
 		for embedding in static_embeddings:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
-			self._vocab.add_embedding(
-				embedding.create_instance(
-					self.token_mapper("tokenizer")).to_core())
+			instance = embedding.create_instance(
+				self.token_mapper("tokenizer"))
+			self._embeddings[instance.name] = instance
+			self._vocab.add_embedding(instance.to_core())
 
 		self._default_metrics = []
 		for embedding in static_embeddings:
@@ -112,6 +114,9 @@ class Session:
 	@cached_property
 	def c_documents(self):
 		return [x.c_doc for x in self._collection.documents]
+
+	def get_embedding_instance(self, embedding):
+		return self._embeddings[embedding.name]
 
 	@property
 	def vocab(self):

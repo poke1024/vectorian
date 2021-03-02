@@ -42,7 +42,7 @@ void run_sanity_checks() {
 				v(i, j) = 7.5 * i + j * 2.25;
 			}
 		}
-		py::array_t<float> array = to_py_array(v);
+		py::array_t<float> array = WordVectors::to_py_array(v);
 		auto r = array.unchecked<2>();
 		for (int i = 0; i < v.rows(); i++) {
 			for (int j = 0; j < v.cols(); j++) {
@@ -101,9 +101,10 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> fast_embedding(m, "StaticEmbedding");
 	fast_embedding.def(py::init<const std::string &, py::object>());
+	fast_embedding.def("token_to_id", &StaticEmbedding::token_to_id);
+	fast_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
 	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);
 	//fast_embedding.def("similarity_matrix", &StaticEmbedding::similarity_matrix);
-	//fast_embedding.def("load_percentiles", &StaticEmbedding::load_percentiles);
 	fast_embedding.def_property_readonly("n_tokens", &StaticEmbedding::n_tokens);
 	fast_embedding.def_property_readonly("measures", &StaticEmbedding::measures);
 
