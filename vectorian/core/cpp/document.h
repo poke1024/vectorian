@@ -18,12 +18,45 @@ inline void add_dummy_token(std::vector<Token> &tokens) {
 	tokens.push_back(t);
 }
 
-class Spans {
+class FixedSpans {
+	const size_t m_size;
+
+public:
+	FixedSpans(const size_t p_size) : m_size(p_size) {
+	}
+
+	inline size_t size() const {
+		return m_size;
+	}
+
+	inline int32_t start(const size_t p_index) const {
+		return p_index;
+	}
+
+	inline int32_t end(const size_t p_index) const {
+		return p_index + 1;
+	}
+
+	inline int32_t len(const size_t p_index) const {
+		return 1;
+	}
+
+	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
+		return std::min(p_size, m_size - p_index);
+	}
+
+	inline int32_t max_len(const size_t p_window_size) const {
+		return p_window_size;
+	}
+};
+
+
+class VariableSpans {
 	const std::vector<int32_t> m_offsets;
 	size_t m_max_len;
 
 public:
-	Spans(std::vector<int32_t> &&p_offsets) : m_offsets(p_offsets) {
+	VariableSpans(std::vector<int32_t> &&p_offsets) : m_offsets(p_offsets) {
 		size_t max_len = 0;
 		if (m_offsets.size() > 0) {
 			for (size_t i = 0; i < m_offsets.size() - 1; i++) {
@@ -49,22 +82,56 @@ public:
 	}
 
 	inline int32_t len(const size_t p_index) const {
-		return m_offsets[p_index + 1] - m_offsets[p_index];
+		return end(p_index) - start(p_index);
 	}
 
 	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
 		const size_t i1 = std::min(p_index + p_size, m_offsets.size() - 1);
-		return m_offsets[i1] - m_offsets[p_index];
+		return start(i1) - start(p_index);
+	}
+
+	inline int32_t max_len(const size_t p_window_size) const {
+		return m_max_len * p_window_size;
+	}
+};
+
+class Spans {
+	std::optional<FixedSpans> m_fixed;
+	std::optional<VariableSpans> m_variable;
+
+public:
+	Spans(FixedSpans &&p_spans) : m_fixed(p_spans) {
+	}
+
+	Spans(VariableSpans &&p_spans) : m_variable(p_spans) {
+	}
+
+	inline size_t size() const {
+		return m_variable.has_value() ? (*m_variable).size() : (*m_fixed).size();
+	}
+
+	inline int32_t start(const size_t p_index) const {
+		return m_variable.has_value() ? (*m_variable).start(p_index) : (*m_fixed).start(p_index);
+	}
+
+	inline int32_t end(const size_t p_index) const {
+		return m_variable.has_value() ? (*m_variable).end(p_index) : (*m_fixed).end(p_index);
+	}
+
+	inline int32_t len(const size_t p_index) const {
+		return m_variable.has_value() ? (*m_variable).len(p_index) : (*m_fixed).len(p_index);
+	}
+
+	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
+		return m_variable.has_value() ? (*m_variable).safe_len(p_index, p_size) : (*m_fixed).safe_len(p_index, p_size);
 	}
 
 	inline Slice slice(const size_t p_index) const {
-		const auto i0 = m_offsets.at(p_index);
-		const auto i1 = m_offsets.at(p_index + 1);
-		return Slice{i0, i1 - i0};
+		return Slice{start(p_index), len(p_index)};
 	}
 
-	inline int32_t max_len() const {
-		return m_max_len;
+	inline int32_t max_len(const size_t p_window_size) const {
+		return m_variable.has_value() ? (*m_variable).max_len(p_window_size) : (*m_fixed).max_len(p_window_size);
 	}
 };
 
@@ -139,27 +206,9 @@ public:
 		return it->second;
 	}
 
-	inline size_t max_len(const std::string &p_name) const {
-		return spans(p_name)->max_len();
+	inline size_t max_len(const std::string &p_name, const size_t p_window_size) const {
+		return spans(p_name)->max_len(p_window_size);
 	}
-
-	/*inline const std::vector<int32_t> &offsets() const {
-		return m_offsets; // into sentences
-	}
-
-	size_t n_sentences() const {
-		return m_offsets.size() - 1;
-	}
-
-	inline size_t max_len_s() const { // maximum sentence length (in tokens)
-		return m_max_len_s;
-	}
-
-	inline Slice sentence(size_t p_index) const {
-		const auto i0 = m_offsets.at(p_index);
-		const auto i1 = m_offsets.at(p_index + 1);
-		return Slice{i0, i1 - i0};
-	}*/
 };
 
 typedef std::shared_ptr<Document> DocumentRef;

@@ -33,12 +33,15 @@ Document::Document(
 
 	for (auto item : p_spans) {
 		const auto table = unwrap_table(item.second.cast<py::object>());
-		m_spans[item.first.cast<py::str>()] = std::make_shared<Spans>(unpack_spans(table));
+		m_spans[item.first.cast<py::str>()] = std::make_shared<Spans>(
+			VariableSpans(unpack_spans(table)));
 	}
-
 	const auto tokens_table = unwrap_table(p_tokens_table);
 	m_tokens = unpack_tokens(
 		p_vocab, tokens_table, p_tokens_strings);
+
+	m_spans["token"] = std::make_shared<Spans>(
+		FixedSpans(m_tokens->size()));
 
 	add_dummy_token(*m_tokens.get());
 

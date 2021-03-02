@@ -191,15 +191,27 @@ class Index:
 	def find(
 		self, text,
 		n=10, min_score=0.2,
+		on='sentence', window=(1, 1),
 		options: dict = dict()):
 
-		metric_args = self._metric.to_args(self._session)
-
 		options = options.copy()
-		if metric_args:
-			options["metric"] = metric_args
+
 		options["max_matches"] = n
 		options["min_score"] = min_score
+
+		if isinstance(window, int):
+			window = [window, window]
+		if len(window) < 2:
+			window = (window[0], window[0])
+		options["slices"] = {
+			'level': on,
+			'window_size': window[0],
+			'window_step': window[1]
+		}
+
+		metric_args = self._metric.to_args(self._session, options)
+		if metric_args:
+			options["metric"] = metric_args
 
 		start_time = time.time()
 

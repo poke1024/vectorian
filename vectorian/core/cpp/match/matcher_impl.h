@@ -122,8 +122,10 @@ public:
 		Matcher(p_query, p_document, p_metric),
 		m_aligner(p_aligner) {
 
+		const auto &slice_strategy = p_query->slice_strategy();
+
 		m_aligner.init(
-			p_document->spans(p_query->slice_strategy().level)->max_len(),
+			p_document->spans(slice_strategy.level)->max_len(slice_strategy.window_size),
 			m_query->len());
 	}
 

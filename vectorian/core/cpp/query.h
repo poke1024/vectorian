@@ -89,7 +89,8 @@ public:
 			"submatch_weight",
 			"bidirectional",
 			"max_matches",
-			"min_score"
+			"min_score",
+			"slices"
 		};
 
 		if (p_kwargs) {
@@ -97,7 +98,7 @@ public:
 				const std::string name = py::str(item.first);
 				if (valid_options.find(name) == valid_options.end()) {
 					std::ostringstream err;
-					err << "illegal option " << name;
+					err << "illegal query option " << name;
 					throw std::runtime_error(err.str());
 				}
 #if 0

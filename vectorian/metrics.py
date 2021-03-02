@@ -151,11 +151,11 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 	def create_index(self, session, nlp):
 		return BruteForceIndex(session, self, nlp=nlp)
 
-	def to_args(self, session):
+	def to_args(self, session, options):
 		return {
 			'metric': 'alignment-isolated',
 			'word_metric': self._word_metric.to_args(),
-			'alignment': self._alignment.to_args(session)
+			'alignment': self._alignment.to_args(session, options)
 		}
 
 
@@ -173,11 +173,11 @@ class TagWeightedSentenceMetric(SentenceSimilarityMetric):
 	def create_index(self, session, nlp):
 		return BruteForceIndex(session, self, nlp=nlp)
 
-	def to_args(self, session):
+	def to_args(self, session, options):
 		return {
 			'metric': 'alignment-tag-weighted',
 			'word_metric': self._word_metric.to_args(),
-			'alignment': self._alignment.to_args(session)
+			'alignment': self._alignment.to_args(session, options)
 		}
 
 
@@ -206,7 +206,7 @@ class SentenceEmbeddingMetric(SentenceSimilarityMetric):
 		return SentenceEmbeddingIndex.load(
 			session, self, self._encoder, path)
 
-	def to_args(self, session):
+	def to_args(self, session, options):
 		return None
 
 	@property

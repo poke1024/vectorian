@@ -65,8 +65,8 @@ class Collection:
 		return self._docs
 
 	@lru_cache(16)
-	def max_len(self, level):
-		return max([doc.c_doc.max_len(level) for doc in self._docs])
+	def max_len(self, level, window_size):
+		return max([doc.c_doc.max_len(level, window_size) for doc in self._docs])
 
 
 class Session:
@@ -123,8 +123,8 @@ class Session:
 		return self._vocab
 
 	@lru_cache(16)
-	def max_len(self, level):
-		return self._collection.max_len(level)
+	def max_len(self, level, window_size):
+		return self._collection.max_len(level, window_size)
 
 	@property
 	def result_class(self):
