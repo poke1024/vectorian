@@ -78,7 +78,7 @@ public:
 
 	py::dict py_assignment() const;
 
-	const Sentence &sentence() const;
+	Slice sentence() const;
 
 	py::list regions() const;
 

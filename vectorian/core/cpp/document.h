@@ -18,6 +18,54 @@ inline void add_dummy_token(std::vector<Token> &tokens) {
 	tokens.push_back(t);
 }
 
+class Spans {
+	const std::vector<int32_t> m_offsets;
+	size_t m_max_len;
+
+public:
+	Spans(std::vector<int32_t> &&p_offsets) : m_offsets(p_offsets) {
+		size_t max_len = 0;
+		if (m_offsets.size() > 0) {
+			for (size_t i = 0; i < m_offsets.size() - 1; i++) {
+				max_len = std::max(
+					max_len,
+					size_t(m_offsets[i + 1] - m_offsets[i]));
+			}
+		}
+		m_max_len = max_len;
+	}
+
+	inline size_t size() const {
+		// we model spans and have one more offset than spans.
+		return m_offsets.size() - 1;
+	}
+
+	inline int32_t start(size_t p_index) const {
+		return m_offsets[p_index];
+	}
+
+	inline int32_t end(size_t p_index) const {
+		return m_offsets[p_index + 1];
+	}
+
+	inline int32_t len(size_t p_index) const {
+		return m_offsets[p_index + 1] - m_offsets[p_index];
+	}
+
+	inline Slice slice(size_t p_index) const {
+		const auto i0 = m_offsets.at(p_index);
+		const auto i1 = m_offsets.at(p_index + 1);
+		return Slice{i0, i1 - i0};
+	}
+
+	inline int32_t max_len() const {
+		return m_max_len;
+	}
+};
+
+typedef std::shared_ptr<Spans> SpansRef;
+
+
 class Document : public std::enable_shared_from_this<Document> {
 private:
 	const int64_t m_id;
@@ -25,8 +73,7 @@ private:
 
 	TokenVectorRef m_tokens;
 	py::dict m_py_tokens;
-	std::vector<Sentence> m_sentences;
-	size_t m_max_len_s;
+	std::map<std::string, SpansRef> m_spans;
 
 	const py::dict m_metadata;
 	std::string m_cache_path;
@@ -35,11 +82,10 @@ public:
 	Document(
 		int64_t p_document_id,
 		VocabularyRef p_vocab,
-		const py::object &p_sentences,
+		const py::dict &p_spans,
 		const py::object &p_tokens_table,
 		const py::list &p_tokens_strings,
-		const py::dict &p_metadata,
-		const std::string p_cache_path);
+		const py::dict &p_metadata);
 
 	ResultSetRef find(const QueryRef &p_query);
 
@@ -78,21 +124,37 @@ public:
 		return m_tokens->size();
 	}
 
-	inline const std::vector<Sentence> &sentences() const {
-		return m_sentences;
+	const SpansRef &spans(const std::string &p_name) const {
+		const auto it = m_spans.find(p_name);
+		if (it == m_spans.end()) {
+			std::ostringstream err;
+			err << "unknown spans " << p_name;
+			throw std::runtime_error(err.str());
+		}
+		return it->second;
+	}
+
+	inline size_t max_len(const std::string &p_name) const {
+		return spans(p_name)->max_len();
+	}
+
+	/*inline const std::vector<int32_t> &offsets() const {
+		return m_offsets; // into sentences
 	}
 
 	size_t n_sentences() const {
-		return m_sentences.size();
+		return m_offsets.size() - 1;
 	}
 
 	inline size_t max_len_s() const { // maximum sentence length (in tokens)
 		return m_max_len_s;
 	}
 
-	inline const Sentence &sentence(size_t p_index) const {
-		return m_sentences.at(p_index);
-	}
+	inline Slice sentence(size_t p_index) const {
+		const auto i0 = m_offsets.at(p_index);
+		const auto i1 = m_offsets.at(p_index + 1);
+		return Slice{i0, i1 - i0};
+	}*/
 };
 
 typedef std::shared_ptr<Document> DocumentRef;

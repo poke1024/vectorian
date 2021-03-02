@@ -258,6 +258,7 @@ public:
 	typedef typename Delegate::Slice Slice;
 
 	inline FilteredSliceFactory(
+		const QueryRef &p_query,
 		const Delegate &p_delegate,
 		const DocumentRef &p_document,
 		const TokenFilter &p_filter) :
@@ -265,7 +266,7 @@ public:
 		m_delegate(p_delegate),
 		m_filter(p_filter) {
 
-		m_filtered.resize(p_document->max_len_s());
+		m_filtered.resize(p_document->spans(p_query->span_name())->max_len());
 	}
 
 	inline Slice create_slice(

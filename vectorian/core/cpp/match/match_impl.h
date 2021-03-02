@@ -13,7 +13,7 @@ void Match::compute_scores(
     const auto &match = m_digest.match;
 
     if (m_scores.empty() && !match.empty()) {
-        const auto token_at = sentence().token_at;
+        const auto token_at = sentence().idx;
 
         int end = 0;
         for (auto m : match) {

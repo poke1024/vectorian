@@ -61,7 +61,7 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 
 		return create_alignment_matcher(
 			p_query, p_document, metric, metric->alignment_def(),
-			gen.create_filtered(p_document, token_filter));
+			gen.create_filtered(p_query, p_document, token_filter));
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
@@ -89,7 +89,7 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 
 		return create_alignment_matcher(
 			p_query, p_document, metric, metric->alignment_def(),
-			gen.create_filtered(p_document, token_filter));
+			gen.create_filtered(p_query, p_document, token_filter));
 	} else {
 
 		std::ostringstream err;

@@ -82,7 +82,7 @@ class WatermanSmithBeyer:
 	def to_args(self, session):
 		return {
 			'algorithm': 'wsb',
-			'gap': self._gap.costs(session.max_sentence_len),
+			'gap': self._gap.costs(session.max_len('sentence')),
 			'zero': self._zero
 		}
 

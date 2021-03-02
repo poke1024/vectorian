@@ -3,12 +3,12 @@
 #include "match/match.h"
 
 class Region {
-	const TextSlice m_s;
+	const Slice m_s;
 	const float m_mismatch_penalty;
 
 public:
 	Region(
-		const TextSlice &p_s,
+		const Slice &p_s,
 		float p_mismatch_penalty = 0.0f):
 
 		m_s(p_s),
@@ -45,7 +45,7 @@ struct TokenRef {
 
 class MatchedRegion : public Region {
 	const TokenScore m_score; // score between s and t
-	const TextSlice m_t;
+	const Slice m_t;
 
 	const QueryVocabularyRef m_vocab;
 	const TokenRef m_s_token;
@@ -56,8 +56,8 @@ class MatchedRegion : public Region {
 public:
 	MatchedRegion(
 		const TokenScore &p_score,
-		const TextSlice &p_s,
-		const TextSlice &p_t,
+		const Slice &p_s,
+		const Slice &p_t,
 		const QueryVocabularyRef &p_vocab,
 		const TokenRef &p_s_token,
 		const TokenRef &p_t_token,

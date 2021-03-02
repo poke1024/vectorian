@@ -3,6 +3,7 @@ import vectorian.utils as utils
 import logging
 
 from cached_property import cached_property
+from functools import lru_cache
 from pathlib import Path
 from vectorian.render import Renderer, LocationFormatter
 from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
@@ -63,9 +64,9 @@ class Collection:
 	def documents(self):
 		return self._docs
 
-	@cached_property
-	def max_sentence_len(self):
-		return max([doc.c_doc.max_sentence_len for doc in self._docs])
+	@lru_cache(16)
+	def max_len(self, level):
+		return max([doc.c_doc.max_len(level) for doc in self._docs])
 
 
 class Session:
@@ -101,6 +102,9 @@ class Session:
 		self._collection = Collection(
 			self, self._vocab, docs)
 
+	def _parse_metric_def(self, s):
+		pass  # e.g. wsb(fasttext-en:cosine)
+
 	@cached_property
 	def documents(self):
 		return [x.p_doc for x in self._collection.documents]
@@ -113,9 +117,9 @@ class Session:
 	def vocab(self):
 		return self._vocab
 
-	@property
-	def max_sentence_len(self):
-		return self._collection.max_sentence_len
+	@lru_cache(16)
+	def max_len(self, level):
+		return self._collection.max_len(level)
 
 	@property
 	def result_class(self):

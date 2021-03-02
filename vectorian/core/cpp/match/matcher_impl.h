@@ -123,7 +123,7 @@ public:
 		m_aligner(p_aligner) {
 
 		m_aligner.init(
-			p_document->max_len_s(),
+			p_document->spans(p_query->span_name())->max_len(),
 			m_query->len());
 	}
 
@@ -150,6 +150,20 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 
 	std::reverse(match.begin(), match.end());
 }
+
+/*template<typename S>
+inline size_t compute_len_s(
+	const S &p_slices,
+	const size_t p_token_at,
+	const size_t p_index,
+	const size_t p_window_size) {
+
+	const size_t n_slices = slices.size();
+
+	size_t len_s = 0;
+	const auto &slice_data = slices[p_index + p_window_size];
+	return slice_data.token_at - p_token_at;
+}*/
 
 template<typename SliceFactory, typename Aligner, bool Bidirectional>
 class MatcherImpl : public MatcherBase<Aligner> {
@@ -187,8 +201,8 @@ public:
 			return;
 		}*/
 
-		const auto &slices = this->m_document->sentences();
-		const size_t n_slices = slices.size();
+		const auto spans = this->m_document->spans(this->m_query->span_name());
+		const size_t n_slices = spans->size();
 		//const size_t max_len_s = m_document->max_len_s();
 
 		size_t token_at = 0;
@@ -197,12 +211,14 @@ public:
 		const Token *t_tokens = this->m_query->tokens()->data();
 		const int len_t =  this->m_query->tokens()->size();
 
+		//const int window_size = 1;
+		const int window_step = 1;
+
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
-			slice_id++) {
+			slice_id += window_step) {
 
-			const auto &slice_data = slices[slice_id];
-			const int len_s = slice_data.n_tokens;
+			const int len_s = spans->len(slice_id);
 
 			if (len_s < 1) {
 				continue;

@@ -194,6 +194,10 @@ public:
 	inline float submatch_weight() const {
 		return m_submatch_weight;
 	}
+
+	inline std::string span_name() const {
+		return "sentence";
+	}
 };
 
 typedef std::shared_ptr<Query> QueryRef;

@@ -80,8 +80,8 @@ py::dict Match::py_assignment() const {
 }
 
 
-const Sentence &Match::sentence() const {
-	return  document()->sentence(sentence_id());
+Slice Match::sentence() const {
+	return document()->spans(query()->span_name())->slice(sentence_id());
 }
 
 py::list Match::regions() const {
@@ -92,7 +92,7 @@ py::list Match::regions() const {
 	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
 
-	const auto token_at = sentence().token_at;
+	const auto token_at = sentence().idx;
 
 	const auto &match = this->match();
 	const auto &scores = m_scores;
@@ -119,8 +119,9 @@ py::list Match::regions() const {
 	std::vector<int16_t> index_map;
 	if (!token_filter.all()) {
 		int16_t k = 0;
-		index_map.resize(sentence().n_tokens);
-		for (int32_t i = 0; i < sentence().n_tokens; i++) {
+		const auto len = sentence().len;
+		index_map.resize(len);
+		for (int32_t i = 0; i < len; i++) {
 			index_map[k] = i;
 			if (token_filter(s_tokens.at(token_at + i))) {
 				k++;
@@ -174,13 +175,13 @@ py::list Match::regions() const {
 			}
 
 			regions.append(std::make_shared<Region>(
-				TextSlice{idx0, s.idx - idx0}, p));
+				Slice{idx0, s.idx - idx0}, p));
 		}
 
 		regions.append(std::make_shared<MatchedRegion>(
 			scores[i],
-			TextSlice{s.idx, s.len},
-			TextSlice{t.idx, t.len},
+			Slice{s.idx, s.len},
+			Slice{t.idx, t.len},
 			query()->vocabulary(),
 			TokenRef{s_tokens_ref, token_at + match_at_i},
 			TokenRef{t_tokens_ref, i},
@@ -195,7 +196,7 @@ py::list Match::regions() const {
 	if (up_to > last_anchor) {
 		const int32_t idx0 = s_tokens.at(last_anchor).idx;
 		regions.append(std::make_shared<Region>(
-			TextSlice{idx0, s_tokens.at(up_to).idx - idx0}));
+			Slice{idx0, s_tokens.at(up_to).idx - idx0}));
 	}
 
 	return regions;
@@ -212,7 +213,7 @@ py::list Match::omitted() const {
 	for (int i = 0; i < int(match.size()); i++) {
 		if (match[i] < 0) {
 			const auto &t = t_tokens.at(i);
-			not_used.append(TextSlice{t.idx, t.len}.to_py());
+			not_used.append(Slice{t.idx, t.len}.to_py());
 		}
 	}
 

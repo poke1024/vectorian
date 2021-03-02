@@ -34,11 +34,6 @@ typedef int32_t token_t;
 typedef int32_t wvec_t;
 
 #pragma pack(push, 1)
-struct Sentence {
-	int32_t token_at;
-	int16_t n_tokens;
-};
-
 struct Token {
 	token_t id;
 	int32_t idx;
@@ -53,7 +48,7 @@ struct TokenSpan {
 	int32_t len;
 };
 
-struct TextSlice {
+struct Slice {
 	int32_t idx;
 	int32_t len;
 

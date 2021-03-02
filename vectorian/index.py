@@ -138,7 +138,7 @@ class Match:
 	def to_json(self, location_formatter):
 		regions = []
 		doc = self.document
-		sentence_info = doc.sentence_info(self.sentence)
+		sentence_info = doc.span_info("sentence", self.sentence)
 
 		for r in self.regions:
 			s = r.s
@@ -259,7 +259,7 @@ class SentenceEmbeddingIndex(Index):
 
 		doc_starts = [0]
 		for i, doc in enumerate(session.documents):
-			doc_starts.append(doc.n_sentences)
+			doc_starts.append(doc.n_spans("sentence"))
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
 
 		if vectors is not None:
@@ -272,7 +272,7 @@ class SentenceEmbeddingIndex(Index):
 
 			with tqdm(desc="Encoding", total=n_sentences) as pbar:
 				for i, doc in enumerate(session.documents):
-					sentences = list(doc.sentences)
+					sentences = list(doc.spans("sentence"))
 					for chunk in chunks(sentences, chunk_size):
 						doc_vec = encoder(chunk)
 						corpus_vec.append(doc_vec)
@@ -321,7 +321,7 @@ class SentenceEmbeddingIndex(Index):
 		path.mkdir(exist_ok=True)
 		offset = 0
 		for doc in tqdm(self._session.documents, desc="Saving"):
-			size = doc.n_sentences
+			size = doc.n_spans("sentence")
 			np.save(
 				str(path / (doc.caching_name + ".npy")),
 				self._corpus_vec[offset:size],
@@ -357,7 +357,7 @@ class SentenceEmbeddingIndex(Index):
 			#print(c_doc.sentence(sentence_id))
 			#print(score, d)
 
-			sent_text = doc.sentence(sent_index)
+			sent_text = doc.span("sentence", sent_index)
 			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
 
 			regions = [Region(

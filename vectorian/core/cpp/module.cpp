@@ -121,8 +121,8 @@ PYBIND11_MODULE(core, m) {
 
 	py::class_<Document, DocumentRef> document(m, "Document");
 	document.def(py::init<
-		int64_t, VocabularyRef, py::object,
-		py::object, py::list, py::dict, const std::string>());
+		int64_t, VocabularyRef, py::dict,
+		py::object, py::list, py::dict>());
 	document.def("find", &Document::find);
 	document.def("__str__", &Document::__str__);
 	document.def("__repr__", &Document::__str__);
@@ -131,8 +131,8 @@ PYBIND11_MODULE(core, m) {
 	document.def_property_readonly("path", &Document::path);
 	document.def_property_readonly("metadata", &Document::metadata);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);
-	document.def_property_readonly("n_sentences", &Document::n_sentences);
-	document.def_property_readonly("max_sentence_len", &Document::max_len_s);
+	//document.def_property_readonly("n_sentences", &Document::n_sentences);
+	document.def("max_len", &Document::max_len);
 
 	py::class_<ResultSet, ResultSetRef> result_set(m, "ResultSet");
 	result_set.def_property_readonly("size", &ResultSet::size);

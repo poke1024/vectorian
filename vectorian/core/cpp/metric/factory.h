@@ -36,10 +36,12 @@ public:
 	}
 
 	FilteredSliceFactory<SliceFactory<MakeSlice>> create_filtered(
+		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const TokenFilter &p_token_filter) const {
 
 		return FilteredSliceFactory(
+			p_query,
 			create(p_document),
 			p_document, p_token_filter);
 	}

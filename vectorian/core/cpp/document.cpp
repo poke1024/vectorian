@@ -2,44 +2,39 @@
 #include "utils.h"
 #include "query.h"
 
-std::vector<Sentence> unpack_sentences(const std::shared_ptr<arrow::Table> &p_table) {
-	py::gil_scoped_release release;
-
+std::vector<int32_t> unpack_spans(const std::shared_ptr<arrow::Table> &p_table) {
 	const auto n_tokens_values = numeric_column<arrow::UInt16Type, uint16_t>(p_table, "n_tokens");
 
 	const size_t n = n_tokens_values.size();
-	std::vector<Sentence> sentences;
-	sentences.reserve(n);
+	std::vector<int32_t> offsets;
+	offsets.reserve(n + 1);
 
 	size_t token_at = 0;
+	offsets.push_back(token_at);
 	for (size_t i = 0; i < n; i++) {
-		 Sentence s;
-		 s.n_tokens = n_tokens_values[i];
-		 s.token_at = token_at;
-		 token_at += s.n_tokens;
-
-		 sentences.push_back(s);
+		token_at += n_tokens_values[i];
+		offsets.push_back(token_at);
 	}
 
-	return sentences;
+	return offsets;
 }
 
 Document::Document(
 	const int64_t p_document_id,
 	VocabularyRef p_vocab,
-	const py::object &p_sentences,
+	const py::dict &p_spans,
 	const py::object &p_tokens_table,
 	const py::list &p_tokens_strings,
-	const py::dict &p_metadata,
-	const std::string p_cache_path):
+	const py::dict &p_metadata):
 
 	m_id(p_document_id),
 	m_vocab(p_vocab),
-	m_metadata(p_metadata),
-	m_cache_path(p_cache_path) {
+	m_metadata(p_metadata) {
 
-	const auto sentences_table = unwrap_table(p_sentences);
-	m_sentences = unpack_sentences(sentences_table);
+	for (auto item : p_spans) {
+		const auto table = unwrap_table(item.second.cast<py::object>());
+		m_spans[item.first.cast<py::str>()] = std::make_shared<Spans>(unpack_spans(table));
+	}
 
 	const auto tokens_table = unwrap_table(p_tokens_table);
 	m_tokens = unpack_tokens(
@@ -51,12 +46,6 @@ Document::Document(
 		py::gil_scoped_acquire acquire;
 		m_py_tokens = to_py_array(m_tokens);
 	}
-
-	size_t max_len = 0;
-	for (const auto &s : m_sentences) {
-		max_len = std::max(max_len, size_t(s.n_tokens));
-	}
-	m_max_len_s = max_len;
 }
 
 ResultSetRef Document::find(const QueryRef &p_query) {

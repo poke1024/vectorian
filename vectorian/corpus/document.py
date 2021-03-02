@@ -4,11 +4,11 @@ import pandas as pd
 import vectorian.core as core
 import collections
 
-from cached_property import cached_property
+from functools import lru_cache
 from slugify import slugify
 
 
-class LocationTable:
+class SpansTable:
 	_types = {
 		'token_at': 'uint32',
 		'n_tokens': 'uint16'
@@ -36,7 +36,7 @@ class LocationTable:
 	def to_pandas(self):
 		data = dict()
 		for k, v in self._loc.items():
-			dtype = LocationTable._types.get(k)
+			dtype = SpansTable._types.get(k)
 			if dtype is None:
 				series = pd.Series(v)
 			else:
@@ -168,7 +168,7 @@ class PreparedDocument:
 		texts = []
 
 		token_table = TokenTable()
-		sentence_table = LocationTable(json['loc_keys'])
+		sentence_table = SpansTable(json['loc_keys'])
 
 		partitions = json['partitions']
 		for partition_i, partition in enumerate(partitions):
@@ -206,7 +206,9 @@ class PreparedDocument:
 					texts.append(sent_text)
 
 		self._text = "".join(texts)
-		self._sentence_table = sentence_table.to_arrow()
+		self._spans = {
+			'sentence': sentence_table.to_arrow()
+		}
 		self._token_table = token_table.to_arrow()
 
 		self._metadata = json['metadata']
@@ -231,18 +233,17 @@ class PreparedDocument:
 	def n_tokens(self):
 		return self._token_table.num_rows
 
-	@property
-	def n_sentences(self):
-		return self._sentence_table.num_rows
+	def n_spans(self, name):
+		return self._spans[name].num_rows
 
-	@cached_property
-	def _sentences(self):
+	@lru_cache(16)
+	def _spans(self, name):
 		col_tok_idx = self._token_table["idx"]
 		col_tok_len = self._token_table["len"]
 		n_tokens = self._token_table.num_rows
 
-		col_token_at = self._sentence_table.column('token_at')
-		col_n_tokens = self._sentence_table.column('n_tokens')
+		col_token_at = self._spans[name].column('token_at')
+		col_n_tokens = self._spans[name].column('n_tokens')
 
 		def get(i):
 			start = col_token_at[i].as_py()
@@ -255,19 +256,19 @@ class PreparedDocument:
 
 		return get
 
-	@property
-	def sentences(self):
-		get = self._sentences
-		for i in range(self._sentence_table.num_rows):
+	def spans(self, name):
+		get = self._spans(name)
+		for i in range(self._spans[name].num_rows):
 			yield get(i)
 
-	def sentence(self, i):
-		return self._sentences(i)
+	def span(self, name, i):
+		return self._spans(name)(i)
 
-	def sentence_info(self, index):
+	def span_info(self, name, index):
 		info = dict()
-		for k in self._sentence_table.column_names:
-			col = self._sentence_table.column(k)
+		table = self._spans[name]
+		for k in table.column_names:
+			col = table.column(k)
 			info[k] = col[index].as_py()
 		return info
 
@@ -275,11 +276,10 @@ class PreparedDocument:
 		return core.Document(
 			index,
 			vocab,
-			self._sentence_table,
+			self._spans,
 			self._token_table,
 			extract_token_str(
 				self._token_table,
 				self._text,
 				self._session.token_mapper('tokenizer')),
-			self._metadata,
-			"")
+			self._metadata)
