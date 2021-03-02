@@ -9,7 +9,7 @@
 class MatchDigest {
 public:
 	DocumentRef document;
-	int32_t sentence_id;
+	int32_t slice_id;
 	std::vector<int16_t> match;
 
 	template<template<typename> typename C>
@@ -17,11 +17,11 @@ public:
 
 	inline MatchDigest(
 		const DocumentRef &p_document,
-		const int32_t p_sentence_id,
+		const int32_t p_slice_id,
 		const std::vector<int16_t> &p_match) :
 
 		document(p_document),
-		sentence_id(p_sentence_id),
+		slice_id(p_slice_id),
 		match(p_match) {
 	}
 };
@@ -48,7 +48,7 @@ public:
 	Match(
 		const MatcherRef &p_matcher,
 		const DocumentRef &p_document,
-		const int32_t p_sentence_id,
+		const int32_t p_slice_id,
 		const std::vector<int16_t> &p_match,
 		const float p_score);
 
@@ -68,8 +68,8 @@ public:
 		return m_score;
 	}
 
-	inline int32_t sentence_id() const {
-		return m_digest.sentence_id;
+	inline int32_t slice_id() const {
+		return m_digest.slice_id;
 	}
 
 	inline const std::vector<int16_t> &match() const {
@@ -78,7 +78,7 @@ public:
 
 	py::dict py_assignment() const;
 
-	Slice sentence() const;
+	Slice slice() const;
 
 	py::list regions() const;
 

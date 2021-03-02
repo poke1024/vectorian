@@ -11,7 +11,7 @@ struct MatchDigest::compare {
 		const MatchDigest &b) const {
 
 		if (a.document == b.document) {
-			if (C<int32_t>()(a.sentence_id, b.sentence_id)) {
+			if (C<int32_t>()(a.slice_id, b.slice_id)) {
 				return true;
 			} else {
 
@@ -44,19 +44,19 @@ Match::Match(
 Match::Match(
 	const MatcherRef &p_matcher,
 	const DocumentRef &p_document,
-	const int32_t p_sentence_id,
+	const int32_t p_slice_id,
 	const std::vector<int16_t> &p_match,
 	const float p_score) :
 
 	m_matcher(p_matcher),
-	m_digest(MatchDigest(p_document, p_sentence_id, p_match)),
+	m_digest(MatchDigest(p_document, p_slice_id, p_match)),
 	m_score(p_score) {
 }
 
 py::dict Match::py_assignment() const {
 	py::dict d;
 
-	// "idx" is index into aligned doc sentence token for each query token.
+	// "idx" is index into aligned doc slice token for each query token.
 	{
 		const std::vector<ssize_t> shape = {
 			static_cast<ssize_t>(m_digest.match.size())};
@@ -80,8 +80,9 @@ py::dict Match::py_assignment() const {
 }
 
 
-Slice Match::sentence() const {
-	return document()->spans(query()->span_name())->slice(sentence_id());
+Slice Match::slice() const {
+	const auto &level = query()->slice_strategy().level;
+	return document()->spans(level)->slice(slice_id());
 }
 
 py::list Match::regions() const {
@@ -92,7 +93,7 @@ py::list Match::regions() const {
 	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
 
-	const auto token_at = sentence().idx;
+	const auto token_at = slice().idx;
 
 	const auto &match = this->match();
 	const auto &scores = m_scores;
@@ -119,7 +120,7 @@ py::list Match::regions() const {
 	std::vector<int16_t> index_map;
 	if (!token_filter.all()) {
 		int16_t k = 0;
-		const auto len = sentence().len;
+		const auto len = slice().len;
 		index_map.resize(len);
 		for (int32_t i = 0; i < len; i++) {
 			index_map[k] = i;

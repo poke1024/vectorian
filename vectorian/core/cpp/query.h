@@ -41,6 +41,12 @@ uint64_t parse_filter_mask(
 	return filter;
 }
 
+struct SliceStrategy {
+	std::string level; // e.g. "sentence"
+	size_t window_size;
+	size_t window_step;
+};
+
 class Query : public std::enable_shared_from_this<Query> {
 	const QueryVocabularyRef m_vocab;
 	std::vector<MetricRef> m_metrics;
@@ -54,6 +60,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	float m_min_score;
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
+	SliceStrategy m_slice_strategy;
 
 public:
 	Query(
@@ -134,6 +141,19 @@ public:
 				metric_def_dict,
 				metric_def_dict["word_metric"]));
 		}
+
+		if (p_kwargs && p_kwargs.contains("slices")) {
+			const auto slices_def_dict = p_kwargs["slices"].cast<py::dict>();
+
+			m_slice_strategy.level = slices_def_dict["level"].cast<py::str>();
+			m_slice_strategy.window_size = slices_def_dict["window_size"].cast<size_t>();
+			m_slice_strategy.window_step = slices_def_dict["window_step"].cast<size_t>();
+
+		} else {
+			m_slice_strategy.level = "sentence";
+			m_slice_strategy.window_size = 1;
+			m_slice_strategy.window_step = 1;
+		}
 	}
 
 	virtual ~Query() {
@@ -195,8 +215,8 @@ public:
 		return m_submatch_weight;
 	}
 
-	inline std::string span_name() const {
-		return "sentence";
+	inline const SliceStrategy& slice_strategy() const {
+		return m_slice_strategy;
 	}
 };
 

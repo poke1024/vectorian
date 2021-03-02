@@ -266,7 +266,8 @@ public:
 		m_delegate(p_delegate),
 		m_filter(p_filter) {
 
-		m_filtered.resize(p_document->spans(p_query->span_name())->max_len());
+		m_filtered.resize(p_document->spans(
+			p_query->slice_strategy().level)->max_len());
 	}
 
 	inline Slice create_slice(

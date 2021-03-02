@@ -104,7 +104,7 @@ class Match:
 		omitted = [s_text[slice(*s)] for s in c_match.omitted]
 
 		return Match(
-			query, document, c_match.sentence, c_match.score,
+			query, document, c_match.slice_id, c_match.score,
 			c_match.metric, omitted, regions)
 
 	@property

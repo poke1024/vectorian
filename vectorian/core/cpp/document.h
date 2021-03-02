@@ -40,19 +40,24 @@ public:
 		return m_offsets.size() - 1;
 	}
 
-	inline int32_t start(size_t p_index) const {
+	inline int32_t start(const size_t p_index) const {
 		return m_offsets[p_index];
 	}
 
-	inline int32_t end(size_t p_index) const {
+	inline int32_t end(const size_t p_index) const {
 		return m_offsets[p_index + 1];
 	}
 
-	inline int32_t len(size_t p_index) const {
+	inline int32_t len(const size_t p_index) const {
 		return m_offsets[p_index + 1] - m_offsets[p_index];
 	}
 
-	inline Slice slice(size_t p_index) const {
+	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
+		const size_t i1 = std::min(p_index + p_size, m_offsets.size() - 1);
+		return m_offsets[i1] - m_offsets[p_index];
+	}
+
+	inline Slice slice(const size_t p_index) const {
 		const auto i0 = m_offsets.at(p_index);
 		const auto i1 = m_offsets.at(p_index + 1);
 		return Slice{i0, i1 - i0};

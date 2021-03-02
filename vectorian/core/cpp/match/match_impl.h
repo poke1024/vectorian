@@ -13,7 +13,7 @@ void Match::compute_scores(
     const auto &match = m_digest.match;
 
     if (m_scores.empty() && !match.empty()) {
-        const auto token_at = sentence().idx;
+        const auto token_at = slice().idx;
 
         int end = 0;
         for (auto m : match) {
@@ -55,7 +55,7 @@ struct Match::compare_by_score {
 
 			if (a->document() == b->document()) {
 
-				if (C<int32_t>()(a->sentence_id(), b->sentence_id())) {
+				if (C<int32_t>()(a->slice_id(), b->slice_id())) {
 					return true;
 				} else {
 
