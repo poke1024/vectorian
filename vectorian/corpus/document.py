@@ -242,19 +242,27 @@ class PreparedDocument:
 		col_tok_len = self._token_table["len"]
 		n_tokens = self._token_table.num_rows
 
-		col_token_at = self._spans[name].column('token_at')
-		col_n_tokens = self._spans[name].column('n_tokens')
+		if name == "token":
+			def get(i):
+				start = col_tok_idx[i].as_py()
+				end = start + col_tok_len[i].as_py()
+				return self._text[start:end]
 
-		def get(i):
-			start = col_token_at[i].as_py()
-			end = start + col_n_tokens[i].as_py()
-			if end < n_tokens:
-				i1 = col_tok_idx[end].as_py()
-			else:
-				i1 = col_tok_idx[end - 1].as_py() + col_tok_len[end - 1].as_py()
-			return self._text[col_tok_idx[start].as_py():i1]
+			return get
+		else:
+			col_token_at = self._spans[name].column('token_at')
+			col_n_tokens = self._spans[name].column('n_tokens')
 
-		return get
+			def get(i):
+				start = col_token_at[i].as_py()
+				end = start + col_n_tokens[i].as_py()
+				if end < n_tokens:
+					i1 = col_tok_idx[end].as_py()
+				else:
+					i1 = col_tok_idx[end - 1].as_py() + col_tok_len[end - 1].as_py()
+				return self._text[col_tok_idx[start].as_py():i1]
+
+			return get
 
 	def spans(self, name):
 		get = self._spans(name)
@@ -266,6 +274,8 @@ class PreparedDocument:
 
 	def span_info(self, name, index):
 		info = dict()
+		if name == "token":
+			return info  # FIXME
 		table = self._spans[name]
 		for k in table.column_names:
 			col = table.column(k)

@@ -176,6 +176,7 @@ class LabResult(Result):
 			self.index,
 			self._matches,
 			self._duration,
+			self._location_formatter,
 			annotate=dict(tags=tags, metric=metric, penalties=penalties, **kwargs))
 
 	def _repr_html_(self):

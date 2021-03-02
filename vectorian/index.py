@@ -65,10 +65,10 @@ TokenMatch = namedtuple('TokenMatch', [
 
 
 class Match:
-	def __init__(self, query, document, sentence, score, metric=None, omitted=None, regions=None, level="word"):
+	def __init__(self, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
 		self._query = query
 		self._document = document
-		self._sentence = sentence
+		self._slice_id = slice_id
 		self._score = score
 		self._metric = metric or ""
 		self._omitted = omitted or []
@@ -101,7 +101,7 @@ class Match:
 					match=None,
 					gap_penalty=r.mismatch_penalty))
 
-		omitted = [s_text[slice(*s)] for s in c_match.omitted]
+		omitted = [t_text[slice(*s)] for s in c_match.omitted]
 
 		return Match(
 			query, document, c_match.slice_id, c_match.score,
@@ -112,8 +112,8 @@ class Match:
 		return self._document
 
 	@property
-	def sentence(self):
-		return self._sentence
+	def slice_id(self):
+		return self._slice_id
 
 	@property
 	def score(self):
@@ -137,8 +137,12 @@ class Match:
 
 	def to_json(self, location_formatter):
 		regions = []
+
 		doc = self.document
-		sentence_info = doc.span_info("sentence", self.sentence)
+		slices = self._query.options["slices"]
+
+		span_info = doc.span_info(
+			slices["level"], self.slice_id)
 
 		for r in self.regions:
 			s = r.s
@@ -157,7 +161,7 @@ class Match:
 				regions.append(dict(s=s, gap_penalty=r.gap_penalty))
 
 		metadata = doc.metadata
-		loc = location_formatter(doc, sentence_info)
+		loc = location_formatter(doc, span_info)
 		if loc:
 			speaker, loc_desc = loc
 		else:
@@ -165,7 +169,7 @@ class Match:
 			loc_desc = ""
 
 		return dict(
-			debug=dict(document=metadata["unique_id"], sentence=self.sentence),
+			debug=dict(document=metadata["unique_id"], slice=self.slice_id),
 			score=self.score,
 			metric=self.metric,
 			location=dict(

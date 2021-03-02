@@ -80,10 +80,11 @@ class WatermanSmithBeyer:
 		self._zero = zero
 
 	def to_args(self, session, options):
+		slices = options['slices']
 		return {
 			'algorithm': 'wsb',
 			'gap': self._gap.costs(session.max_len(
-				'sentence', options['slices']['window_size'])),
+				slices['level'], slices['window_size'])),
 			'zero': self._zero
 		}
 
