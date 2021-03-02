@@ -131,10 +131,10 @@ class WordSimilarityMetric:
 
 
 class SentenceSimilarityMetric:
-	def create_index(self, session):
+	def create_index(self, partition):
 		raise NotImplementedError()
 
-	def to_args(self, session):
+	def to_args(self, partition):
 		raise NotImplementedError()
 
 
@@ -148,20 +148,19 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 		self._word_metric = word_metric
 		self._alignment = alignment
 
-	def create_index(self, session, nlp):
-		return BruteForceIndex(session, self, nlp=nlp)
+	def create_index(self, partition, **kwargs):
+		return BruteForceIndex(partition, self, **kwargs)
 
-	def to_args(self, session, options):
+	def to_args(self, partition):
 		return {
 			'metric': 'alignment-isolated',
 			'word_metric': self._word_metric.to_args(),
-			'alignment': self._alignment.to_args(session, options)
+			'alignment': self._alignment.to_args(partition)
 		}
 
 
 class TagWeightedSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, word_metric: WordSimilarityMetric, alignment,
-				 tag_weights, pos_mismatch_penalty, similarity_threshold):
+	def __init__(self, word_metric: WordSimilarityMetric, alignment, **kwargs):
 		assert isinstance(word_metric, WordSimilarityMetric)
 
 		if alignment is None:
@@ -170,14 +169,19 @@ class TagWeightedSentenceMetric(SentenceSimilarityMetric):
 		self._word_metric = word_metric
 		self._alignment = alignment
 
-	def create_index(self, session, nlp):
-		return BruteForceIndex(session, self, nlp=nlp)
+		self._options = kwargs
 
-	def to_args(self, session, options):
+	def create_index(self, partition, **kwargs):
+		return BruteForceIndex(partition, self, **kwargs)
+
+	def to_args(self, partition):
 		return {
 			'metric': 'alignment-tag-weighted',
 			'word_metric': self._word_metric.to_args(),
-			'alignment': self._alignment.to_args(session, options)
+			'alignment': self._alignment.to_args(partition),
+			'pos_mismatch_penalty': self._options.get('pos_mismatch_penalty', 0),
+			'similarity_threshold': self._options.get('similarity_threshold', 0),
+			'tag_weights': self._options.get('tag_weights', {})
 		}
 
 
@@ -198,15 +202,15 @@ class SentenceEmbeddingMetric(SentenceSimilarityMetric):
 		self._encoder = encoder
 		self._metric = metric
 
-	def create_index(self, session):
+	def create_index(self, partition, **kwargs):
 		return SentenceEmbeddingIndex(
-			session, self, self._encoder)
+			partition, self, self._encoder, **kwargs)
 
-	def load_index(self, session, path):
+	def load_index(self, partition, path, **kwargs):
 		return SentenceEmbeddingIndex.load(
-			session, self, self._encoder, path)
+			partition, self, self._encoder, path, **kwargs)
 
-	def to_args(self, session, options):
+	def to_args(self, partition):
 		return None
 
 	@property

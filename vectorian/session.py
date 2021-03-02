@@ -69,6 +69,52 @@ class Collection:
 		return max([doc.c_doc.max_len(level, window_size) for doc in self._docs])
 
 
+class Partition:
+	def __init__(self, session, level, window):
+		self._session = session
+		self._level = level
+		self._window = window
+
+	@property
+	def session(self):
+		return self._session
+
+	@property
+	def level(self):
+		return self._level
+
+	@property
+	def window(self):
+		return self._window
+
+	def to_args(self):
+		window = self._window
+		return {
+			'level': self._level,
+			'window_size': window[0],
+			'window_step': window[1]
+		}
+
+	def max_len(self):
+		return self._session.max_len(self._level, self._window[0])
+
+	def index(self, metric, nlp=None, path=None, **kwargs):
+		if isinstance(metric, str) and metric == "auto":
+			metric = self.session.default_metric()
+		assert isinstance(metric, SentenceSimilarityMetric)
+
+		if nlp:
+			kwargs = kwargs.copy()
+			kwargs['nlp'] = nlp
+
+		if path:
+			path = Path(path)
+		if path and path.exists():
+			return metric.load_index(self, path=path, **kwargs)
+		else:
+			return metric.create_index(self, **kwargs)
+
+
 class Session:
 	def __init__(self, docs, static_embeddings=None, token_mappings=None):
 		self._vocab = core.Vocabulary()
@@ -94,18 +140,17 @@ class Session:
 			self._embeddings[instance.name] = instance
 			self._vocab.add_embedding(instance.to_core())
 
-		self._default_metrics = []
-		for embedding in static_embeddings:
-			self._default_metrics.append(
-				AlignmentSentenceMetric(
-					WordSimilarityMetric(
-						embedding, CosineMetric())))
-
 		self._collection = Collection(
 			self, self._vocab, docs)
 
 	def _parse_metric_def(self, s):
 		pass  # e.g. wsb(fasttext-en:cosine)
+
+	def default_metric(self):
+		embedding = list(self._embeddings.values())[0]
+		return AlignmentSentenceMetric(
+			WordSimilarityMetric(
+				embedding, CosineMetric()))
 
 	@cached_property
 	def documents(self):
@@ -130,21 +175,8 @@ class Session:
 	def result_class(self):
 		return Result
 
-	def index_for_metric(self, metric, nlp=None, path=None, **kwargs):
-		if isinstance(metric, str) and metric == "auto":
-			metric = self._default_metrics[0]
-		assert isinstance(metric, SentenceSimilarityMetric)
-
-		if nlp:
-			kwargs = kwargs.copy()
-			kwargs['nlp'] = nlp
-
-		if path:
-			path = Path(path)
-		if path and path.exists():
-			return metric.load_index(self, path, **kwargs)
-		else:
-			return metric.create_index(self, **kwargs)
+	def partition(self, on, window_size=1, window_step=1):
+		return Partition(self, on, (window_size, window_step))
 
 	def run_query(self, find, query):
 		return Result, find(query)

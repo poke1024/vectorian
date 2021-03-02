@@ -90,7 +90,7 @@ public:
 			"bidirectional",
 			"max_matches",
 			"min_score",
-			"slices"
+			"partition"
 		};
 
 		if (p_kwargs) {
@@ -143,12 +143,19 @@ public:
 				metric_def_dict["word_metric"]));
 		}
 
-		if (p_kwargs && p_kwargs.contains("slices")) {
-			const auto slices_def_dict = p_kwargs["slices"].cast<py::dict>();
+		if (p_kwargs && p_kwargs.contains("partition")) {
+			const auto slices_def_dict = p_kwargs["partition"].cast<py::dict>();
 
 			m_slice_strategy.level = slices_def_dict["level"].cast<py::str>();
 			m_slice_strategy.window_size = slices_def_dict["window_size"].cast<size_t>();
 			m_slice_strategy.window_step = slices_def_dict["window_step"].cast<size_t>();
+
+			if (m_slice_strategy.window_size < 1) {
+				throw std::runtime_error("partition window size needs to be >= 1");
+			}
+			if (m_slice_strategy.window_step < 1) {
+				throw std::runtime_error("partition window step needs to be >= 1");
+			}
 
 		} else {
 			m_slice_strategy.level = "sentence";

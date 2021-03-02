@@ -81,12 +81,10 @@ class WatermanSmithBeyer:
 		self._gap = gap
 		self._zero = zero
 
-	def to_args(self, session, options):
-		slices = options['slices']
+	def to_args(self, partition):
 		return {
 			'algorithm': 'wsb',
-			'gap': self._gap.costs(session.max_len(
-				slices['level'], slices['window_size'])),
+			'gap': self._gap.costs(partition.max_len()),
 			'zero': self._zero
 		}
 
@@ -126,7 +124,7 @@ class WordMoversDistance:
 			assert variant is None
 			self._options = options
 
-	def to_args(self, session, options):
+	def to_args(self, partition):
 		multiplicity = self._options['multiplicity']
 		representation = self._options['repr']
 		symmetric = self._options['symmetric']

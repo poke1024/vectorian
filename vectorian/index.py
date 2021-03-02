@@ -139,10 +139,10 @@ class Match:
 		regions = []
 
 		doc = self.document
-		slices = self._query.options["slices"]
+		partition = self._query.options["partition"]
 
 		span_info = doc.span_info(
-			slices["level"], self.slice_id)
+			partition["level"], self.slice_id)
 
 		for r in self.regions:
 			s = r.s
@@ -184,43 +184,34 @@ class Match:
 
 
 class Index:
-	def __init__(self, session, metric):
-		self._session = session
+	def __init__(self, partition, metric):
+		self._partition = partition
 		self._metric = metric
 
 	@property
 	def session(self):
-		return self._session
+		return self._partition.session
 
 	def find(
 		self, text,
 		n=10, min_score=0.2,
-		on='sentence', window=(1, 1),
 		options: dict = dict()):
 
 		options = options.copy()
 
 		options["max_matches"] = n
 		options["min_score"] = min_score
+		options["partition"] = self._partition.to_args()
 
-		if isinstance(window, int):
-			window = [window, window]
-		if len(window) < 2:
-			window = (window[0], window[0])
-		options["slices"] = {
-			'level': on,
-			'window_size': window[0],
-			'window_step': window[1]
-		}
-
-		metric_args = self._metric.to_args(self._session, options)
+		metric_args = self._metric.to_args(self._partition)
 		if metric_args:
 			options["metric"] = metric_args
 
 		start_time = time.time()
 
-		query = Query(self, self._session.vocab, text, options)
-		result_class, matches = self._session.run_query(self._find, query)
+		session = self._partition.session
+		query = Query(self, session.vocab, text, options)
+		result_class, matches = session.run_query(self._find, query)
 
 		return result_class(
 			self,
@@ -239,7 +230,7 @@ class BruteForceIndex(Index):
 		def find_in_doc(x):
 			return x, x.find(c_query)
 
-		docs = self._session.c_documents
+		docs = self.session.c_documents
 
 		total = sum([x.n_tokens for x in docs])
 		done = 0
@@ -258,7 +249,8 @@ class BruteForceIndex(Index):
 				if progress:
 					progress(done / total)
 
-		return [Match.from_core(self._session, query, m) for m in results.best_n(-1)]
+		session = self.session
+		return [Match.from_core(session, query, m) for m in results.best_n(-1)]
 
 
 def chunks(x, n):
@@ -267,14 +259,14 @@ def chunks(x, n):
 
 
 class SentenceEmbeddingIndex(Index):
-	def __init__(self, session, metric, encoder, vectors=None):
-		super().__init__(session, metric)
+	def __init__(self, partition, metric, encoder, vectors=None):
+		super().__init__(partition, metric)
 
 		self._encoder = encoder
 		self._metric = metric
 
 		doc_starts = [0]
-		for i, doc in enumerate(session.documents):
+		for i, doc in enumerate(partition.session.documents):
 			doc_starts.append(doc.n_spans("sentence"))
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
 

@@ -60,8 +60,9 @@ if __name__ == '__main__':
 
     formatter = LocationFormatter()
 
-    index = session.index_for_metric("auto", nlp)
-    matches = index.find("write female", n=3, on="token", window=(25, 1))
+    #p = Partition("sentence")
+    index = session.partition("token", 25, 1).index("auto", nlp)
+    matches = index.find("write female", n=3)
 
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")
