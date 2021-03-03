@@ -18,7 +18,6 @@ public:
 		const char *p_name) :
 
 		StaticEmbeddingMetric(
-			EmbeddingRef(),
 			std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)->options()),
 		m_a(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_b)) {
@@ -79,7 +78,6 @@ public:
 		float t) :
 
 		StaticEmbeddingMetric(
-			EmbeddingRef(),
 			std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)->options()),
 		m_a(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_b)) {

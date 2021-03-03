@@ -4,7 +4,6 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
-#include "metric/static.h"
 #include "utils.h"
 
 class VocabularyToEmbedding {
@@ -173,34 +172,15 @@ public:
 		return m_tokens;
 	}*/
 
+	inline const WordVectors &embeddings() const {
+		return m_embeddings;
+	}
+
 	virtual MetricRef create_metric(
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
 		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle) {
-
-		const auto m = std::make_shared<StaticEmbeddingMetric>(
-			shared_from_this(),
-			p_sent_metric_def);
-
-		const auto builder = p_metric.instantiate(m_embeddings);
-
-		const Needle needle(p_vocabulary_to_embedding, p_needle);
-
-		builder->build_similarity_matrix(
-			p_vocabulary_to_embedding,
-			needle,
-			m->w_similarity());
-
-		//compute_length();
-
-		if (p_sent_metric_def.contains("similarity_falloff")) {
-			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
-			m->w_similarity() = m->w_similarity().array().pow(similarity_falloff);
-		}
-
-		return m;
-	}
+		const std::vector<Token> &p_needle);
 
 	py::dict py_vectors() const {
 		return m_embeddings.to_py();
@@ -276,27 +256,6 @@ public:
 			names.append(py::str(i.first));
 		}
 		return names;
-	}
-
-private:
-	void compute_magnitudes(
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const Needle &p_needle) {
-		/*for (size_t j = 0; j < p_needle.size(); j++) {
-			const size_t k = needle_embedding_token_ids[j];
-			r_magnitudes_t(j) = m_embeddings.unmodified[k].norm();
-		}*/
-
-		/*size_t offset = 0;
-		for (const auto &x : p_vocabulary_to_embedding) {
-			const auto n = x.rows();
-			for (size_t i = 0; i < n; i++) {
-				r_length_s(offset + i) = m_embeddings.unmodified[x(i)].norm();
-			}
-			offset += n;
-		}
-		}*/
-
 	}
 };
 

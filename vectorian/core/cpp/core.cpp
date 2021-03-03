@@ -62,13 +62,27 @@ cfg['compiler_args'].append('-fvisibility=hidden')
 
 cfg['dependencies'] = [
 	'alignment/aligner.h',
-	'common.h',
-	'document.h',
+	'alignment/wmd.h',
+	'alignment/wrd.h',
+	'embedding/contextual.h',
+	'embedding/embedding.h',
+	'embedding/sim.h',
+	'embedding/static.h',
+	'embedding/vectors.h',
 	'match/match.h',
 	'match/match_impl.h',
 	'match/matcher.h',
 	'match/matcher_impl.h',
 	'match/region.h',
+	'metric/alignment.h',
+	'metric/composite.h',
+	'metric/contextual.h',
+	'metric/factory.h',
+	'metric/metric.h',
+	'metric/static.h',
+	'slice/static.h',
+	'common.h',
+	'document.h',
 	'query.h',
 	'result_set.h',
 	'utils.h',
@@ -76,6 +90,7 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'embedding/static.cpp',
 	'match/match.cpp',
 	'match/matcher.cpp',
 	'metric/contextual.cpp',
