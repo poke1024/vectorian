@@ -4,6 +4,8 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
+#include "metric/static.h"
+#include "utils.h"
 
 class VocabularyToEmbedding {
 	std::vector<MappedTokenIdArray> m_vocabulary_to_embedding;
@@ -102,7 +104,7 @@ class StaticEmbedding : public Embedding {
 	//std::vector<std::string> m_tokens;
 	std::unordered_map<std::string, token_t> m_tokens;
 	WordVectors m_embeddings;
-	std::map<std::string, EmbeddingSimilarityRef> m_similarity_measures;
+	std::map<std::string, SimilarityMatrixBuilderRef> m_similarity_measures;
 
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -181,14 +183,13 @@ public:
 			shared_from_this(),
 			p_sent_metric_def);
 
-		const auto s = p_metric.instantiate(m_embeddings);
+		const auto builder = p_metric.instantiate(m_embeddings);
 
 		const Needle needle(p_vocabulary_to_embedding, p_needle);
 
-		build_similarity_matrix(
+		builder->build_similarity_matrix(
 			p_vocabulary_to_embedding,
 			needle,
-			s,
 			m->w_similarity());
 
 		//compute_length();
@@ -278,10 +279,12 @@ public:
 	}
 
 private:
-	void compute_magnitudes() {
+	void compute_magnitudes(
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
+		const Needle &p_needle) {
 		/*for (size_t j = 0; j < p_needle.size(); j++) {
 			const size_t k = needle_embedding_token_ids[j];
-			r_length_t(j) = m_embeddings.unmodified[k].norm();
+			r_magnitudes_t(j) = m_embeddings.unmodified[k].norm();
 		}*/
 
 		/*size_t offset = 0;
@@ -293,41 +296,6 @@ private:
 			offset += n;
 		}
 		}*/
-
-	}
-
-	void build_similarity_matrix(
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const Needle &p_needle,
-		const EmbeddingSimilarityRef &p_embedding_similarity,
-		MatrixXf &r_matrix) const {
-
-		py::gil_scoped_release release;
-
-		const size_t vocab_size = p_vocabulary_to_embedding.size();
-		//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
-		r_matrix.resize(vocab_size, p_needle.embedding_token_ids().rows());
-
-		p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
-			p_embedding_similarity->fill_matrix(
-				m_embeddings,
-				embedding_token_ids,
-				p_needle.embedding_token_ids(),
-				offset,
-				0,
-				r_matrix);
-		});
-
-		for (size_t j = 0; j < p_needle.size(); j++) { // for each token in needle
-
-			// since the j-th needle token is a specific vocabulary token, we always
-			// set that specific vocabulary token similarity to 1 (regardless of the
-			// embedding distance).
-			const auto k = p_needle.vocabulary_token_ids()[j];
-			if (k >= 0) {
-				r_matrix(k, j) = 1.0f;
-			}
-		}
 
 	}
 };

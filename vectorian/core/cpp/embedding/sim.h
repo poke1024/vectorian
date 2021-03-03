@@ -5,22 +5,35 @@
 #include "embedding/vectors.h"
 #include <iostream>
 
+class VocabularyToEmbedding;
+class Needle;
 
-class EmbeddingSimilarity {
+class SimilarityMatrixBuilder {
+protected:
+	const WordVectors &m_embeddings;
+
 public:
-	virtual ~EmbeddingSimilarity() {
+	inline SimilarityMatrixBuilder(
+		const WordVectors &p_embeddings) : m_embeddings(p_embeddings) {
+	}
+
+	virtual ~SimilarityMatrixBuilder() {
 	}
 
 	virtual void fill_matrix(
-		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
 		const size_t i0,
 		const size_t j0,
 		MatrixXf &r_matrix) const = 0;
+
+	void build_similarity_matrix(
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
+		const Needle &p_needle,
+		MatrixXf &r_matrix) const;
 };
 
-typedef std::shared_ptr<EmbeddingSimilarity> EmbeddingSimilarityRef;
+typedef std::shared_ptr<SimilarityMatrixBuilder> SimilarityMatrixBuilderRef;
 
 
 class WordMetricDef {
@@ -30,24 +43,26 @@ public:
 	const std::string metric; // e.g. cosine
 	const py::dict options;
 
-	EmbeddingSimilarityRef instantiate(
+	SimilarityMatrixBuilderRef instantiate(
 		const WordVectors &p_vectors) const;
 };
 
 
 template<typename Distance>
-class BuiltinSimilarityMeasure : public EmbeddingSimilarity {
+class BuiltinSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
 protected:
 	Distance m_distance;
 
 public:
-	BuiltinSimilarityMeasure(
-		const WordVectors &p_vectors,
-		const Distance p_distance = Distance()) : m_distance(p_distance) {
+	BuiltinSimilarityMatrixBuilder(
+		const WordVectors &p_embeddings,
+		const Distance p_distance = Distance()) :
+
+		SimilarityMatrixBuilder(p_embeddings),
+		m_distance(p_distance) {
 	}
 
 	virtual void fill_matrix(
-		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
 		const size_t i0,
@@ -77,7 +92,7 @@ public:
 					if (s == t) {
 						score = 1.0f;
 					} else if (t >= 0) {
-						score = m_distance(p_embeddings, s, t);
+						score = m_distance(m_embeddings, s, t);
 					} else {
 						score = 0.0f;
 					}
@@ -108,17 +123,19 @@ inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
 	return filtered_a;
 }
 
-class CustomSimilarityMeasure : public EmbeddingSimilarity {
+class CustomSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
 	const py::object m_callback;
 
 public:
-	CustomSimilarityMeasure(
-		const WordVectors &p_vectors,
-		const py::object p_callback) : m_callback(p_callback) {
+	CustomSimilarityMatrixBuilder(
+		const WordVectors &p_embeddings,
+		const py::object p_callback) :
+
+		SimilarityMatrixBuilder(p_embeddings),
+		m_callback(p_callback) {
 	}
 
 	virtual void fill_matrix(
-		const WordVectors &p_embeddings,
 		const TokenIdArray &p_a,
 		const TokenIdArray &p_b,
 		const size_t i0,
@@ -130,7 +147,7 @@ public:
 		TokenIdArray filtered_a = filter_token_ids(p_a);
 		TokenIdArray filtered_b = filter_token_ids(p_b);
 
-		py::dict vectors = p_embeddings.to_py();
+		const py::dict vectors = m_embeddings.to_py();
 
 		py::array_t<float> output;
 		output.resize({filtered_a.rows(), filtered_b.rows()});

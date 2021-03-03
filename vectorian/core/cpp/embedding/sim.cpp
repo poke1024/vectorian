@@ -1,4 +1,5 @@
 #include "embedding/sim.h"
+#include "embedding/static.h"
 
 struct Cosine {
 	inline float operator()(
@@ -54,27 +55,60 @@ struct PNorm {
 	}
 };
 
-EmbeddingSimilarityRef WordMetricDef::instantiate(
+SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 	const WordVectors &p_vectors) const {
 
 	if (metric == "cosine") {
-		return std::make_shared<BuiltinSimilarityMeasure<Cosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<Cosine>>(p_vectors);
 	} if (metric == "zhu-cosine") {
-		return std::make_shared<BuiltinSimilarityMeasure<ZhuCosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<ZhuCosine>>(p_vectors);
 	} if (metric == "sohangir-cosine") {
-		return std::make_shared<BuiltinSimilarityMeasure<SohangirCosine>>(p_vectors);
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<SohangirCosine>>(p_vectors);
 	} else if (metric == "p-norm") {
-		return std::make_shared<BuiltinSimilarityMeasure<PNorm>>(
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<PNorm>>(
 			p_vectors, PNorm(
 				options["p"].cast<float>(),
 				options["scale"].cast<float>()));
 
 	} else if (metric == "custom") {
-		return std::make_shared<CustomSimilarityMeasure>(
+		return std::make_shared<CustomSimilarityMatrixBuilder>(
 			p_vectors, options["fn"]);
 	} else {
 		std::ostringstream err;
 		err << "unsupported metric " << metric;
 		throw std::runtime_error(err.str());
 	}
+}
+
+void SimilarityMatrixBuilder::build_similarity_matrix(
+	const VocabularyToEmbedding &p_vocabulary_to_embedding,
+	const Needle &p_needle,
+	MatrixXf &r_matrix) const {
+
+	py::gil_scoped_release release;
+
+	const size_t vocab_size = p_vocabulary_to_embedding.size();
+	//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
+	r_matrix.resize(vocab_size, p_needle.embedding_token_ids().rows());
+
+	p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
+		fill_matrix(
+			embedding_token_ids,
+			p_needle.embedding_token_ids(),
+			offset,
+			0,
+			r_matrix);
+	});
+
+	for (size_t j = 0; j < p_needle.size(); j++) { // for each token in needle
+
+		// since the j-th needle token is a specific vocabulary token, we always
+		// set that specific vocabulary token similarity to 1 (regardless of the
+		// embedding distance).
+		const auto k = p_needle.vocabulary_token_ids()[j];
+		if (k >= 0) {
+			r_matrix(k, j) = 1.0f;
+		}
+	}
+
 }
