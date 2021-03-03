@@ -96,6 +96,8 @@ public:
 			s,
 			m->w_similarity());
 
+		//compute_length();
+
 		if (p_sent_metric_def.contains("similarity_falloff")) {
 			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
 			m->w_similarity() = m->w_similarity().array().pow(similarity_falloff);
@@ -181,6 +183,24 @@ public:
 	}
 
 private:
+	void compute_magnitudes() {
+		/*for (size_t j = 0; j < p_needle.size(); j++) {
+			const size_t k = needle_embedding_token_ids[j];
+			r_length_t(j) = m_embeddings.unmodified[k].norm();
+		}*/
+
+		/*size_t offset = 0;
+		for (const auto &x : p_vocabulary_to_embedding) {
+			const auto n = x.rows();
+			for (size_t i = 0; i < n; i++) {
+				r_length_s(offset + i) = m_embeddings.unmodified[x(i)].norm();
+			}
+			offset += n;
+		}
+		}*/
+
+	}
+
 	void build_similarity_matrix(
 		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
 		const std::vector<Token> &p_needle,

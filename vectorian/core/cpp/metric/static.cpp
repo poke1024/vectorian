@@ -54,7 +54,7 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 			const TokenSpan &s,
 			const TokenSpan &t) {
 
-	        return StaticEmbeddingSlice(metric, s, t);
+	        return StaticEmbeddingSlice(metric.get(), s, t);
 		};
 
 		const FactoryGenerator gen(make_fast_slice);
@@ -81,7 +81,7 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 			const TokenSpan &t) {
 
 			return TagWeightedSlice(
-				StaticEmbeddingSlice(metric, s, t),
+				StaticEmbeddingSlice(metric.get(), s, t),
 				options);
 		};
 

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "alignment/wmd.h"
+#include "alignment/wrd.h"
 
 template<typename Index>
 class WatermanSmithBeyer {
@@ -163,6 +164,47 @@ public:
 	}
 };
 
+template<typename Index>
+class WordRotatorsDistance {
+	WRD<Index> m_wrd;
+	float m_score;
+
+public:
+	WordRotatorsDistance() {
+	}
+
+	void init(Index max_len_s, Index max_len_t) {
+		m_wrd.resize(max_len_s, max_len_t);
+	}
+
+	inline float gap_cost(size_t len) const {
+		return 0;
+	}
+
+	template<typename Slice>
+	inline void operator()(
+		const QueryRef &p_query,
+		const Slice &slice,
+		const int len_s,
+		const int len_t) {
+
+		m_score = m_wrd.compute(
+			slice, len_s, len_t);
+	}
+
+	inline float score() const {
+		return m_score;
+	}
+
+	inline const std::vector<Index> &match() const {
+		return m_wrd.match();
+	}
+
+	inline std::vector<Index> &mutable_match() {
+		return m_wrd.match();
+	}
+};
+
 
 template<typename SliceFactory>
 MatcherRef create_alignment_matcher(
@@ -225,6 +267,11 @@ MatcherRef create_alignment_matcher(
 			p_query, p_document, p_metric, p_factory,
 			RelaxedWordMoversDistance<int16_t>(
 				normalize_bow, symmetric, one_target));
+
+	} else if (algorithm == "wrd") {
+
+		return make_matcher(p_query, p_document, p_metric, p_factory,
+			WordRotatorsDistance<int16_t>());
 
 	} else {
 

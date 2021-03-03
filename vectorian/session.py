@@ -6,7 +6,7 @@ from cached_property import cached_property
 from functools import lru_cache
 from pathlib import Path
 from vectorian.render import Renderer, LocationFormatter
-from vectorian.metrics import CosineMetric, WordSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
+from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
 
 
@@ -103,9 +103,8 @@ class Partition:
 		return self._session.max_len(self._level, self._window_size)
 
 	def index(self, metric, nlp=None, **kwargs):
-		if isinstance(metric, str) and metric == "auto":
-			metric = self.session.default_metric()
-		assert isinstance(metric, SentenceSimilarityMetric)
+		if not isinstance(metric, SentenceSimilarityMetric):
+			raise TypeError(metric)
 
 		if nlp:
 			kwargs = kwargs.copy()
@@ -142,13 +141,10 @@ class Session:
 		self._collection = Collection(
 			self, self._vocab, docs)
 
-	def _parse_metric_def(self, s):
-		pass  # e.g. wsb(fasttext-en:cosine)
-
 	def default_metric(self):
 		embedding = list(self._embeddings.values())[0]
 		return AlignmentSentenceMetric(
-			WordSimilarityMetric(
+			TokenSimilarityMetric(
 				embedding, CosineMetric()))
 
 	@cached_property

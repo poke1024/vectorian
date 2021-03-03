@@ -38,7 +38,7 @@ public:
 };
 
 class StaticEmbeddingSlice {
-	const StaticEmbeddingMetricRef m_metric;
+	const StaticEmbeddingMetric *m_metric;
 	const Token * const s_tokens;
 	const int32_t m_len_s;
 	const Token * const t_tokens;
@@ -49,11 +49,11 @@ public:
 	typedef TokenIdEncoder Encoder;
 
 	inline StaticEmbeddingSlice(
-		const MetricRef &metric,
+		const StaticEmbeddingMetric *metric,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 
-		m_metric(std::dynamic_pointer_cast<StaticEmbeddingMetric>(metric)),
+		m_metric(metric),
 		s_tokens(s.tokens),
 		m_len_s(s.len),
 		t_tokens(t.tokens),

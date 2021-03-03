@@ -115,7 +115,7 @@ class MaxMetric(VectorSpaceMetric):
 		}
 
 
-class WordSimilarityMetric:
+class TokenSimilarityMetric:
 	def __init__(self, embedding, metric: VectorSpaceMetric):
 		self._embedding = embedding
 		self._metric = metric
@@ -139,8 +139,8 @@ class SentenceSimilarityMetric:
 
 
 class AlignmentSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, word_metric: WordSimilarityMetric, alignment=None):
-		assert isinstance(word_metric, WordSimilarityMetric)
+	def __init__(self, word_metric: TokenSimilarityMetric, alignment=None):
+		assert isinstance(word_metric, TokenSimilarityMetric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -160,8 +160,8 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 
 
 class TagWeightedSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, word_metric: WordSimilarityMetric, alignment, **kwargs):
-		assert isinstance(word_metric, WordSimilarityMetric)
+	def __init__(self, word_metric: TokenSimilarityMetric, alignment, **kwargs):
+		assert isinstance(word_metric, TokenSimilarityMetric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
