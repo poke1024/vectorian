@@ -11,26 +11,27 @@ protected:
 	const py::dict m_alignment_def;
 
 	MatrixXf m_similarity;
-	ArrayXf m_magnitudes[2];
+	ArrayXf m_mag_s;
+	ArrayXf m_mag_t;
 
 	void compute_magnitudes(
 		const WordVectors &p_embeddings,
 		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		const Needle &p_needle) {
 
-		/*r_mag_s.resize(p_vocabulary_to_embedding.size());
+		m_mag_s.resize(p_vocabulary_to_embedding.size());
 		p_vocabulary_to_embedding.iterate([&] (const auto &x, const size_t offset) {
-			const auto n = x.rows();
+			const size_t n = static_cast<size_t>(x.rows());
 			for (size_t i = 0; i < n; i++) {
-				r_mag_s(offset + i) = m_embeddings.unmodified[x(i)].norm();
+				m_mag_s(offset + i) = p_embeddings.unmodified.row(x(i)).norm();
 			}
 		});
 
-		r_mag_t.resize(p_needle.size());
+		m_mag_t.resize(p_needle.size());
 		for (size_t j = 0; j < p_needle.size(); j++) {
 			const size_t k = p_needle.embedding_token_ids()[j];
-			r_mag_t(j) = m_embeddings.unmodified[k].norm();
-		}*/
+			m_mag_t(j) = p_embeddings.unmodified.row(k).norm();
+		}
 	}
 
 public:
@@ -62,13 +63,16 @@ public:
 			needle,
 			m_similarity);
 
-		//compute_length();
-
 		if (p_sent_metric_def.contains("similarity_falloff")) {
 			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
 			m_similarity = m_similarity.array().pow(similarity_falloff);
 		}
 
+		// FIXME do not do this always.
+		compute_magnitudes(
+			p_embedding->embeddings(),
+			p_vocabulary_to_embedding,
+			needle);
 	}
 
 	inline const py::dict &options() const {
@@ -80,11 +84,11 @@ public:
 	}
 
 	inline float magnitude_s(int i) const {
-		return 0.0f; // FIXME
+		return m_mag_s(i);
 	}
 
 	inline float magnitude_t(int i) const {
-		return 0.0f; // FIXME
+		return m_mag_t(i);
 	}
 
 	virtual MatcherRef create_matcher(
