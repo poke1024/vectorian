@@ -28,19 +28,24 @@ class Renderer:
 		self._html = (doc, tag, text)
 		self._annotate = annotate or {}
 
-	def add_bold(self, s):
+	def add_context_text(self, s):
+		doc, tag, text = Doc().tagtext()
+		r = "&crarr;".join([html.escape(x) for x in s.split("\n")])
+		doc.asis(r)
+
+	def add_bold_text(self, s):
 		doc, tag, text = self._html
 		with tag('span', klass="has-text-black has-text-weight-bold"):
-			text(s)
-
-	def add_light_tag(self, s):
-		doc, tag, text = self._html
-		with tag('span', klass="tag is-light"):
-			text(s)
+			self.add_context_text(s)
 
 	def add_light_text(self, s):
 		doc, tag, text = self._html
 		with tag('span', klass="has-text-grey-light"):
+			self.add_context_text(s)
+
+	def add_light_tag(self, s):
+		doc, tag, text = self._html
+		with tag('span', klass="tag is-light"):
 			text(s)
 
 	def add_match_region(self, region):
@@ -49,7 +54,7 @@ class Renderer:
 			with tag('span', style='display:inline-table;'):
 				with tag('span', style='display:table-row;'):
 					with tag('span', style='display:table-cell;'):
-						self.add_bold(region['s'])
+						self.add_bold_text(region['s'])
 					text(" ")
 					with tag('span', style='display:table-cell;'):
 						self.add_light_tag(region['t'])

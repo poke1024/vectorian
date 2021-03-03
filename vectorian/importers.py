@@ -144,7 +144,7 @@ class NovelImporter(Importer):
 					book += 1
 					expected_chapter = 1
 				else:
-					logging.warn("bad chapter. wanted %d, got: %s" % (
+					logging.warning("bad chapter. wanted %d, got: %s" % (
 						expected_chapter, m.group(0).strip()))
 					chapter_breaks = []
 					break

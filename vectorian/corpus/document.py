@@ -60,6 +60,9 @@ class TokenTable:
 	def __len__(self):
 		return len(self._token_idx)
 
+	def advance(self, n):
+		self._idx += n
+
 	def extend(self, text, sent, tokens):
 		last_idx = sent["start"]
 
@@ -189,8 +192,14 @@ class PreparedDocument:
 			loc = partition["loc"]
 
 			token_i = 0
+			last_sent_end = None
 			for sent in sents:
 				sent_tokens = []
+
+				if last_sent_end is not None and sent["start"] > last_sent_end:
+					s = text[last_sent_end:sent["start"]]
+					token_table.advance(len(s))
+					texts.append(s)
 
 				if sent["start"] > tokens[token_i]["start"]:
 					raise RuntimeError(
@@ -215,6 +224,7 @@ class PreparedDocument:
 					token_table.extend(text, sent, sent_tokens)
 					sentence_table.extend(loc, sent_tokens)
 					texts.append(sent_text)
+				last_sent_end = sent["end"]
 
 		self._text = "".join(texts)
 		self._spans = {

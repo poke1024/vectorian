@@ -174,17 +174,10 @@ class Session:
 	def result_class(self):
 		return Result
 
-	def partition(self, on, window_size=1, window_step=None):
+	def partition(self, level, window_size=1, window_step=None):
 		if window_step is None:
 			window_step = window_size
-		return Partition(self, on, window_size, window_step)
-
-	def load_index(self, path):
-		# FIXME detect metric from index.json
-		if isinstance(metric, str) and metric == "auto":
-			metric = self.session.default_metric()
-		assert isinstance(metric, SentenceSimilarityMetric)
-		return metric.load_index(self, path=path)
+		return Partition(self, level, window_size, window_step)
 
 	def run_query(self, find, query):
 		return Result, find(query)

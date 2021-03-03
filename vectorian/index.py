@@ -324,9 +324,12 @@ class SentenceEmbeddingIndex(Index):
 
 	@staticmethod
 	def load(session, metric, encoder, path):
+		path = Path(path)
 		corpus_vec = []
 		with open(path / "index.json", "r") as f:
 			data = json.loads(f.read())
+		if data["metric"] != "sentence_embedding":
+			raise RuntimeError(f"index at {path} is not a SentenceEmbedding index")
 		for i, doc in enumerate(session.documents):
 			p = path / (doc.caching_name + ".npy")
 			if not p.exists():

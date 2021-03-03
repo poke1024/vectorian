@@ -206,9 +206,9 @@ class SentenceEmbeddingMetric(SentenceSimilarityMetric):
 		return SentenceEmbeddingIndex(
 			partition, self, self._encoder, **kwargs)
 
-	def load_index(self, partition, path, **kwargs):
+	def load_index(self, session, path, **kwargs):
 		return SentenceEmbeddingIndex.load(
-			partition, self, self._encoder, path, **kwargs)
+			session, self, self._encoder, path, **kwargs)
 
 	def to_args(self, partition):
 		return None
