@@ -64,6 +64,9 @@ TokenMatch = namedtuple('TokenMatch', [
 	't', 'pos_s', 'pos_t', 'similarity', 'weight', 'metric'])
 
 
+PartitionData = namedtuple('PartitionData', [
+	'level', 'window_size', 'window_step'])
+
 class Match:
 	def __init__(self, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
 		self._query = query
@@ -142,7 +145,7 @@ class Match:
 		partition = self._query.options["partition"]
 
 		span_info = doc.span_info(
-			partition["level"], self.slice_id)
+			PartitionData(**partition), self.slice_id)
 
 		for r in self.regions:
 			s = r.s
@@ -262,12 +265,15 @@ class SentenceEmbeddingIndex(Index):
 	def __init__(self, partition, metric, encoder, vectors=None):
 		super().__init__(partition, metric)
 
-		self._encoder = encoder
+		self._partition = partition
 		self._metric = metric
+		self._encoder = encoder
+
+		session = self._partition.session
 
 		doc_starts = [0]
-		for i, doc in enumerate(partition.session.documents):
-			doc_starts.append(doc.n_spans("sentence"))
+		for i, doc in enumerate(session.documents):
+			doc_starts.append(doc.n_spans(self._partition))
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
 
 		if vectors is not None:
@@ -276,12 +282,12 @@ class SentenceEmbeddingIndex(Index):
 			corpus_vec = []
 
 			chunk_size = 50
-			n_sentences = self._doc_starts[-1]
+			n_spans = self._doc_starts[-1]
 
-			with tqdm(desc="Encoding", total=n_sentences) as pbar:
+			with tqdm(desc="Encoding", total=n_spans) as pbar:
 				for i, doc in enumerate(session.documents):
-					sentences = list(doc.spans("sentence"))
-					for chunk in chunks(sentences, chunk_size):
+					spans = list(doc.spans(self._partition))
+					for chunk in chunks(spans, chunk_size):
 						doc_vec = encoder(chunk)
 						corpus_vec.append(doc_vec)
 						pbar.update(len(chunk))
@@ -312,9 +318,15 @@ class SentenceEmbeddingIndex(Index):
 		self._index = index
 		self._corpus_vec = corpus_vec
 
+	@property
+	def session(self):
+		return self._partition.session
+
 	@staticmethod
 	def load(session, metric, encoder, path):
 		corpus_vec = []
+		with open(path / "index.json", "r") as f:
+			data = json.loads(f.read())
 		for i, doc in enumerate(session.documents):
 			p = path / (doc.caching_name + ".npy")
 			if not p.exists():
@@ -322,22 +334,29 @@ class SentenceEmbeddingIndex(Index):
 			corpus_vec.append(np.load(p))
 		corpus_vec = np.vstack(corpus_vec)
 		return SentenceEmbeddingIndex(
-			session, metric, encoder, corpus_vec)
+			session.partition(**data["partition"]),
+			metric, encoder, corpus_vec)
 
 	def save(self, path):
 		path = Path(path)
 		path.mkdir(exist_ok=True)
+
 		offset = 0
-		for doc in tqdm(self._session.documents, desc="Saving"):
-			size = doc.n_spans("sentence")
+		session = self._partition.session
+
+		for doc in tqdm(session.documents, desc="Saving"):
+			size = doc.n_spans(self._partition)
 			np.save(
 				str(path / (doc.caching_name + ".npy")),
 				self._corpus_vec[offset:size],
 				allow_pickle=False)
 			offset += size
+
 		with open(path / "index.json", "w") as f:
-			f.write(json.dumps(
-				{'type': 'sentence_embedding_index'}))
+			f.write(json.dumps({
+				'metric': 'sentence_embedding',
+				'partition': self._partition.to_args()
+			}))
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder([query.text])
@@ -358,18 +377,18 @@ class SentenceEmbeddingIndex(Index):
 
 			#print(i, doc_index, sent_index, self._doc_starts)
 
-			doc = self._session.documents[doc_index]
+			doc = self.session.documents[doc_index]
 			score = (d + 1) * 0.5
 
 			#print(c_doc, sentence_id)
 			#print(c_doc.sentence(sentence_id))
 			#print(score, d)
 
-			sent_text = doc.span("sentence", sent_index)
+			span_text = doc.span(self._partition, sent_index)
 			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
 
 			regions = [Region(
-				s=sent_text.strip(),
+				s=span_text.strip(),
 				match=None, gap_penalty=0)]
 
 			matches.append(Match(
@@ -379,7 +398,7 @@ class SentenceEmbeddingIndex(Index):
 				score,
 				self._metric.name,
 				regions=regions,
-				level="sentence"
+				level="span"
 			))
 
 		return matches

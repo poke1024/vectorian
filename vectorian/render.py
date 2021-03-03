@@ -140,7 +140,7 @@ class Renderer:
 					doc.stag('br')
 					with tag('span'):
 						regions = trim_regions(match['regions'])
-						if match['level'] == 'sentence':
+						if match['level'] == 'span':
 							for i, r in enumerate(regions):
 								text(r['s'])
 								if i < len(regions) - 1:

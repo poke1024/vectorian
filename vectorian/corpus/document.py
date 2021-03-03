@@ -107,6 +107,17 @@ def extract_token_str(table, text, normalizer):
 	return tokens
 
 
+def xspan(idxs, lens, i0, window_size, window_step):
+	i = i0 * window_step
+	start = idxs[i].as_py()
+	j = i + window_size
+	if j <= len(idxs) - 1:
+		end = idxs[j].as_py()
+	else:
+		end = idxs[-1].as_py() + lens[-1].as_py()
+	return start, end
+
+
 class Document:
 	def __init__(self, json):
 		self._json = json
@@ -233,19 +244,27 @@ class PreparedDocument:
 	def n_tokens(self):
 		return self._token_table.num_rows
 
-	def n_spans(self, name):
-		return self._spans[name].num_rows
+	def n_spans(self, partition):
+		n = self._spans[partition.level].num_rows
+		k = n // partition.window_step
+		if (k * partition.window_step) < n:
+			k += 1
+		return k
+
+	def _spans_getter(self, p):
+		return self._cached_spans(
+			p.level, p.window_size, p.window_step)
 
 	@lru_cache(16)
-	def _spans(self, name):
+	def _cached_spans(self, name, window_size, window_step):
 		col_tok_idx = self._token_table["idx"]
 		col_tok_len = self._token_table["len"]
-		n_tokens = self._token_table.num_rows
 
 		if name == "token":
 			def get(i):
-				start = col_tok_idx[i].as_py()
-				end = start + col_tok_len[i].as_py()
+				start, end = xspan(
+					col_tok_idx, col_tok_len, i,
+					window_size, window_step)
 				return self._text[start:end]
 
 			return get
@@ -254,32 +273,35 @@ class PreparedDocument:
 			col_n_tokens = self._spans[name].column('n_tokens')
 
 			def get(i):
-				start = col_token_at[i].as_py()
-				end = start + col_n_tokens[i].as_py()
-				if end < n_tokens:
-					i1 = col_tok_idx[end].as_py()
-				else:
-					i1 = col_tok_idx[end - 1].as_py() + col_tok_len[end - 1].as_py()
-				return self._text[col_tok_idx[start].as_py():i1]
+				start, end = xspan(
+					col_token_at, col_n_tokens, i,
+					window_size, window_step)
+
+				i0, i1 = xspan(
+					col_tok_idx, col_tok_len, start,
+					end - start, 1)
+
+				return self._text[i0:i1]
 
 			return get
 
-	def spans(self, name):
-		get = self._spans(name)
-		for i in range(self._spans[name].num_rows):
+	def spans(self, partition):
+		get = self._spans_getter(partition)
+		for i in range(self.n_spans(partition)):
 			yield get(i)
 
-	def span(self, name, i):
-		return self._spans(name)(i)
+	def span(self, partition, index):
+		return self._spans_getter(partition)(index)
 
-	def span_info(self, name, index):
+	def span_info(self, partition, index):
 		info = dict()
-		if name == "token":
+		if partition.level == "token":
 			return info  # FIXME
-		table = self._spans[name]
+		table = self._spans[partition.level]
+		i = index * partition.window_step
 		for k in table.column_names:
 			col = table.column(k)
-			info[k] = col[index].as_py()
+			info[k] = col[i].as_py()
 		return info
 
 	def to_core(self, index, vocab):

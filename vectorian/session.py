@@ -70,10 +70,11 @@ class Collection:
 
 
 class Partition:
-	def __init__(self, session, level, window):
+	def __init__(self, session, level, window_size, window_step):
 		self._session = session
 		self._level = level
-		self._window = window
+		self._window_size = window_size
+		self._window_step = window_step
 
 	@property
 	def session(self):
@@ -84,21 +85,24 @@ class Partition:
 		return self._level
 
 	@property
-	def window(self):
-		return self._window
+	def window_size(self):
+		return self._window_size
+
+	@property
+	def window_step(self):
+		return self._window_step
 
 	def to_args(self):
-		window = self._window
 		return {
 			'level': self._level,
-			'window_size': window[0],
-			'window_step': window[1]
+			'window_size': self._window_size,
+			'window_step': self._window_step
 		}
 
 	def max_len(self):
-		return self._session.max_len(self._level, self._window[0])
+		return self._session.max_len(self._level, self._window_size)
 
-	def index(self, metric, nlp=None, path=None, **kwargs):
+	def index(self, metric, nlp=None, **kwargs):
 		if isinstance(metric, str) and metric == "auto":
 			metric = self.session.default_metric()
 		assert isinstance(metric, SentenceSimilarityMetric)
@@ -107,12 +111,7 @@ class Partition:
 			kwargs = kwargs.copy()
 			kwargs['nlp'] = nlp
 
-		if path:
-			path = Path(path)
-		if path and path.exists():
-			return metric.load_index(self, path=path, **kwargs)
-		else:
-			return metric.create_index(self, **kwargs)
+		return metric.create_index(self, **kwargs)
 
 
 class Session:
@@ -175,8 +174,17 @@ class Session:
 	def result_class(self):
 		return Result
 
-	def partition(self, on, window_size=1, window_step=1):
-		return Partition(self, on, (window_size, window_step))
+	def partition(self, on, window_size=1, window_step=None):
+		if window_step is None:
+			window_step = window_size
+		return Partition(self, on, window_size, window_step)
+
+	def load_index(self, path):
+		# FIXME detect metric from index.json
+		if isinstance(metric, str) and metric == "auto":
+			metric = self.session.default_metric()
+		assert isinstance(metric, SentenceSimilarityMetric)
+		return metric.load_index(self, path=path)
 
 	def run_query(self, find, query):
 		return Result, find(query)
