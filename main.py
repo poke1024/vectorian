@@ -4,6 +4,7 @@ import vectorian.core as core
 import vectorian.utils as utils
 import vectorian
 
+from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
@@ -60,8 +61,12 @@ if __name__ == '__main__':
 
     formatter = LocationFormatter()
 
+    metric = AlignmentSentenceMetric(
+        TokenSimilarityMetric(
+            embedding, CosineMetric()))
+
     #p = Partition("sentence")
-    index = session.partition("token", 25, 1).index("auto", nlp)
+    index = session.partition("token", 25, 1).index(metric, nlp)
     matches = index.find("write female", n=3)
 
     #index = session.index_for_metric("auto", nlp=nlp)

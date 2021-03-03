@@ -28,7 +28,7 @@ public:
 	virtual MetricRef create_metric(
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding, // ignored
+		const VocabularyToEmbedding&, // ignored
 		const std::vector<Token> &p_needle) {
 
 		const auto m = std::make_shared<ContextualEmbeddingMetric>(

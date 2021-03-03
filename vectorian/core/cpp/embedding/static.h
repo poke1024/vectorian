@@ -5,6 +5,99 @@
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
 
+class VocabularyToEmbedding {
+	std::vector<MappedTokenIdArray> m_vocabulary_to_embedding;
+
+public:
+	inline VocabularyToEmbedding() {
+		m_vocabulary_to_embedding.reserve(2);
+	}
+
+	const std::vector<MappedTokenIdArray> &unpack() const {
+		return m_vocabulary_to_embedding;
+	}
+
+	template<typename F>
+	inline void iterate(const F &f) const {
+		size_t offset = 0;
+		for (const auto &embedding_token_ids : m_vocabulary_to_embedding) {
+			f(embedding_token_ids, offset);
+			offset += embedding_token_ids.rows();
+		}
+	}
+
+	inline void append(const std::vector<token_t> &p_mapping) {
+		m_vocabulary_to_embedding.push_back(MappedTokenIdArray(
+			const_cast<token_t*>(p_mapping.data()), p_mapping.size()));
+	}
+
+	inline size_t size() const {
+		size_t vocab_size = 0;
+		for (const auto &x : m_vocabulary_to_embedding) {
+			vocab_size += x.rows();
+		}
+		return vocab_size;
+	}
+};
+
+class Needle {
+	const std::vector<Token> &m_needle;
+	TokenIdArray m_needle_vocabulary_token_ids;
+	TokenIdArray m_needle_embedding_token_ids;
+
+public:
+	Needle(
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
+		const std::vector<Token> &p_needle) :
+
+		m_needle(p_needle) {
+
+		m_needle_vocabulary_token_ids.resize(p_needle.size());
+		for (size_t i = 0; i < p_needle.size(); i++) {
+			m_needle_vocabulary_token_ids[i] = p_needle[i].id;
+		}
+
+		// p_a maps from a Vocabulary corpus token id to an Embedding token id,
+		// e.g. 3 in the corpus and 127 in the embedding.
+
+		// p_b are the needle's Vocabulary token ids (not yet mapped to Embedding)
+
+		m_needle_embedding_token_ids.resize(p_needle.size());
+
+		for (size_t i = 0; i < p_needle.size(); i++) {
+			const token_t t = m_needle_vocabulary_token_ids[i];
+			if (t >= 0) {
+				token_t mapped = -1;
+				token_t r = t;
+				for (const auto &x : p_vocabulary_to_embedding.unpack()) {
+					if (r < x.rows()) {
+						mapped = x[r];
+						break;
+					} else {
+						r -= x.rows();
+					}
+				}
+				PPK_ASSERT(mapped >= 0);
+				m_needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
+			} else {
+				m_needle_embedding_token_ids[i] = -1;
+			}
+		}
+	}
+
+	const size_t size() const {
+		return m_needle.size();
+	}
+
+	const TokenIdArray &vocabulary_token_ids() const {
+		return m_needle_vocabulary_token_ids;
+	}
+
+	const TokenIdArray &embedding_token_ids() const {
+		return m_needle_embedding_token_ids;
+	}
+};
+
 class StaticEmbedding : public Embedding {
 	//std::vector<std::string> m_tokens;
 	std::unordered_map<std::string, token_t> m_tokens;
@@ -81,7 +174,7 @@ public:
 	virtual MetricRef create_metric(
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		const std::vector<Token> &p_needle) {
 
 		const auto m = std::make_shared<StaticEmbeddingMetric>(
@@ -90,9 +183,11 @@ public:
 
 		const auto s = p_metric.instantiate(m_embeddings);
 
+		const Needle needle(p_vocabulary_to_embedding, p_needle);
+
 		build_similarity_matrix(
 			p_vocabulary_to_embedding,
-			p_needle,
+			needle,
 			s,
 			m->w_similarity());
 
@@ -202,74 +297,35 @@ private:
 	}
 
 	void build_similarity_matrix(
-		const std::vector<MappedTokenIdArray> &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle,
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
+		const Needle &p_needle,
 		const EmbeddingSimilarityRef &p_embedding_similarity,
 		MatrixXf &r_matrix) const {
 
-		TokenIdArray needle_vocabulary_token_ids;
-		needle_vocabulary_token_ids.resize(p_needle.size());
-
-		for (size_t i = 0; i < p_needle.size(); i++) {
-			needle_vocabulary_token_ids[i] = p_needle[i].id;
-		}
-
-		// p_a maps from a Vocabulary corpus token id to an Embedding token id,
-		// e.g. 3 in the corpus and 127 in the embedding.
-
-		// p_b are the needle's Vocabulary token ids (not yet mapped to Embedding)
-
-		TokenIdArray needle_embedding_token_ids;
-		needle_embedding_token_ids.resize(p_needle.size());
-
-		for (size_t i = 0; i < p_needle.size(); i++) {
-			const token_t t = needle_vocabulary_token_ids[i];
-			if (t >= 0) {
-				token_t mapped = -1;
-				token_t r = t;
-				for (const auto &x : p_vocabulary_to_embedding) {
-					if (r < x.rows()) {
-						mapped = x[r];
-						break;
-					} else {
-						r -= x.rows();
-					}
-				}
-				PPK_ASSERT(mapped >= 0);
-				needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
-			} else {
-				needle_embedding_token_ids[i] = -1;
-			}
-		}
-
 		py::gil_scoped_release release;
 
-		size_t vocab_size = 0;
-		for (const auto &x : p_vocabulary_to_embedding) {
-			vocab_size += x.rows();
-		}
+		const size_t vocab_size = p_vocabulary_to_embedding.size();
 		//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
-		r_matrix.resize(vocab_size, needle_embedding_token_ids.rows());
+		r_matrix.resize(vocab_size, p_needle.embedding_token_ids().rows());
 
-		size_t offset = 0;
-		for (const auto &x : p_vocabulary_to_embedding) {
+		p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
 			p_embedding_similarity->fill_matrix(
 				m_embeddings,
-				x,
-				needle_embedding_token_ids,
+				embedding_token_ids,
+				p_needle.embedding_token_ids(),
 				offset,
 				0,
 				r_matrix);
-			offset += x.rows();
-		}
+		});
 
 		for (size_t j = 0; j < p_needle.size(); j++) { // for each token in needle
 
 			// since the j-th needle token is a specific vocabulary token, we always
 			// set that specific vocabulary token similarity to 1 (regardless of the
 			// embedding distance).
-			if (needle_vocabulary_token_ids[j] >= 0) {
-				r_matrix(needle_vocabulary_token_ids[j], j) = 1.0f;
+			const auto k = p_needle.vocabulary_token_ids()[j];
+			if (k >= 0) {
+				r_matrix(k, j) = 1.0f;
 			}
 		}
 

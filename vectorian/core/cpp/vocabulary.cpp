@@ -1,5 +1,6 @@
 #include "vocabulary.h"
 #include "utils.h"
+#include "embedding/static.h"
 
 template<typename VocabularyRef>
 TokenVectorRef _unpack_tokens(
@@ -102,4 +103,55 @@ TokenVectorRef unpack_tokens(
 	const std::shared_ptr<arrow::Table> &p_table,
 	const py::list &p_token_strings) {
 	return _unpack_tokens(p_vocab, p_table, p_token_strings);
+}
+
+MetricRef QueryVocabulary::create_metric(
+	const std::vector<Token> &p_needle,
+	const py::dict &p_sent_metric_def,
+	const py::dict &p_word_metric_def) {
+
+	const WordMetricDef metric_def{
+		p_word_metric_def["name"].cast<py::str>(),
+		p_word_metric_def["embedding"].cast<py::str>(),
+		p_word_metric_def["metric"].cast<py::str>(),
+		p_word_metric_def["options"].cast<py::dict>()};
+
+	if (metric_def.name == "lerp") {
+
+		return std::make_shared<LerpMetric>(
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
+			metric_def.options["t"].cast<float>());
+
+	} else if (metric_def.name == "min") {
+
+		return std::make_shared<MinMetric>(
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+
+	} else if (metric_def.name == "max") {
+
+		return std::make_shared<MaxMetric>(
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+
+	} else {
+
+		const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
+		if (it == m_vocab->m_embeddings_by_name.end()) {
+			std::ostringstream err;
+			err << "unknown embedding " << metric_def.embedding << " referenced in metric " << metric_def.name;
+			throw std::runtime_error(err.str());
+		}
+
+		VocabularyToEmbedding vocabulary_to_embedding;
+		vocabulary_to_embedding.append(m_vocab->get_embedding_map(it->second));
+		vocabulary_to_embedding.append(get_embedding_map(it->second));
+
+		return m_embeddings[it->second].embedding->create_metric(
+			metric_def,
+			p_sent_metric_def,
+			vocabulary_to_embedding,
+			p_needle);
+	}
 }
