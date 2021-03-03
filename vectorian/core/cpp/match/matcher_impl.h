@@ -233,8 +233,6 @@ public:
 				continue;
 			}
 
-			MatchRef best_slice_match = this->m_no_match;
-
 			const auto slice = m_slice_factory.create_slice(
 			    TokenSpan{s_tokens + token_at, len_s},
 			    TokenSpan{t_tokens, len_t});
@@ -257,16 +255,11 @@ public:
 				}
 			}
 
-			if (m->score() > best_slice_match->score()) {
-				best_slice_match = m;
-			}
-
-			if (best_slice_match->score() > this->m_no_match->score()) {
-
-				best_slice_match->compute_scores(
+			if (m->score() > this->m_no_match->score()) {
+				m->compute_scores(
 					m_slice_factory, len_s, len_t);
 
-				p_matches->add(best_slice_match);
+				p_matches->add(m);
 			}
 
 			token_at += spans->safe_len(

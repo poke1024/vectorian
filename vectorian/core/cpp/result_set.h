@@ -23,11 +23,13 @@ public:
 		m_max_matches(p_max_matches),
 		m_min_score(p_min_score) {
 
+		PPK_ASSERT(m_max_matches > 0);
+
 		m_matches.reserve(p_max_matches);
 	}
 
 	inline float worst_score() const {
-		if (m_matches.empty()) {
+		if (m_matches.size() < m_max_matches) {
 			return m_min_score;
 		} else {
 			return m_matches[0]->score();
@@ -36,25 +38,24 @@ public:
 
 	inline void add(const MatchRef &p_match) {
 
-		if (p_match->score() > worst_score()) {
+		PPK_ASSERT(p_match->score() >= worst_score());
 
-			if (m_matches.size() >= m_max_matches) {
+		if (m_matches.size() >= m_max_matches) {
 
-				std::pop_heap(
-					m_matches.begin(),
-					m_matches.end(),
-					Match::is_greater());
-
-				m_matches.pop_back();
-			}
-
-			m_matches.push_back(p_match);
-
-			std::push_heap(
+			std::pop_heap(
 				m_matches.begin(),
 				m_matches.end(),
 				Match::is_greater());
+
+			m_matches.pop_back();
 		}
+
+		m_matches.push_back(p_match);
+
+		std::push_heap(
+			m_matches.begin(),
+			m_matches.end(),
+			Match::is_greater());
 	}
 
 	inline size_t size() const {

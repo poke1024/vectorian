@@ -22,15 +22,25 @@ protected:
 		m_mag_s.resize(p_vocabulary_to_embedding.size());
 		p_vocabulary_to_embedding.iterate([&] (const auto &x, const size_t offset) {
 			const size_t n = static_cast<size_t>(x.rows());
+			PPK_ASSERT(offset + n <= m_mag_s.rows());
 			for (size_t i = 0; i < n; i++) {
-				m_mag_s(offset + i) = p_embeddings.unmodified.row(x(i)).norm();
+				const token_t k = x(i);
+				if (k >= 0) {
+					m_mag_s(offset + i) = p_embeddings.unmodified.row(k).norm();
+				} else {
+					m_mag_s(offset + i) = 0.0f;
+				}
 			}
 		});
 
 		m_mag_t.resize(p_needle.size());
 		for (size_t j = 0; j < p_needle.size(); j++) {
-			const size_t k = p_needle.embedding_token_ids()[j];
-			m_mag_t(j) = p_embeddings.unmodified.row(k).norm();
+			const token_t k = p_needle.embedding_token_ids()[j];
+			if (k >= 0) {
+				m_mag_t(j) = p_embeddings.unmodified.row(k).norm();
+			} else {
+				m_mag_t(j) = 0.0f;
+			}
 		}
 	}
 

@@ -31,6 +31,16 @@ struct TokenScore {
 	float weight;
 };
 
+class AssignmentMatrix {
+	std::vector<float> m_matrix;
+
+public:
+	AssignmentMatrix(const size_t p_len_s, const size_t p_len_t) {
+	}
+};
+
+typedef std::shared_ptr<AssignmentMatrix> AssignmentMatrixRef;
+
 class Match {
 private:
 	MatcherRef m_matcher;
@@ -38,6 +48,7 @@ private:
 	const MatchDigest m_digest;
 	float m_score; // overall score
 	std::vector<TokenScore> m_scores;
+	AssignmentMatrixRef m_assignment;
 
 public:
 	Match(
