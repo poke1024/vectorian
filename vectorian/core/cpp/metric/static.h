@@ -79,6 +79,14 @@ public:
 		return m_similarity;
 	}
 
+	inline float magnitude_s(int i) const {
+		return 0.0f; // FIXME
+	}
+
+	inline float magnitude_t(int i) const {
+		return 0.0f; // FIXME
+	}
+
 	virtual MatcherRef create_matcher(
 		const QueryRef &p_query,
 		const DocumentRef &p_document);

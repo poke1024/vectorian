@@ -86,6 +86,15 @@ public:
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
+	inline float magnitude_s(int i) const {
+		const Token &s = s_tokens[i];
+		return m_metric->magnitude_s(m_encoder.to_embedding(s));
+	}
+
+	inline float magnitude_t(int i) const {
+		return m_metric->magnitude_t(i);
+	}
+
 	inline float max_similarity_for_t(int i) const {
 		return 1.0f;
 	}
@@ -171,6 +180,14 @@ public:
 		}
 	}
 
+	inline float magnitude_s(int i) const {
+		return m_delegate.magnitude_s(i);
+	}
+
+	inline float magnitude_t(int i) const {
+		return m_delegate.magnitude_t(i);
+	}
+
 	inline float max_similarity_for_t(int i) const {
 		return m_modifiers.t_pos_weights[i];
 	}
@@ -227,6 +244,16 @@ public:
 		return m_slice.similarity(len_s - 1 - u, len_t - 1 - v);
 	}
 
+	inline float magnitude_s(int i) const {
+		const auto len_s = m_slice.len_s();
+		return m_slice.magnitude_s(len_s - 1 - i);
+	}
+
+	inline float magnitude_t(int i) const {
+		const auto len_t = m_slice.len_t();
+		return m_slice.magnitude_t(len_t - 1 - i);
+	}
+
 	inline float max_similarity_for_t(int i) const {
 		const auto len_t = m_slice.len_t();
 		return m_slice.max_similarity_for_t(len_t - 1 - i);
@@ -275,21 +302,28 @@ public:
 		const TokenSpan &s_span,
 		const TokenSpan &t_span) const {
 
-	    const Token *s = s_span.tokens;
-	    const auto len_s = s_span.len;
+		if (m_filter.all()) {
+			return m_delegate.create_slice(
+				s_span, t_span);
 
-	    Token *new_s = m_filtered.data();
-        PPK_ASSERT(static_cast<size_t>(len_s) <= m_filtered.size());
+		} else {
 
-	    int32_t new_len_s = 0;
-        for (int32_t i = 0; i < len_s; i++) {
-            if (m_filter(s[i])) {
-                new_s[new_len_s++] = s[i];
-            }
-        }
+		    const Token *s = s_span.tokens;
+		    const auto len_s = s_span.len;
 
-		return m_delegate.create_slice(
-			TokenSpan{new_s, new_len_s}, t_span);
+		    Token *new_s = m_filtered.data();
+	        PPK_ASSERT(static_cast<size_t>(len_s) <= m_filtered.size());
+
+		    int32_t new_len_s = 0;
+	        for (int32_t i = 0; i < len_s; i++) {
+	            if (m_filter(s[i])) {
+	                new_s[new_len_s++] = s[i];
+	            }
+	        }
+
+			return m_delegate.create_slice(
+				TokenSpan{new_s, new_len_s}, t_span);
+		}
 	}
 };
 
