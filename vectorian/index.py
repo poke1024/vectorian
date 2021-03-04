@@ -138,7 +138,7 @@ class Match:
 	def level(self):
 		return self._level
 
-	def to_json(self, location_formatter):
+	def to_json(self, location_formatter=None):
 		regions = []
 
 		doc = self.document
@@ -164,26 +164,34 @@ class Match:
 				regions.append(dict(s=s, gap_penalty=r.gap_penalty))
 
 		metadata = doc.metadata
-		loc = location_formatter(doc, span_info)
-		if loc:
-			speaker, loc_desc = loc
-		else:
-			speaker = ""
-			loc_desc = ""
-
-		return dict(
-			debug=dict(document=metadata["unique_id"], slice=self.slice_id),
-			score=self.score,
-			metric=self.metric,
-			location=dict(
+		if location_formatter is not None:
+			loc = location_formatter(doc, span_info)
+			if loc:
+				speaker, loc_desc = loc
+			else:
+				speaker = ""
+				loc_desc = ""
+			r_location = dict(
 				speaker=speaker,
 				author=metadata["author"],
 				title=metadata["title"],
-				location=loc_desc
-			),
+				location=loc_desc)
+		else:
+			r_location = None
+
+		data = dict(
+			document=metadata,
+			slice=self.slice_id,
+			location=span_info,
+			score=self.score,
+			metric=self.metric,
 			regions=regions,
 			omitted=self.omitted,
 			level=self.level)
+
+		if r_location is not None:
+			data['r_location'] = r_location
+		return data
 
 
 class Index:

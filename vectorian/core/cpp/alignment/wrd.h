@@ -88,7 +88,10 @@ MapTypeConst m2mapconst(p,m2.size());  // a read-only accessor for m2
 
 */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreorder"
 #include "network_simplex_simple.h"
+#pragma clang diagnostic pop
 
 typedef Eigen::Map<Eigen::MatrixXf> MappedMatrixXf;
 typedef Eigen::Map<Eigen::VectorXf> MappedVectorXf;
@@ -150,11 +153,7 @@ class OptimalTransport {
 	    std::vector<int> indI(n), indJ(m);
 	    std::vector<float> weights1(n), weights2(m);
 	    Digraph di(n, m);
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreorder"
 	    lemon::NetworkSimplexSimple<Digraph,float,float,node_id_type> net(di, true, n+m, n*m, maxIter);
-#pragma clang diagnostic pop
 
 	    // Set supply and demand, don't account for 0 values (faster)
 
@@ -314,7 +313,7 @@ public:
 		m_cost_storage.resize(max_len_s, max_len_t);
 		m_ot.resize(max_len_s, max_len_t);
 
-		m_match.resize(max_len_t);
+		m_match.reserve(max_len_t);
 	}
 
 	inline const std::vector<Index> &match() const {

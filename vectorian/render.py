@@ -29,7 +29,7 @@ class Renderer:
 		self._annotate = annotate or {}
 
 	def add_context_text(self, s):
-		doc, tag, text = Doc().tagtext()
+		doc, tag, text = self._html
 		r = "&crarr;".join([html.escape(x) for x in s.split("\n")])
 		doc.asis(r)
 
@@ -123,22 +123,22 @@ class Renderer:
 					# FIXME annotateDebug
 
 			with tag('div', klass='media-content'):
-				speaker = match['location']['speaker']
-				title = match['location']['title']
+				speaker = match['r_location']['speaker']
+				title = match['r_location']['title']
 
 				if speaker:
 					with tag('span', style='font-variant: small-caps;'):
-						text(match['location']['speaker'])
+						text(match['r_location']['speaker'])
 
 				with tag('div', klass='is-pulled-right'):
 					if speaker:
 						with tag('small'):
-							text(match['location']['author'] + ', ')
+							text(match['r_location']['author'] + ', ')
 					if title:
 						with tag('small', klass='is-italic'):
 							text(title + ', ')
 					with tag('small'):
-						text(match['location']['location'])
+						text(match['r_location']['location'])
 
 				with tag('div'):
 					doc.stag('br')

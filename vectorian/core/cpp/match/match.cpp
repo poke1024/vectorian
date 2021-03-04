@@ -97,8 +97,16 @@ py::list Match::regions(const int window_size) const {
 
 	const auto &match = this->match();
 	const auto &scores = m_scores;
+	py::list regions;
 
-	PPK_ASSERT(match.size() > 0);
+	if (match.size() < 1) {
+		const auto &s0 = s_tokens.at(token_at);
+		const auto &s1 = s_tokens.at(std::min(
+			static_cast<size_t>(token_at + slice().len), s_tokens.size() - 1));
+		regions.append(std::make_shared<Region>(Slice{s0.idx, s1.idx - s0.idx}, 0.0f));
+		return regions;
+	}
+
 	PPK_ASSERT(match.size() == scores.size());
 
 	int match_0 = 0;
@@ -112,7 +120,6 @@ py::list Match::regions(const int window_size) const {
 	int32_t last_anchor = std::max(0, token_at + match_0 - window_size);
 	bool last_matched = false;
 
-	py::list regions;
 	const int32_t n = static_cast<int32_t>(match.size());
 
 	const TokenFilter &token_filter = query()->token_filter();

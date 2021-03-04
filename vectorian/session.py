@@ -26,7 +26,7 @@ class Result:
 	def __getitem__(self, i):
 		return self._matches[i]
 
-	def to_json(self, location_formatter):
+	def to_json(self, location_formatter=None):
 		return [m.to_json(location_formatter) for m in self._matches]
 
 	def limit_to(self, n):
