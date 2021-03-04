@@ -61,6 +61,7 @@ class Query : public std::enable_shared_from_this<Query> {
 	POSWMap m_pos_weights;
 	std::vector<float> m_t_tokens_pos_weights;
 	SliceStrategy m_slice_strategy;
+	std::optional<py::object> m_debug_hook;
 
 public:
 	Query(
@@ -90,7 +91,8 @@ public:
 			"bidirectional",
 			"max_matches",
 			"min_score",
-			"partition"
+			"partition",
+			"debug"
 		};
 
 		if (p_kwargs) {
@@ -162,6 +164,10 @@ public:
 			m_slice_strategy.window_size = 1;
 			m_slice_strategy.window_step = 1;
 		}
+
+		if (p_kwargs && p_kwargs.contains("debug")) {
+			m_debug_hook = p_kwargs["debug"].cast<py::object>();
+		}
 	}
 
 	virtual ~Query() {
@@ -225,6 +231,10 @@ public:
 
 	inline const SliceStrategy& slice_strategy() const {
 		return m_slice_strategy;
+	}
+
+	inline const std::optional<py::object>& debug_hook() const {
+		return m_debug_hook;
 	}
 };
 

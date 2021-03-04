@@ -93,9 +93,6 @@ MapTypeConst m2mapconst(p,m2.size());  // a read-only accessor for m2
 #include "network_simplex_simple.h"
 #pragma clang diagnostic pop
 
-typedef Eigen::Map<Eigen::MatrixXf> MappedMatrixXf;
-typedef Eigen::Map<Eigen::VectorXf> MappedVectorXf;
-
 class OptimalTransport {
 	// the following EMD functions have been adapted from:
 	// https://github.com/PythonOT/POT/tree/master/ot/lp
@@ -105,8 +102,6 @@ class OptimalTransport {
 	Eigen::MatrixXf m_G_storage;
 	Eigen::VectorXf m_alpha_storage;
 	Eigen::VectorXf m_beta_storage;
-
-	float m_cost;
 
 	/*enum ProblemType {
 		INFEASIBLE,
@@ -119,12 +114,12 @@ class OptimalTransport {
     typedef lemon::FullBipartiteDigraph Digraph;
     DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
 
-	bool EMD_wrap(
+	std::tuple<bool, float> EMD_wrap(
 		const int n1, const int n2,
 		const MappedVectorXf &X, const MappedVectorXf &Y,
 		const MappedMatrixXf &D, MappedMatrixXf &G,
         MappedVectorXf &alpha, MappedVectorXf &beta,
-        float *cost, const int maxIter) {
+        const int maxIter) {
 
 	    int n, m, cur;
 
@@ -135,7 +130,7 @@ class OptimalTransport {
 	        if (val>0) {
 	            n++;
 	        }else if(val<0){
-				return false; //INFEASIBLE;
+				return std::make_tuple(false, 0.0f); //INFEASIBLE;
 			}
 	    }
 	    m=0;
@@ -144,7 +139,7 @@ class OptimalTransport {
 	        if (val>0) {
 	            m++;
 	        }else if(val<0){
-				return false; //INFEASIBLE;
+				return std::make_tuple(false, 0.0f); //INFEASIBLE;
 			}
 	    }
 
@@ -192,14 +187,14 @@ class OptimalTransport {
 	    // Solve the problem with the network simplex algorithm
 
 	    int ret=net.run();
+	    float cost = 0.0f;
 	    if (ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED) {
-	        *cost = 0;
 	        Arc a; di.first(a);
 	        for (; a != INVALID; di.next(a)) {
 	            const int i = di.source(a);
 	            const int j = di.target(a);
 	            const auto flow = net.flow(a);
-	            *cost += flow * D(indI[i], indJ[j-n]);
+	            cost += flow * D(indI[i], indJ[j-n]);
 	            G(indI[i], indJ[j-n]) = flow;
 	            alpha(indI[i]) = -net.potential(i);
 	            beta(indJ[j-n]) = net.potential(j);
@@ -208,7 +203,9 @@ class OptimalTransport {
 	    }
 
 
-	    return ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED;
+	    return std::make_tuple(
+	        ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED,
+	        cost);
 	}
 
 public:
@@ -218,7 +215,13 @@ public:
 		m_beta_storage.resize(max_n2);
 	}
 
-	inline bool emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
+	struct Result {
+		bool success;
+		float opt_cost;
+		MappedMatrixXf G;
+	};
+
+	inline Result emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
 	    const size_t n1 = M.rows();
 	    const size_t n2 = M.cols();
 	    //const size_t nmax = n1 + n2 - 1;
@@ -238,22 +241,17 @@ public:
 	    auto beta = MappedVectorXf(&m_beta_storage(0), n2);
 	    beta.setZero();
 
-	    m_cost = 0.0f;
-
-		return EMD_wrap(
+		const auto r = EMD_wrap(
             n1, n2,
             a, b,
             M, G,
-            alpha, beta,
-            &m_cost, max_iter);
+            alpha, beta, max_iter);
+
+        return Result{std::get<0>(r), std::get<1>(r), G};
 	}
 
-	inline bool emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
+	inline Result emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
 		return emd_c(a, b, M, max_iter);
-	}
-
-	inline float optimal_cost() const {
-		return m_cost;
 	}
 };
 
@@ -267,9 +265,66 @@ class WRD {
 	Eigen::MatrixXf m_cost_storage;
 	OptimalTransport m_ot;
 
+	template<typename Slice>
+	inline void call_debug_hook(
+		const QueryRef &p_query, const Slice &slice,
+		const int len_s, const int len_t,
+		const MappedVectorXf &mag_s, const MappedVectorXf &mag_t,
+		const MappedMatrixXf &D, const MappedMatrixXf &G) {
+
+		py::gil_scoped_acquire acquire;
+
+		const QueryVocabularyRef vocab = p_query->vocabulary();
+
+		const auto token_vector = [&] (const auto &get_id, const int n) {
+			py::list tokens;
+			for (int i = 0; i < n; i++) {
+				tokens.append(vocab->id_to_token(get_id(i)));
+			}
+			return tokens;
+		};
+
+		py::dict data;
+
+		data[py::str("s")] = token_vector([&] (int i) {
+			return slice.s(i).id;
+		}, len_s);
+
+		data[py::str("t")] = token_vector([&] (int i) {
+			return slice.t(i).id;
+		}, len_t);
+
+		data[py::str("mag_s")] = to_py_array(mag_s);
+		data[py::str("mag_t")] = to_py_array(mag_t);
+
+		data[py::str("D")] = to_py_array(D);
+		data[py::str("G")] = to_py_array(G);
+
+		const auto callback = *p_query->debug_hook();
+		callback(data);
+
+		/*const auto fmt_matrix = [&] (const MappedMatrixXf &data) {
+			fort::char_table table;
+			table << "";
+			for (int j = 0; j < len_t; j++) {
+				table << vocab->id_to_token(slice.t(j).id);
+			}
+			table << fort::endr;
+			for (int i = 0; i < len_s; i++) {
+				table << vocab->id_to_token(slice.s(i).id);
+				for (int j = 0; j < len_t; j++) {
+					table << fmt_float(data(i, j));
+				}
+				table << fort::endr;
+			}
+			return table.to_string();
+		};*/
+	}
+
 public:
 	template<typename Slice>
 	float compute(
+		const QueryRef &p_query,
 		const Slice &slice,
 		const size_t len_s,
 		const size_t len_t) {
@@ -297,8 +352,14 @@ public:
 			}
 		}
 
-		if (m_ot.emd2(mag_s, mag_t, cost)) {
-			return 1.0f - m_ot.optimal_cost() * 0.5f;
+		const auto r = m_ot.emd2(mag_s, mag_t, cost);
+
+		if (r.success) {
+			if (p_query->debug_hook().has_value()) {
+				call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r.G);
+			}
+
+			return 1.0f - r.opt_cost * 0.5f;
 		} else {
 			return 0.0f;
 		}

@@ -7,3 +7,6 @@
 [submodule "lib/pot"]
 	path = lib/pot
 	url = https://github.com/PythonOT/POT
+[submodule "lib/libfort"]
+	path = lib/libfort
+	url = https://github.com/seleznevae/libfort

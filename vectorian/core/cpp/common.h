@@ -25,6 +25,9 @@ namespace py = pybind11;
 using Eigen::MatrixXf;
 using Eigen::ArrayXf;
 
+typedef Eigen::Map<Eigen::MatrixXf> MappedMatrixXf;
+typedef Eigen::Map<Eigen::VectorXf> MappedVectorXf;
+
 static_assert(
 	std::make_tuple<int, int, int>(EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION) >=
 		std::make_tuple<int, int, int>(3, 3, 90),
@@ -89,6 +92,8 @@ typedef std::shared_ptr<ResultSet> ResultSetRef;
 py::array_t<float, py::array::f_style> to_py_array(MatrixXf &p_matrix);
 py::array_t<token_t> to_py_array(const TokenIdArray &p_array);
 py::dict to_py_array(const TokenVectorRef &p_array);
+py::array_t<float, py::array::f_style> to_py_array(const MappedMatrixXf &p_matrix);
+py::array_t<float> to_py_array(const MappedVectorXf &p_vector);
 
 #define PY_ARRAY_MEMBER(STRUCT, MEMBER)                      \
 	py::array_t<decltype(STRUCT::MEMBER)>(                   \

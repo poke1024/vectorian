@@ -189,7 +189,7 @@ public:
 		const int len_t) {
 
 		m_score = m_wrd.compute(
-			slice, len_s, len_t);
+			p_query, slice, len_s, len_t);
 	}
 
 	inline float score() const {

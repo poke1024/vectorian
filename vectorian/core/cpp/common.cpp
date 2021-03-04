@@ -10,6 +10,25 @@ py::array_t<float, py::array::f_style> to_py_array(MatrixXf &p_matrix) {
         p_matrix.data());
 }
 
+py::array_t<float, py::array::f_style> to_py_array(const MappedMatrixXf &p_matrix) {
+	std::vector<ssize_t> shape(2);
+	shape[0] = p_matrix.rows();
+	shape[1] = p_matrix.cols();
+	return py::array_t<float, py::array::f_style>(
+        shape,                                      // shape
+        {shape[0] * sizeof(float), sizeof(float)},  // strides (col-major)
+        p_matrix.data());
+}
+
+py::array_t<float> to_py_array(const MappedVectorXf &p_vector) {
+	std::vector<ssize_t> shape(1);
+	shape[0] = p_vector.rows();
+	return py::array_t<float>(
+        shape,              // shape
+        {sizeof(float)},    // strides
+        p_vector.data());   // data pointer
+}
+
 py::array_t<token_t> to_py_array(const TokenIdArray &p_array) {
 	std::vector<ssize_t> shape(1);
 	shape[0] = p_array.rows();
