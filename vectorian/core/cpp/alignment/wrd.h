@@ -114,11 +114,12 @@ class OptimalTransport {
     typedef lemon::FullBipartiteDigraph Digraph;
     DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
 
+	template<typename Vector, typename Matrix>
 	std::tuple<bool, float> EMD_wrap(
 		const int n1, const int n2,
-		const MappedVectorXf &X, const MappedVectorXf &Y,
-		const MappedMatrixXf &D, MappedMatrixXf &G,
-        MappedVectorXf &alpha, MappedVectorXf &beta,
+		const Vector &X, const Vector &Y,
+		const Matrix &D, Matrix &G,
+        Vector &alpha, Vector &beta,
         const int maxIter) {
 
 	    int n, m, cur;
@@ -218,10 +219,12 @@ public:
 	struct Result {
 		bool success;
 		float opt_cost;
-		MappedMatrixXf G;
+		//MappedMatrixXf G;
+		Eigen::MatrixXf G; // FIXME
 	};
 
-	inline Result emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
+	template<typename Vector, typename Matrix>
+	inline Result emd_c(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter) {
 	    const size_t n1 = M.rows();
 	    const size_t n2 = M.cols();
 	    //const size_t nmax = n1 + n2 - 1;
@@ -232,13 +235,24 @@ public:
 	    PPK_ASSERT(n1 <= static_cast<size_t>(m_alpha_storage.rows()));
 	    PPK_ASSERT(n2 <= static_cast<size_t>(m_beta_storage.rows()));
 
-	    auto G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
+	    /*auto G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
 	    G.setZero();
 
 	    auto alpha = MappedVectorXf(&m_alpha_storage(0), n1);
 	    alpha.setZero();
 
 	    auto beta = MappedVectorXf(&m_beta_storage(0), n2);
+	    beta.setZero();*/
+
+	    MatrixXf G;
+	    G.resize(n1, n2);
+	    VectorXf alpha;
+	    alpha.resize(n1);
+	    VectorXf beta;
+	    beta.resize(n2); // FIXME
+
+	    G.setZero();
+	    alpha.setZero();
 	    beta.setZero();
 
 		const auto r = EMD_wrap(
@@ -250,7 +264,8 @@ public:
         return Result{std::get<0>(r), std::get<1>(r), G};
 	}
 
-	inline Result emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
+	template<typename Vector, typename Matrix>
+	inline Result emd2(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter=100000) {
 		return emd_c(a, b, M, max_iter);
 	}
 };
@@ -265,12 +280,12 @@ class WRD {
 	Eigen::MatrixXf m_cost_storage;
 	OptimalTransport m_ot;
 
-	template<typename Slice>
+	template<typename Slice, typename Vector, typename Matrix>
 	inline void call_debug_hook(
 		const QueryRef &p_query, const Slice &slice,
 		const int len_s, const int len_t,
-		const MappedVectorXf &mag_s, const MappedVectorXf &mag_t,
-		const MappedMatrixXf &D, const MappedMatrixXf &G) {
+		const Vector &mag_s, const Vector &mag_t,
+		const Matrix &D, const Matrix &G) {
 
 		py::gil_scoped_acquire acquire;
 
@@ -329,12 +344,22 @@ public:
 		const size_t len_s,
 		const size_t len_t) {
 
-		MappedVectorXf mag_s(
+		PPK_ASSERT(len_s <= static_cast<size_t>(m_cost_storage.rows()));
+		PPK_ASSERT(len_t <= static_cast<size_t>(m_cost_storage.cols()));
+
+		/*MappedVectorXf mag_s(
 			&m_mag_s_storage(0), len_s);
 		MappedVectorXf mag_t(
 			&m_mag_t_storage(0), len_t);
 		MappedMatrixXf cost(
-			&m_cost_storage(0, 0), len_s, len_t);
+			&m_cost_storage(0, 0), len_s, len_t);*/
+
+		VectorXf mag_s;
+		mag_s.resize(len_s);
+		VectorXf mag_t;
+		mag_t.resize(len_t);
+		MatrixXf cost;
+		cost.resize(len_s, len_t); // FIXME
 
 		for (size_t i = 0; i < len_s; i++) {
 			mag_s(i) = slice.magnitude_s(i);
