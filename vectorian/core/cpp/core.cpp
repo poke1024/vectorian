@@ -27,6 +27,7 @@ if platform.system() == 'Linux':
 
 cfg['include_dirs'].append('../../../lib/eigen')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
+cfg['include_dirs'].append('../../../lib/pot/ot/lp')
 
 old_pyarrow = 1 if compare_versions(
 	pyarrow.__version__, '0.12.1', operator.le) else 0

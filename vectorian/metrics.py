@@ -1,6 +1,6 @@
 import numpy as np
 
-from vectorian.alignment import WatermanSmithBeyer
+from vectorian.alignment import AlignmentAlgorithm, WatermanSmithBeyer
 from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
@@ -140,10 +140,14 @@ class SentenceSimilarityMetric:
 
 class AlignmentSentenceMetric(SentenceSimilarityMetric):
 	def __init__(self, word_metric: TokenSimilarityMetric, alignment=None):
-		assert isinstance(word_metric, TokenSimilarityMetric)
+		if not isinstance(word_metric, TokenSimilarityMetric):
+			raise TypeError(word_metric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
+
+		if not isinstance(alignment, AlignmentAlgorithm):
+			raise TypeError(alignment)
 
 		self._word_metric = word_metric
 		self._alignment = alignment

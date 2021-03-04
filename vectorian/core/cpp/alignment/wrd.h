@@ -88,52 +88,173 @@ MapTypeConst m2mapconst(p,m2.size());  // a read-only accessor for m2
 
 */
 
-// the following EMD functions have been adapted from:
-// https://github.com/PythonOT/POT/tree/master/ot/lp
+#include "network_simplex_simple.h"
 
 typedef Eigen::Map<Eigen::MatrixXf> MappedMatrixXf;
 typedef Eigen::Map<Eigen::VectorXf> MappedVectorXf;
 
-class EMD {
-	MappedMatrixXf m_G_storage;
-	MappedVectorXf m_alpha_storage;
-	MappedVectorXf m_beta_storage;
+class OptimalTransport {
+	// the following EMD functions have been adapted from:
+	// https://github.com/PythonOT/POT/tree/master/ot/lp
+	// EMD_wrap itself is a port of
+	// https://github.com/PythonOT/POT/blob/master/ot/lp/EMD_wrapper.cpp
 
-	MappedMatrixXf G;
-	MappedVectorXf alpha;
-	MappedVectorXf beta;
+	Eigen::MatrixXf m_G_storage;
+	Eigen::VectorXf m_alpha_storage;
+	Eigen::VectorXf m_beta_storage;
 
-public:
-	int emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
-	    const size_t n1 = M.rows();
-	    const size_t n2 = M.cols();
-	    const size_t nmax = n1 + n2 - 1;
+	float m_cost;
 
-	    G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
-	    G.setZero();
+	/*enum ProblemType {
+		INFEASIBLE,
+		OPTIMAL,
+		UNBOUNDED,
+		MAX_ITER_REACHED
+	};*/
 
-	    alpha = MappedVectorXf(&m_alpha_storage(0), n1);
-	    alpha.setZero();
+	typedef unsigned int node_id_type;
+    typedef lemon::FullBipartiteDigraph Digraph;
+    DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
 
-	    beta = MappedVectorXf(&m_beta_storage(0), n2);
-	    beta.setZero();
+	bool EMD_wrap(
+		const int n1, const int n2,
+		const MappedVectorXf &X, const MappedVectorXf &Y,
+		const MappedMatrixXf &D, MappedMatrixXf &G,
+        MappedVectorXf &alpha, MappedVectorXf &beta,
+        float *cost, const int maxIter) {
 
-	    float cost = 0.0f;
+	    int n, m, cur;
 
-		/*return EMD_wrap(
-            n1, n2,
-            a, b,
-            M, G,
-            &cost, max_iter);*/
+	    // Get the number of non zero coordinates for r and c
+	    n=0;
+	    for (int i=0; i<n1; i++) {
+	        const auto val=X(i);
+	        if (val>0) {
+	            n++;
+	        }else if(val<0){
+				return false; //INFEASIBLE;
+			}
+	    }
+	    m=0;
+	    for (int i=0; i<n2; i++) {
+	        const auto val=Y(i);
+	        if (val>0) {
+	            m++;
+	        }else if(val<0){
+				return false; //INFEASIBLE;
+			}
+	    }
 
-		return 0;
+	    // Define the graph
+
+	    std::vector<int> indI(n), indJ(m);
+	    std::vector<float> weights1(n), weights2(m);
+	    Digraph di(n, m);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreorder"
+	    lemon::NetworkSimplexSimple<Digraph,float,float,node_id_type> net(di, true, n+m, n*m, maxIter);
+#pragma clang diagnostic pop
+
+	    // Set supply and demand, don't account for 0 values (faster)
+
+	    cur=0;
+	    for (int i=0; i<n1; i++) {
+	        const auto val=X(i);
+	        if (val>0) {
+	            weights1[ cur ] = val;
+	            indI[cur++]=i;
+	        }
+	    }
+
+	    // Demand is actually negative supply...
+
+	    cur=0;
+	    for (int i=0; i<n2; i++) {
+	        const auto val=Y(i);
+	        if (val>0) {
+	            weights2[ cur ] = -val;
+	            indJ[cur++]=i;
+	        }
+	    }
+
+
+	    net.supplyMap(&weights1[0], n, &weights2[0], m);
+
+	    // Set the cost of each edge
+	    for (int i=0; i<n; i++) {
+	        for (int j=0; j<m; j++) {
+	            const auto val=D(indI[i], indJ[j]);
+	            net.setCost(di.arcFromId(i*m+j), val);
+	        }
+	    }
+
+
+	    // Solve the problem with the network simplex algorithm
+
+	    int ret=net.run();
+	    if (ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED) {
+	        *cost = 0;
+	        Arc a; di.first(a);
+	        for (; a != INVALID; di.next(a)) {
+	            const int i = di.source(a);
+	            const int j = di.target(a);
+	            const auto flow = net.flow(a);
+	            *cost += flow * D(indI[i], indJ[j-n]);
+	            G(indI[i], indJ[j-n]) = flow;
+	            alpha(indI[i]) = -net.potential(i);
+	            beta(indJ[j-n]) = net.potential(j);
+	        }
+
+	    }
+
+
+	    return ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED;
 	}
 
-	int emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
+public:
+	void resize(const size_t max_n1, const size_t max_n2) {
+		m_G_storage.resize(max_n1, max_n2);
+		m_alpha_storage.resize(max_n1);
+		m_beta_storage.resize(max_n2);
+	}
+
+	inline bool emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
+	    const size_t n1 = M.rows();
+	    const size_t n2 = M.cols();
+	    //const size_t nmax = n1 + n2 - 1;
+
 		PPK_ASSERT(a.rows() == M.rows());
 		PPK_ASSERT(b.rows() == M.cols());
 
+	    PPK_ASSERT(n1 <= static_cast<size_t>(m_alpha_storage.rows()));
+	    PPK_ASSERT(n2 <= static_cast<size_t>(m_beta_storage.rows()));
+
+	    auto G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
+	    G.setZero();
+
+	    auto alpha = MappedVectorXf(&m_alpha_storage(0), n1);
+	    alpha.setZero();
+
+	    auto beta = MappedVectorXf(&m_beta_storage(0), n2);
+	    beta.setZero();
+
+	    m_cost = 0.0f;
+
+		return EMD_wrap(
+            n1, n2,
+            a, b,
+            M, G,
+            alpha, beta,
+            &m_cost, max_iter);
+	}
+
+	inline bool emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
 		return emd_c(a, b, M, max_iter);
+	}
+
+	inline float optimal_cost() const {
+		return m_cost;
 	}
 };
 
@@ -145,6 +266,7 @@ class WRD {
 	Eigen::VectorXf m_mag_s_storage;
 	Eigen::VectorXf m_mag_t_storage;
 	Eigen::MatrixXf m_cost_storage;
+	OptimalTransport m_ot;
 
 public:
 	template<typename Slice>
@@ -176,9 +298,11 @@ public:
 			}
 		}
 
-		// Wd=ot.emd2(a,b,M)
-
-		return 0.0f;
+		if (m_ot.emd2(mag_s, mag_t, cost)) {
+			return 1.0f - m_ot.optimal_cost() * 0.5f;
+		} else {
+			return 0.0f;
+		}
 	}
 
 	void resize(
@@ -188,6 +312,7 @@ public:
 		m_mag_s_storage.resize(max_len_s);
 		m_mag_t_storage.resize(max_len_t);
 		m_cost_storage.resize(max_len_s, max_len_t);
+		m_ot.resize(max_len_s, max_len_t);
 
 		m_match.resize(max_len_t);
 	}

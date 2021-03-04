@@ -74,7 +74,12 @@ class CustomGapCost(GapCost):
 		return c
 
 
-class WatermanSmithBeyer:
+class AlignmentAlgorithm:
+	def to_args(self, partition):
+		raise NotImplementedError()
+
+
+class WatermanSmithBeyer(AlignmentAlgorithm):
 	def __init__(self, gap: GapCost = None, zero: float = 0.5):
 		if gap is None:
 			gap = ConstantGapCost(0)
@@ -89,7 +94,7 @@ class WatermanSmithBeyer:
 		}
 
 
-class WordMoversDistance:
+class WordMoversDistance(AlignmentAlgorithm):
 	_variants = {
 		'kusner': {
 			'multiplicity': 'n:n',
@@ -150,4 +155,14 @@ class WordMoversDistance:
 			'one_target': one_target,
 			'normalize_bow': normalize_bow,
 			'symmetric': symmetric
+		}
+
+
+class WordRotatorsDistance(AlignmentAlgorithm):
+	def __init__(self):
+		pass
+
+	def to_args(self, partition):
+		return {
+			'algorithm': 'wrd'
 		}
