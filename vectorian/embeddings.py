@@ -2,8 +2,6 @@ import vectorian.core as core
 
 from tqdm import tqdm
 from pathlib import Path
-from functools import lru_cache
-from vectorian.utils import CachableCallable
 
 import numpy as np
 import pyarrow as pa
@@ -134,6 +132,8 @@ class StaticEmbedding:
 			if path and not path.exists():
 				loaded.save(path)
 
+			loaded.free_table()
+
 		return loaded
 
 
@@ -156,12 +156,16 @@ class StaticEmbeddingFromFile(StaticEmbedding):
 class StaticEmbeddingInstance:
 	def __init__(self, name, table):
 		self._name = name
+		self._table = table
 		self._core = core.StaticEmbedding(self._name, table)
 		self._vec = self._core.vectors
 
 	@property
 	def name(self):
 		return self._name
+
+	def free_table(self):
+		self._table = None
 
 	def save(self, path):
 		logging.info(f"writing {path}")
