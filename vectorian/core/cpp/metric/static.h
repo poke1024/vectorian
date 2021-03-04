@@ -22,7 +22,7 @@ protected:
 		m_mag_s.resize(p_vocabulary_to_embedding.size());
 		p_vocabulary_to_embedding.iterate([&] (const auto &x, const size_t offset) {
 			const size_t n = static_cast<size_t>(x.rows());
-			PPK_ASSERT(offset + n <= m_mag_s.rows());
+			PPK_ASSERT(offset + n <= static_cast<size_t>(m_mag_s.rows()));
 			for (size_t i = 0; i < n; i++) {
 				const token_t k = x(i);
 				if (k >= 0) {

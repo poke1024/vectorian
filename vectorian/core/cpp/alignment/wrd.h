@@ -61,54 +61,90 @@ ef emd_c(np.ndarray[double, ndim=1, mode="c"] a, np.ndarray[double, ndim=1, mode
 
     # calling the function
     with nogil:
-        result_code = EMD_wrap(n1, n2, <double*> a.data, <double*> b.data, <double*> M.data, <double*> G.data, <double*> alpha.data, <double*> beta.data, <double*> &cost, max_iter)
+        result_code = EMD_wrap(
+            n1, n2,
+            <double*> a.data, <double*> b.data,
+            <double*> M.data, <double*> G.data,
+            <double*> alpha.data, <double*> beta.data,
+            <double*> &cost, max_iter)
 
     return G, cost, alpha, beta, result_code
 */
 
-
 /*
 
-	def emd2(a, b, M, processes=multiprocessing.cpu_count(),
-         numItermax=100000, log=False, return_matrix=False,
-         center_dual=True):
 
-	a = np.asarray(a, dtype=np.float64)
-    b = np.asarray(b, dtype=np.float64)
-    M = np.asarray(M, dtype=np.float64)
+typedef Matrix<float,1,Dynamic> MatrixType;
+typedef Map<MatrixType> MapType;
+typedef Map<const MatrixType> MapTypeConst;   // a read-only map
+const int n_dims = 5;
 
-    # if empty array given then use uniform distributions
-    if len(a) == 0:
-        a = np.ones((M.shape[0],), dtype=np.float64) / M.shape[0]
-    if len(b) == 0:
-        b = np.ones((M.shape[1],), dtype=np.float64) / M.shape[1]
-
-    assert (a.shape[0] == M.shape[0] and b.shape[0] == M.shape[1]), \
-        "Dimension mismatch, check dimensions of M with a and b"
-
-    asel = a != 0
-
-    if log or return_matrix:
-        def f(b):
-            bsel = b != 0
-
-            G, cost, u, v, result_code = emd_c(a, b, M, numItermax)
-
-
-	if len(b.shape) == 1:
-        return f(b)
-
+MatrixType m1(n_dims), m2(n_dims);
+m1.setRandom();
+m2.setRandom();
+float *p = &m2(0);  // get the address storing the data for m2
+MapType m2map(p,m2.size());   // m2map shares data with m2
+MapTypeConst m2mapconst(p,m2.size());  // a read-only accessor for m2
 
 */
+
+// the following EMD functions have been adapted from:
+// https://github.com/PythonOT/POT/tree/master/ot/lp
+
+typedef Eigen::Map<Eigen::MatrixXf> MappedMatrixXf;
+typedef Eigen::Map<Eigen::VectorXf> MappedVectorXf;
+
+class EMD {
+	MappedMatrixXf m_G_storage;
+	MappedVectorXf m_alpha_storage;
+	MappedVectorXf m_beta_storage;
+
+	MappedMatrixXf G;
+	MappedVectorXf alpha;
+	MappedVectorXf beta;
+
+public:
+	int emd_c(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter) {
+	    const size_t n1 = M.rows();
+	    const size_t n2 = M.cols();
+	    const size_t nmax = n1 + n2 - 1;
+
+	    G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
+	    G.setZero();
+
+	    alpha = MappedVectorXf(&m_alpha_storage(0), n1);
+	    alpha.setZero();
+
+	    beta = MappedVectorXf(&m_beta_storage(0), n2);
+	    beta.setZero();
+
+	    float cost = 0.0f;
+
+		/*return EMD_wrap(
+            n1, n2,
+            a, b,
+            M, G,
+            &cost, max_iter);*/
+
+		return 0;
+	}
+
+	int emd2(const MappedVectorXf &a, const MappedVectorXf &b, const MappedMatrixXf &M, const size_t max_iter=100000) {
+		PPK_ASSERT(a.rows() == M.rows());
+		PPK_ASSERT(b.rows() == M.cols());
+
+		return emd_c(a, b, M, max_iter);
+	}
+};
 
 
 template<typename Index>
 class WRD {
 	std::vector<Index> m_match;
 
-	ArrayXf m_mag_s;
-	ArrayXf m_mag_t;
-	MatrixXf m_cost;
+	Eigen::VectorXf m_mag_s_storage;
+	Eigen::VectorXf m_mag_t_storage;
+	Eigen::MatrixXf m_cost_storage;
 
 public:
 	template<typename Slice>
@@ -117,19 +153,26 @@ public:
 		const size_t len_s,
 		const size_t len_t) {
 
+		MappedVectorXf mag_s(
+			&m_mag_s_storage(0), len_s);
+		MappedVectorXf mag_t(
+			&m_mag_t_storage(0), len_t);
+		MappedMatrixXf cost(
+			&m_cost_storage(0, 0), len_s, len_t);
+
 		for (size_t i = 0; i < len_s; i++) {
-			m_mag_s(i) = slice.magnitude_s(i);
+			mag_s(i) = slice.magnitude_s(i);
 		}
-		m_mag_s /= m_mag_s.sum();
+		mag_s /= mag_s.sum();
 
 		for (size_t i = 0; i < len_t; i++) {
-			m_mag_t(i) = slice.magnitude_t(i);
+			mag_t(i) = slice.magnitude_t(i);
 		}
-		m_mag_t /= m_mag_t.sum();
+		mag_t /= mag_t.sum();
 
 		for (size_t i = 0; i < len_s; i++) {
 			for (size_t j = 0; j < len_t; j++) {
-				m_cost(i, j) = 1.0f - slice.similarity(i, j);
+				cost(i, j) = 1.0f - slice.similarity(i, j);
 			}
 		}
 
@@ -142,9 +185,9 @@ public:
 		const size_t max_len_s,
 		const size_t max_len_t) {
 
-		m_mag_s.resize(max_len_s);
-		m_mag_t.resize(max_len_t);
-		m_cost.resize(max_len_s, max_len_t);
+		m_mag_s_storage.resize(max_len_s);
+		m_mag_t_storage.resize(max_len_t);
+		m_cost_storage.resize(max_len_s, max_len_t);
 
 		m_match.resize(max_len_t);
 	}
