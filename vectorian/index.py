@@ -261,9 +261,32 @@ def chunks(x, n):
 		yield x[i:i + n]
 
 
+# the next three functions are taken from:
+# https://gist.github.com/mdouze/e4bdb404dbd976c83fe447e529e5c9dc
+# see http://ulrichpaquet.com/Papers/SpeedUp.pdf theorem 5
+
+def get_phi(xb):
+	return (xb ** 2).sum(1).max()
+
+
+def augment_xb(xb, phi=None):
+	norms = (xb ** 2).sum(1)
+	if phi is None:
+		phi = norms.max()
+	extracol = np.sqrt(phi - norms)
+	return np.hstack((xb, extracol.reshape(-1, 1)))
+
+
+def augment_xq(xq):
+	extracol = np.zeros(len(xq), dtype=np.float32)
+	return np.hstack((xq, extracol.reshape(-1, 1)))
+
+
 class SentenceEmbeddingIndex(Index):
-	def __init__(self, partition, metric, encoder, vectors=None):
+	def __init__(self, partition, metric, encoder, vectors=None, faiss_description='Flat'):
 		super().__init__(partition, metric)
+
+		import faiss
 
 		self._partition = partition
 		self._metric = metric
@@ -295,23 +318,21 @@ class SentenceEmbeddingIndex(Index):
 			corpus_vec = np.vstack(corpus_vec)
 			corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
 
-		try:
-			import faiss
-		except ImportError:
-			raise
-
 		# https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
 		# https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
-
-		pca_dim = 128
-		if corpus_vec.shape[0] < pca_dim:
-			pca_dim = None
-
 		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
+		# e.g. ""Flat", "PCA128,Flat", "LSH"
+
+		self._ip_to_l2 = faiss_description.split(",")[-1] != "Flat"
+
+		if self._ip_to_l2:
+			corpus_vec = augment_xb(corpus_vec)
+			metric = faiss.METRIC_L2
+		else:
+			metric = faiss.METRIC_INNER_PRODUCT
+
 		n_dims = corpus_vec.shape[-1]
-		index = faiss.index_factory(n_dims, "Flat", faiss.METRIC_INNER_PRODUCT)
-		#index = faiss.index_factory(n_dims, "PCA128,LSH", faiss.METRIC_INNER_PRODUCT)
-		#index = faiss.index_factory(n_dims, "LSH", faiss.METRIC_INNER_PRODUCT)
+		index = faiss.index_factory(n_dims, faiss_description, metric)
 		index.train(corpus_vec)
 		index.add(corpus_vec)
 
@@ -364,6 +385,9 @@ class SentenceEmbeddingIndex(Index):
 	def _find(self, query, progress=None):
 		query_vec = self._encoder([query.text])
 		query_vec /= np.linalg.norm(query_vec)
+
+		if self._ip_to_l2:
+			query_vec = augment_xq(query_vec)
 
 		distance, index = self._index.search(
 			query_vec, query.options["max_matches"])
