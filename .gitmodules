@@ -4,3 +4,6 @@
 [submodule "lib/eigen"]
 	path = lib/eigen
 	url = https://gitlab.com/libeigen/eigen
+[submodule "lib/pot"]
+	path = lib/pot
+	url = https://github.com/PythonOT/POT
