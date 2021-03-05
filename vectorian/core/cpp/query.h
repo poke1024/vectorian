@@ -113,6 +113,10 @@ public:
 			}
 		}
 
+		if (p_kwargs && p_kwargs.contains("debug")) {
+			m_debug_hook = p_kwargs["debug"].cast<py::object>();
+		}
+
 		m_submatch_weight = (p_kwargs && p_kwargs.contains("submatch_weight")) ?
             p_kwargs["submatch_weight"].cast<float>() :
             0.0f;
@@ -138,15 +142,6 @@ public:
 			p_kwargs["min_score"].cast<float>() :
 			0.2f;
 
-		if (p_kwargs && p_kwargs.contains("metric")) {
-			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
-
-			m_metrics.push_back(m_vocab->create_metric(
-				shared_from_this(),
-				metric_def_dict,
-				metric_def_dict["word_metric"]));
-		}
-
 		if (p_kwargs && p_kwargs.contains("partition")) {
 			const auto slices_def_dict = p_kwargs["partition"].cast<py::dict>();
 
@@ -167,8 +162,13 @@ public:
 			m_slice_strategy.window_step = 1;
 		}
 
-		if (p_kwargs && p_kwargs.contains("debug")) {
-			m_debug_hook = p_kwargs["debug"].cast<py::object>();
+		if (p_kwargs && p_kwargs.contains("metric")) {
+			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
+
+			m_metrics.push_back(m_vocab->create_metric(
+				shared_from_this(),
+				metric_def_dict,
+				metric_def_dict["word_metric"]));
 		}
 	}
 
