@@ -42,7 +42,7 @@ class Query:
 		tokens = self._filter(tokens, 'pos_filter', 'pos')
 		tokens = self._filter(tokens, 'tag_filter', 'tag')
 
-		token_table = TokenTable()
+		token_table = TokenTable(self._index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
 		token_table_pa = token_table.to_arrow()

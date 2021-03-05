@@ -18,8 +18,10 @@ class SpansTable:
 		self._loc = collections.defaultdict(list)
 		self._loc_keys = loc_keys
 
-	def extend(self, location, tokens):
-		assert len(tokens) > 0
+	def extend(self, location, n_tokens):
+		if n_tokens < 1:
+			return
+
 		loc = self._loc
 
 		for k, v in zip(self._loc_keys, location):
@@ -30,7 +32,7 @@ class SpansTable:
 		else:
 			token_at = 0
 
-		loc['n_tokens'].append(len(tokens))
+		loc['n_tokens'].append(n_tokens)
 		loc['token_at'].append(token_at)
 
 	def to_pandas(self):
@@ -49,13 +51,15 @@ class SpansTable:
 
 
 class TokenTable:
-	def __init__(self):
+	def __init__(self, normalizer):
 		self._idx = 0
 
 		self._token_idx = []
 		self._token_len = []
 		self._token_pos = []  # pos_ from spacy's Token
 		self._token_tag = []  # tag_ from spacy's Token
+
+		self._normalizer = normalizer
 
 	def __len__(self):
 		return len(self._token_idx)
@@ -65,6 +69,7 @@ class TokenTable:
 
 	def extend(self, text, sent, tokens):
 		last_idx = sent["start"]
+		n_tokens = 0
 
 		for token in tokens:
 			idx = token["start"]
@@ -72,13 +77,18 @@ class TokenTable:
 			last_idx = idx
 
 			token_text = text[token["start"]:token["end"]]
-			self._token_idx.append(self._idx)
-			self._token_len.append(len(token_text))
+			if len((self._normalizer(token_text) or "").strip()) > 0:
+				self._token_idx.append(self._idx)
+				self._token_len.append(len(token_text))
 
-			self._token_pos.append(token["pos"])
-			self._token_tag.append(token["tag"])
+				self._token_pos.append(token["pos"])
+				self._token_tag.append(token["tag"])
+
+				n_tokens += 1
 
 		self._idx += len(text[last_idx:sent["end"]])
+
+		return n_tokens
 
 	def to_pandas(self):
 		return pd.DataFrame({
@@ -106,7 +116,8 @@ def extract_token_str(table, text, normalizer):
 	tokens = []
 	for idx, len_ in zip(col_tok_idx, col_tok_len):
 		t = normalizer(text[idx:idx + len_])
-		tokens.append(t or "")
+		assert len(t) > 0
+		tokens.append(t)
 	return tokens
 
 
@@ -181,7 +192,7 @@ class PreparedDocument:
 
 		texts = []
 
-		token_table = TokenTable()
+		token_table = TokenTable(self._session.token_mapper('tokenizer'))
 		sentence_table = SpansTable(json['loc_keys'])
 
 		partitions = json['partitions']
@@ -221,8 +232,8 @@ class PreparedDocument:
 
 				sent_text = text[sent["start"]:sent["end"]]
 				if sent_text.strip() and sent_tokens:
-					token_table.extend(text, sent, sent_tokens)
-					sentence_table.extend(loc, sent_tokens)
+					n_tokens = token_table.extend(text, sent, sent_tokens)
+					sentence_table.extend(loc, n_tokens)
 					texts.append(sent_text)
 				last_sent_end = sent["end"]
 
@@ -231,8 +242,16 @@ class PreparedDocument:
 			'sentence': sentence_table.to_arrow()
 		}
 		self._token_table = token_table.to_arrow()
+		self._save_tokens("/Users/arbeit/Desktop/tokens.txt")
 
 		self._metadata = json['metadata']
+
+	def _save_tokens(self, path):
+		with open(path, "w") as f:
+			col_tok_idx = self._token_table["idx"].to_numpy()
+			col_tok_len = self._token_table["len"].to_numpy()
+			for idx, len_ in zip(col_tok_idx, col_tok_len):
+				f.write('"' + self._text[idx:idx + len_] + '"\n')
 
 	@property
 	def text(self):

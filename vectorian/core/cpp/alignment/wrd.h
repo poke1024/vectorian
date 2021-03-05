@@ -281,10 +281,15 @@ class WRD {
 		const QueryVocabularyRef vocab = p_query->vocabulary();
 
 		const auto token_vector = [&] (const auto &get_id, const int n) {
-			py::list tokens;
+			py::list id;
+			py::list text;
 			for (int i = 0; i < n; i++) {
-				tokens.append(vocab->id_to_token(get_id(i)));
+				id.append(get_id(i));
+				text.append(vocab->id_to_token(get_id(i)));
 			}
+			py::dict tokens;
+			tokens[py::str("id")] = id;
+			tokens[py::str("text")] = text;
 			return tokens;
 		};
 
