@@ -5,6 +5,7 @@
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
 #include "utils.h"
+#include <fstream>
 
 class VocabularyToEmbedding {
 	std::vector<MappedTokenIdArray> m_vocabulary_to_embedding;
@@ -164,6 +165,19 @@ public:
 		}
 
 		m_embeddings.update_normalized();
+
+		/*std::ofstream outfile;
+		outfile.open("/Users/arbeit/Desktop/embeddings.txt", std::ios_base::app);
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < m_embeddings.unmodified.shape(1); j++) {
+				outfile << m_embeddings.unmodified(i, j) << ",";
+			}
+			outfile << "\n";
+			for (int j = 0; j < m_embeddings.unmodified.shape(1); j++) {
+				outfile << m_embeddings.normalized(i, j) << ",";
+			}
+			outfile << "\n";
+		}*/
 
 		//m_similarity_measures = create_similarity_measures(p_name, m_embeddings);
 	}

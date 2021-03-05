@@ -20,8 +20,9 @@ struct WordVectors {
 	void update_normalized() {
 		normalized.resize({unmodified.shape(0), unmodified.shape(1)});
 		for (size_t j = 0; j < unmodified.shape(0); j++) {
-			const float len = xt::linalg::norm(xt::view(unmodified, j, xt::all()));
-			normalized(j) = unmodified(j) / len;
+			const auto row = xt::view(unmodified, j, xt::all());
+			const float len = xt::linalg::norm(row);
+			xt::view(normalized, j, xt::all()) = row / len;
 		}
 	}
 
