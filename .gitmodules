@@ -10,3 +10,9 @@
 [submodule "lib/libfort"]
 	path = lib/libfort
 	url = https://github.com/seleznevae/libfort
+[submodule "lib/xtensor"]
+	path = lib/xtensor
+	url = https://github.com/xtensor-stack/xtensor
+[submodule "lib/xtensor-python"]
+	path = lib/xtensor-python
+	url = https://github.com/xtensor-stack/xtensor-python
