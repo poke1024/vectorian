@@ -58,8 +58,13 @@ class TokenTable:
 		self._token_len = []
 		self._token_pos = []  # pos_ from spacy's Token
 		self._token_tag = []  # tag_ from spacy's Token
+		self._token_str = []
 
 		self._normalizer = normalizer
+
+	@property
+	def normalized_tokens(self):
+		return self._token_str
 
 	def __len__(self):
 		return len(self._token_idx)
@@ -77,13 +82,15 @@ class TokenTable:
 			last_idx = idx
 
 			token_text = text[token["start"]:token["end"]]
-			if len((self._normalizer(token_text) or "").strip()) > 0:
+			norm_text = self._normalizer(token_text) or ""
+			if len(norm_text.strip()) > 0:
 				self._token_idx.append(self._idx)
 				self._token_len.append(len(token_text))
 
 				self._token_pos.append(token["pos"])
 				self._token_tag.append(token["tag"])
 
+				self._token_str.append(norm_text)
 				n_tokens += 1
 
 		self._idx += len(text[last_idx:sent["end"]])
@@ -108,17 +115,6 @@ class TokenTable:
 		return pa.Table.from_arrays(
 			tokens_table_data,
 			['idx', 'len', 'pos', 'tag'])
-
-
-def extract_token_str(table, text, normalizer):
-	col_tok_idx = table["idx"].to_numpy()
-	col_tok_len = table["len"].to_numpy()
-	tokens = []
-	for idx, len_ in zip(col_tok_idx, col_tok_len):
-		t = normalizer(text[idx:idx + len_])
-		assert len(t) > 0
-		tokens.append(t)
-	return tokens
 
 
 def xspan(idxs, lens, i0, window_size, window_step):
@@ -242,7 +238,8 @@ class PreparedDocument:
 			'sentence': sentence_table.to_arrow()
 		}
 		self._token_table = token_table.to_arrow()
-		self._save_tokens("/Users/arbeit/Desktop/tokens.txt")
+		self._token_str = token_table.normalized_tokens
+		#self._save_tokens("/Users/arbeit/Desktop/tokens.txt")
 
 		self._metadata = json['metadata']
 
@@ -339,8 +336,5 @@ class PreparedDocument:
 			vocab,
 			self._spans,
 			self._token_table,
-			extract_token_str(
-				self._token_table,
-				self._text,
-				self._session.token_mapper('tokenizer')),
+			self._token_str,
 			self._metadata)

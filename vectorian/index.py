@@ -9,7 +9,7 @@ import json
 from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
-from vectorian.corpus.document import TokenTable, extract_token_str
+from vectorian.corpus.document import TokenTable
 
 
 class Query:
@@ -45,14 +45,10 @@ class Query:
 		token_table = TokenTable(self._index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
-		token_table_pa = token_table.to_arrow()
 		return core.Query(
 			self._vocab,
-			token_table_pa,
-			extract_token_str(
-				token_table_pa,
-				self.text,
-				self._index.session.token_mapper('tokenizer')),
+			token_table.to_arrow(),
+			token_table.normalized_tokens,
 			**self._options)
 
 
