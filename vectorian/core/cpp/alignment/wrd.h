@@ -6,7 +6,6 @@ ef emd_c(np.ndarray[double, ndim=1, mode="c"] a, np.ndarray[double, ndim=1, mode
     .. math::
         \gamma = arg\min_\gamma <\gamma,M>_F
         s.t. \gamma 1 = a
-             \gamma^T 1= b
              \gamma\geq 0
     where :
     - M is the metric cost matrix
@@ -113,9 +112,14 @@ class OptimalTransport {
 	typedef unsigned int node_id_type;
     typedef lemon::FullBipartiteDigraph Digraph;
     DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
+    typedef lemon::NetworkSimplexSimple<Digraph,float,float,node_id_type> Simplex;
 
+public:
+    typedef Simplex::ProblemType ProblemType;
+
+private:
 	template<typename Vector, typename VectorOut, typename MatrixD, typename MatrixG>
-	std::tuple<bool, float> EMD_wrap(
+	std::tuple<ProblemType, float> EMD_wrap(
 		const int n1, const int n2,
 		const Vector &X, const Vector &Y,
 		const MatrixD &D, MatrixG &G,
@@ -131,7 +135,7 @@ class OptimalTransport {
 	        if (val>0) {
 	            n++;
 	        }else if(val<0){
-				return std::make_tuple(false, 0.0f); //INFEASIBLE;
+				return std::make_tuple(ProblemType::INFEASIBLE, 0.0f);
 			}
 	    }
 	    m=0;
@@ -140,7 +144,7 @@ class OptimalTransport {
 	        if (val>0) {
 	            m++;
 	        }else if(val<0){
-				return std::make_tuple(false, 0.0f); //INFEASIBLE;
+				return std::make_tuple(ProblemType::INFEASIBLE, 0.0f);
 			}
 	    }
 
@@ -149,7 +153,7 @@ class OptimalTransport {
 	    std::vector<int> indI(n), indJ(m);
 	    std::vector<float> weights1(n), weights2(m);
 	    Digraph di(n, m);
-	    lemon::NetworkSimplexSimple<Digraph,float,float,node_id_type> net(di, true, n+m, n*m, maxIter);
+	    Simplex net(di, true, n+m, n*m, maxIter);
 
 	    // Set supply and demand, don't account for 0 values (faster)
 
@@ -203,9 +207,8 @@ class OptimalTransport {
 
 	    }
 
-
 	    return std::make_tuple(
-	        ret==(int)net.OPTIMAL || ret==(int)net.MAX_ITER_REACHED,
+	        static_cast<ProblemType>(ret),
 	        cost);
 	}
 
@@ -217,10 +220,14 @@ public:
 	}
 
 	template<typename Matrix>
-	struct Result {
-		bool success;
+	struct Solution {
+		ProblemType type;
 		float opt_cost;
 		Matrix G;
+
+		inline bool success() const {
+			return type == ProblemType::OPTIMAL || type == ProblemType::MAX_ITER_REACHED;
+		}
 	};
 
 	template<typename Vector, typename Matrix>
@@ -249,7 +256,7 @@ public:
             M, G,
             alpha, beta, max_iter);
 
-        return Result<decltype(G)>{std::get<0>(r), std::get<1>(r), G};
+        return Solution<decltype(G)>{std::get<0>(r), std::get<1>(r), G};
 	}
 
 	template<typename Vector, typename Matrix>
@@ -268,13 +275,12 @@ class WRD {
 	xt::xtensor<float, 2> m_cost_storage;
 	OptimalTransport m_ot;
 
-	template<typename Slice, typename Vector, typename MatrixD, typename MatrixG>
+	template<typename Slice, typename Vector, typename MatrixD, typename Solution>
 	inline void call_debug_hook(
 		const QueryRef &p_query, const Slice &slice,
 		const int len_s, const int len_t,
 		const Vector &mag_s, const Vector &mag_t,
-		const MatrixD &D, const MatrixG &G,
-		const bool success) {
+		const MatrixD &D, const Solution &solution) {
 
 		py::gil_scoped_acquire acquire;
 
@@ -307,9 +313,33 @@ class WRD {
 		data[py::str("mag_t")] = xt::pyarray<float>(mag_t);
 
 		data[py::str("D")] = xt::pyarray<float>(D);
-		data[py::str("G")] = xt::pyarray<float>(G);
 
-		data[py::str("success")] = success;
+		py::dict py_solution;
+
+		py_solution[py::str("G")] = xt::pyarray<float>(solution.G);
+		py_solution[py::str("opt_cost")] = solution.opt_cost;
+
+		const char *p_type_str;
+		switch (solution.type) {
+			case OptimalTransport::ProblemType::OPTIMAL: {
+				p_type_str = "optimal";
+			} break;
+			case OptimalTransport::ProblemType::MAX_ITER_REACHED: {
+				p_type_str = "max_iter_reached";
+			} break;
+			case OptimalTransport::ProblemType::INFEASIBLE: {
+				p_type_str = "infeasible";
+			} break;
+			case OptimalTransport::ProblemType::UNBOUNDED: {
+				p_type_str = "unbounded";
+			} break;
+			default: {
+				p_type_str = "illegal";
+			} break;
+		}
+
+		py_solution[py::str("type")] = p_type_str;
+		data[py::str("solution")] = py_solution;
 
 		py::dict args;
 		args[py::str("hook")] = "alignment_wrd";
@@ -370,32 +400,32 @@ public:
 		}
 		mag_t /= xt::sum(mag_t);
 
-		std::ofstream outfile;
+		/*std::ofstream outfile;
 		outfile.open("/Users/arbeit/Desktop/debug_wrd.txt", std::ios_base::app);
 
-		outfile << "--- before:\n";
+		outfile << "--- before:\n";*/
 		for (size_t i = 0; i < len_s; i++) {
 			for (size_t j = 0; j < len_t; j++) {
 				cost(i, j) = 1.0f - slice.similarity(i, j);
-				outfile << cost(i, j) << "; " << slice.similarity(i, j) << "\n";
+				//outfile << cost(i, j) << "; " << slice.similarity(i, j) << "\n";
 			}
 		}
 
 		const auto r = m_ot.emd2(mag_s, mag_t, cost);
 
 		if (p_query->debug_hook().has_value()) {
-			call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r.G, r.success);
+			call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r);
 		}
 
-		outfile << "--- after:\n";
+		/*outfile << "--- after:\n";
 		for (size_t i = 0; i < len_s; i++) {
 			for (size_t j = 0; j < len_t; j++) {
 				outfile << cost(i, j) << "\n";
 			}
-		}
+		}*/
 
-		if (r.success) {
-			outfile << "--- success.\n";
+		if (r.success()) {
+			//outfile << "--- success.\n";
 			return 1.0f - r.opt_cost * 0.5f;
 		} else {
 			return 0.0f;
