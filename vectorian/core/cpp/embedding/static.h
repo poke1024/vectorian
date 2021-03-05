@@ -5,17 +5,17 @@
 #include "embedding/embedding.h"
 #include "embedding/sim.h"
 #include "utils.h"
-#include <fstream>
+#include <xtensor/xadapt.hpp>
 
 class VocabularyToEmbedding {
-	std::vector<MappedTokenIdArray> m_vocabulary_to_embedding;
+	std::vector<TokenIdArray> m_vocabulary_to_embedding;
 
 public:
 	inline VocabularyToEmbedding() {
 		m_vocabulary_to_embedding.reserve(2);
 	}
 
-	const std::vector<MappedTokenIdArray> &unpack() const {
+	const std::vector<TokenIdArray> &unpack() const {
 		return m_vocabulary_to_embedding;
 	}
 
@@ -24,19 +24,19 @@ public:
 		size_t offset = 0;
 		for (const auto &embedding_token_ids : m_vocabulary_to_embedding) {
 			f(embedding_token_ids, offset);
-			offset += embedding_token_ids.rows();
+			offset += embedding_token_ids.shape(0);
 		}
 	}
 
 	inline void append(const std::vector<token_t> &p_mapping) {
-		m_vocabulary_to_embedding.push_back(MappedTokenIdArray(
-			const_cast<token_t*>(p_mapping.data()), p_mapping.size()));
+		m_vocabulary_to_embedding.push_back(xt::adapt(
+			const_cast<token_t*>(p_mapping.data()), {p_mapping.size()}));
 	}
 
 	inline size_t size() const {
 		size_t vocab_size = 0;
 		for (const auto &x : m_vocabulary_to_embedding) {
-			vocab_size += x.rows();
+			vocab_size += x.shape(0);
 		}
 		return vocab_size;
 	}
@@ -54,9 +54,9 @@ public:
 
 		m_needle(p_needle) {
 
-		m_needle_vocabulary_token_ids.resize(p_needle.size());
+		m_needle_vocabulary_token_ids.resize({p_needle.size()});
 		for (size_t i = 0; i < p_needle.size(); i++) {
-			m_needle_vocabulary_token_ids[i] = p_needle[i].id;
+			m_needle_vocabulary_token_ids(i) = p_needle[i].id;
 		}
 
 		// p_a maps from a Vocabulary corpus token id to an Embedding token id,
@@ -64,25 +64,25 @@ public:
 
 		// p_b are the needle's Vocabulary token ids (not yet mapped to Embedding)
 
-		m_needle_embedding_token_ids.resize(p_needle.size());
+		m_needle_embedding_token_ids.resize({p_needle.size()});
 
 		for (size_t i = 0; i < p_needle.size(); i++) {
-			const token_t t = m_needle_vocabulary_token_ids[i];
+			const token_t t = m_needle_vocabulary_token_ids(i);
 			if (t >= 0) {
 				token_t mapped = -1;
 				token_t r = t;
 				for (const auto &x : p_vocabulary_to_embedding.unpack()) {
-					if (r < x.rows()) {
+					if (r < static_cast<ssize_t>(x.shape(0))) {
 						mapped = x[r];
 						break;
 					} else {
-						r -= x.rows();
+						r -= x.shape(0);
 					}
 				}
 				PPK_ASSERT(mapped >= 0);
-				m_needle_embedding_token_ids[i] = mapped; // map to Embedding token ids
+				m_needle_embedding_token_ids(i) = mapped; // map to Embedding token ids
 			} else {
-				m_needle_embedding_token_ids[i] = -1;
+				m_needle_embedding_token_ids(i) = -1;
 			}
 		}
 	}

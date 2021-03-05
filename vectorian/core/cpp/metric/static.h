@@ -11,18 +11,18 @@ protected:
 	const py::dict m_alignment_def;
 
 	xt::xtensor<float, 2> m_similarity;
-	ArrayXf m_mag_s;
-	ArrayXf m_mag_t;
+	xt::xtensor<float, 1> m_mag_s;
+	xt::xtensor<float, 1> m_mag_t;
 
 	void compute_magnitudes(
 		const WordVectors &p_embeddings,
 		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		const Needle &p_needle) {
 
-		m_mag_s.resize(p_vocabulary_to_embedding.size());
+		m_mag_s.resize({p_vocabulary_to_embedding.size()});
 		p_vocabulary_to_embedding.iterate([&] (const auto &x, const size_t offset) {
-			const size_t n = static_cast<size_t>(x.rows());
-			PPK_ASSERT(offset + n <= static_cast<size_t>(m_mag_s.rows()));
+			const size_t n = static_cast<size_t>(x.shape(0));
+			PPK_ASSERT(offset + n <= static_cast<size_t>(m_mag_s.shape(0)));
 			for (size_t i = 0; i < n; i++) {
 				const token_t k = x(i);
 				if (k >= 0) {
@@ -34,7 +34,7 @@ protected:
 			}
 		});
 
-		m_mag_t.resize(p_needle.size());
+		m_mag_t.resize({p_needle.size()});
 		for (size_t j = 0; j < p_needle.size(); j++) {
 			const token_t k = p_needle.embedding_token_ids()[j];
 			if (k >= 0) {

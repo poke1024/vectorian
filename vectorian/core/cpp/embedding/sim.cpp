@@ -95,7 +95,7 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 
 	const size_t vocab_size = p_vocabulary_to_embedding.size();
 	//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
-	r_matrix.resize({vocab_size, static_cast<size_t>(p_needle.embedding_token_ids().rows())});
+	r_matrix.resize({vocab_size, static_cast<size_t>(p_needle.embedding_token_ids().shape(0))});
 
 	p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
 		fill_matrix(

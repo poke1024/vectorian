@@ -69,8 +69,8 @@ public:
 		const size_t j0,
 		xt::xtensor<float, 2> &r_matrix) const {
 
-		const size_t n = p_a.rows();
-		const size_t m = p_b.rows();
+		const size_t n = p_a.shape(0);
+		const size_t m = p_b.shape(0);
 
 		/*std::cout << "r_matrix: (" << r_matrix.rows() << ", " << r_matrix.cols() << ")\n";
 		std::cout << "i0, n, i0 + n: " << i0 << ", " << n << ", " << (i0 + n) << "\n";
@@ -109,9 +109,9 @@ public:
 };
 
 inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
-	const size_t n = p_a.rows();
+	const size_t n = p_a.shape(0);
 	TokenIdArray filtered_a;
-	filtered_a.resize(n);
+	filtered_a.resize({n});
 	size_t k = 0;
 	for (size_t i = 0; i < n; i++) {
 		const token_t s = p_a[i];
@@ -119,7 +119,7 @@ inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
 			filtered_a[k++] = s;
 		}
 	}
-	filtered_a.resize(k);
+	filtered_a.reshape({k});
 	return filtered_a;
 }
 
@@ -150,18 +150,18 @@ public:
 		const py::dict vectors = m_embeddings.to_py();
 
 		py::array_t<float> output;
-		output.resize({filtered_a.rows(), filtered_b.rows()});
+		output.resize({filtered_a.shape(0), filtered_b.shape(0)});
 
 		m_callback(
 			vectors,
-			to_py_array(filtered_a),
-			to_py_array(filtered_b),
+			xt::pyarray<token_t>(filtered_a),
+			xt::pyarray<token_t>(filtered_b),
 			output);
 
 		const auto r_output = output.unchecked<2>();
 
-		const size_t n = p_a.rows();
-		const size_t m = p_b.rows();
+		const size_t n = p_a.shape(0);
+		const size_t m = p_b.shape(0);
 
 		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.shape(0)));
 		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.shape(1)));
