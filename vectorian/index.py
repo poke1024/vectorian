@@ -45,6 +45,10 @@ class Query:
 		token_table = TokenTable(self._index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
+		# make sure all core.Documents are instantiated at this point so that
+		# the interval vocabulary is setup and complete.
+		self._index.session.c_documents
+
 		query = core.Query(self._vocab)
 		query.initialize(
 			token_table.to_arrow(),

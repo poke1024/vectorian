@@ -31,6 +31,8 @@ public:
 	inline void append(const std::vector<token_t> &p_mapping) {
 		m_vocabulary_to_embedding.push_back(xt::adapt(
 			const_cast<token_t*>(p_mapping.data()), {p_mapping.size()}));
+		/*std::cout << "adding vocab mapping with size " <<
+			p_mapping.size() << ", total size now: " << this->size() << "\n";*/
 	}
 
 	inline size_t size() const {
@@ -213,6 +215,7 @@ public:
 		const size_t i0 = p_map.size();
 		const size_t i1 = p_tokens.size();
 		PPK_ASSERT(i0 <= i1);
+		//std::cout << "update_map called on " << this << ": " << i0 << ", " << i1 << "\n";
 		if (i0 == i1) {
 			return;
 		}
