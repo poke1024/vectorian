@@ -1,18 +1,6 @@
 [submodule "lib/ppk_assert"]
 	path = lib/ppk_assert
 	url = https://github.com/gpakosz/PPK_ASSERT
-[submodule "lib/eigen"]
-	path = lib/eigen
-	url = https://gitlab.com/libeigen/eigen
 [submodule "lib/pot"]
 	path = lib/pot
 	url = https://github.com/PythonOT/POT
-[submodule "lib/libfort"]
-	path = lib/libfort
-	url = https://github.com/seleznevae/libfort
-[submodule "lib/xtensor"]
-	path = lib/xtensor
-	url = https://github.com/xtensor-stack/xtensor
-[submodule "lib/xtensor-python"]
-	path = lib/xtensor-python
-	url = https://github.com/xtensor-stack/xtensor-python
