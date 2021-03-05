@@ -9,7 +9,10 @@ struct Cosine {
 
 		//PPK_ASSERT(p_s >= 0 && p_s < p_vectors.normalized.rows());
 		//PPK_ASSERT(p_t >= 0 && p_t < p_vectors.normalized.rows());
-		return p_vectors.normalized.row(p_s).dot(p_vectors.normalized.row(p_t));
+
+		auto s = xt::view(p_vectors.normalized, p_s, xt::all());
+		auto t = xt::view(p_vectors.normalized, p_t, xt::all());
+		return xt::linalg::dot(s, t)();
 	}
 };
 
@@ -19,9 +22,10 @@ struct ZhuCosine { // Zhu et al.
 		const token_t p_s,
 		const token_t p_t) const {
 
-		const float num = (p_vectors.normalized.row(p_s) * p_vectors.normalized.row(p_t)).array().sqrt().sum();
+		/*const float num = (p_vectors.normalized.row(p_s) * p_vectors.normalized.row(p_t)).array().sqrt().sum();
 		const float denom = p_vectors.normalized.row(p_s).sum() * p_vectors.normalized.row(p_t).sum();
-		return num / denom;
+		return num / denom;*/
+		return 0.0f; // FIXME
 	}
 };
 
@@ -31,9 +35,10 @@ struct SohangirCosine { // Sohangir & Wang
 		const token_t p_s,
 		const token_t p_t) const {
 
-		const float num = (p_vectors.unmodified.row(p_s) * p_vectors.unmodified.row(p_t)).array().sqrt().sum();
+		/*const float num = (p_vectors.unmodified.row(p_s) * p_vectors.unmodified.row(p_t)).array().sqrt().sum();
 		const float denom = std::sqrt(p_vectors.normalized.row(p_s).sum()) * std::sqrt(p_vectors.normalized.row(p_t).sum());
-		return num / denom;
+		return num / denom;*/
+		return 0.0f; // FIXME
 	}
 };
 
@@ -49,9 +54,10 @@ struct PNorm {
 		const token_t p_s,
 		const token_t p_t) const {
 
-		const auto uv = p_vectors.unmodified.row(p_s) - p_vectors.unmodified.row(p_t);
-		const float distance = pow(uv.cwiseAbs().array().pow(m_p).sum(), 1.0f / m_p);
-		return std::max(0.0f, 1.0f - distance * m_distance_scale);
+		const auto s = xt::view(p_vectors.normalized, p_s, xt::all());
+		const auto t = xt::view(p_vectors.normalized, p_t, xt::all());
+		const float d = xt::sum(xt::pow(xt::abs(s - t), m_p))();
+		return std::max(0.0f, 1.0f - std::pow(d, 1.0f / m_p) * m_distance_scale);
 	}
 };
 
@@ -83,13 +89,13 @@ SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 void SimilarityMatrixBuilder::build_similarity_matrix(
 	const VocabularyToEmbedding &p_vocabulary_to_embedding,
 	const Needle &p_needle,
-	MatrixXf &r_matrix) const {
+	xt::xtensor<float, 2> &r_matrix) const {
 
 	py::gil_scoped_release release;
 
 	const size_t vocab_size = p_vocabulary_to_embedding.size();
 	//std::cout << "resizing matrix " << vocab_size << " x " << needle_embedding_token_ids.rows() << "\n";
-	r_matrix.resize(vocab_size, p_needle.embedding_token_ids().rows());
+	r_matrix.resize({vocab_size, static_cast<size_t>(p_needle.embedding_token_ids().rows())});
 
 	p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
 		fill_matrix(

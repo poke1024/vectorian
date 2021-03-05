@@ -93,6 +93,7 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'embedding/sim.cpp',
 	'metric/static.cpp',
 	'module.cpp',
 	'embedding/static.cpp',
@@ -104,7 +105,6 @@ cfg['sources'] = [
 	'document.cpp',
 	'query.cpp',
 	'vocabulary.cpp',
-	'embedding/sim.cpp',
 	'../../../lib/ppk_assert/src/ppk_assert.cpp']
 
 if platform.system() == 'Darwin':  # >= macOS 10.14.6

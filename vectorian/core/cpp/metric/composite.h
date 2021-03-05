@@ -7,7 +7,7 @@ class MinMaxMetric : public StaticEmbeddingMetric {
 	const StaticEmbeddingMetricRef m_a;
 	const StaticEmbeddingMetricRef m_b;
 	std::string m_name;
-	Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> m_is_from_a;
+	xt::xtensor<bool, 2>  m_is_from_a;
 
 public:
 	template<typename F>
@@ -22,8 +22,8 @@ public:
 		m_a(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_a)),
 		m_b(std::dynamic_pointer_cast<StaticEmbeddingMetric>(p_b)) {
 
-		this->m_similarity = m_a->similarity().cwiseMax(m_b->similarity());
-		m_is_from_a = this->m_similarity.cwiseEqual(m_a->similarity());
+		this->m_similarity = p_f(m_a->similarity(), m_b->similarity());
+		m_is_from_a = xt::equal(this->m_similarity, m_a->similarity());
 
 		std::ostringstream s;
 		s << p_name << "(" << m_a->name() << ", " << m_b->name() << ")";
@@ -45,7 +45,7 @@ public:
 	MaxMetric(
 		const MetricRef &p_a,
 		const MetricRef &p_b) : MinMaxMetric(p_a, p_b, [] (const auto &a, const auto &b) {
-			return a.cwiseMax(b);
+			return xt::maximum(a, b);
 		}, "max") {
 	}
 };
@@ -58,7 +58,7 @@ public:
 	MinMetric(
 		const MetricRef &p_a,
 		const MetricRef &p_b) : MinMaxMetric(p_a, p_b, [] (const auto &a, const auto &b) {
-			return a.cwiseMin(b);
+			return xt::minimum(a, b);
 		}, "min") {
 	}
 };

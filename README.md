@@ -1,6 +1,7 @@
 conda install -c conda-forge xtl
 conda install -c conda-forge xtensor
 conda install -c conda-forge xsimd
+conda install -c conda-forge xtensor-blas
 conda install -c conda-forge xtensor-python
 
 

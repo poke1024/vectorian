@@ -143,7 +143,7 @@ public:
 
 		// note: these "raw" tables were already normalized in preprocessing.
 
-		m_embeddings.unmodified.resize(m_tokens.size(), table->num_columns() - 1);
+		m_embeddings.unmodified.resize({m_tokens.size(), static_cast<size_t>(table->num_columns() - 1)});
 		/*std::cout << "table size: " << table->num_rows() << " x " << table->num_columns() << "\n";
 		std::cout << "m_tokens.size(): " << m_tokens.size() << "\n";
 		std::cout << std::flush;*/
@@ -156,7 +156,7 @@ public:
 
 			for_each_column<arrow::FloatType, float>(table, [this] (size_t i, auto v, size_t offset) {
 				PPK_ASSERT(i > 0 && offset + v.size() <= m_tokens.size());
-				m_embeddings.unmodified.col(i - 1)(Eigen::seq(offset, v.size())) = v;
+				xt::view(m_embeddings.unmodified, xt::range(offset, offset + v.size()), i - 1) = v;
 			}, 1);
 		} catch(...) {
 			printf("failed to load embedding vectors parquet table.\n");
@@ -247,7 +247,7 @@ public:
 	}
 
 	size_t n_tokens() const {
-		return m_embeddings.unmodified.rows();
+		return m_embeddings.unmodified.shape(0);
 	}
 
 	py::list measures() const {

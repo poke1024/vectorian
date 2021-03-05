@@ -2,6 +2,7 @@
 #define __VECTORIAN_UTILS_H__
 
 #include "common.h"
+#include <xtensor/xadapt.hpp>
 
 #if PYARROW_0_12_1
 inline auto column_data(const std::shared_ptr<arrow::Column> &c) {
@@ -187,10 +188,7 @@ void for_each_column(
             ensure_type<ArrowType>(array);
 
             auto num_array = std::static_pointer_cast<arrow::NumericArray<ArrowType>>(array);
-
-            const Eigen::Map<Eigen::Array<CType, Eigen::Dynamic, 1>> v(
-                const_cast<CType*>(num_array->raw_values()), num_array->length());
-
+			auto v = xt::adapt(const_cast<CType*>(num_array->raw_values()), {num_array->length()});
             p_f(i, v, offset);
 
             offset += num_array->length();

@@ -18,6 +18,5 @@ import cppimport.import_hook
 from .cpp.core import *
 
 init_pyarrow()
-run_sanity_checks()
 
 logging.debug("cpp core: imported.")

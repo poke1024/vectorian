@@ -25,12 +25,12 @@ public:
 		const TokenIdArray &p_b,
 		const size_t i0,
 		const size_t j0,
-		MatrixXf &r_matrix) const = 0;
+		xt::xtensor<float, 2> &r_matrix) const = 0;
 
 	void build_similarity_matrix(
 		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		const Needle &p_needle,
-		MatrixXf &r_matrix) const;
+		xt::xtensor<float, 2> &r_matrix) const;
 };
 
 typedef std::shared_ptr<SimilarityMatrixBuilder> SimilarityMatrixBuilderRef;
@@ -67,7 +67,7 @@ public:
 		const TokenIdArray &p_b,
 		const size_t i0,
 		const size_t j0,
-		MatrixXf &r_matrix) const {
+		xt::xtensor<float, 2> &r_matrix) const {
 
 		const size_t n = p_a.rows();
 		const size_t m = p_b.rows();
@@ -76,12 +76,12 @@ public:
 		std::cout << "i0, n, i0 + n: " << i0 << ", " << n << ", " << (i0 + n) << "\n";
 		std::cout << "j0, m, j0 + m: " << j0 << ", " << m << ", " << (j0 + m) << "\n";*/
 
-		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.rows()));
-		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.cols()));
+		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.shape(0)));
+		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.shape(1)));
 
 		for (size_t i = 0; i < n; i++) { // e.g. for each token in Vocabulary
 			const token_t s = p_a[i];
-			auto row = r_matrix.row(i + i0);
+			auto row = xt::view(r_matrix, i + i0, xt::all());
 
 			if (s >= 0) {
 				for (size_t j = 0; j < m; j++) { // e.g. for each token in needle
@@ -102,7 +102,7 @@ public:
 
 			} else { // token in Vocabulary, but not in Embedding
 
-				row.setZero();
+				row.fill(0.0f);
 			}
 		}
 	}
@@ -140,7 +140,7 @@ public:
 		const TokenIdArray &p_b,
 		const size_t i0,
 		const size_t j0,
-		MatrixXf &r_matrix) const {
+		xt::xtensor<float, 2> &r_matrix) const {
 
 		py::gil_scoped_acquire acquire;
 
@@ -163,12 +163,12 @@ public:
 		const size_t n = p_a.rows();
 		const size_t m = p_b.rows();
 
-		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.rows()));
-		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.cols()));
+		PPK_ASSERT(i0 + n <= static_cast<size_t>(r_matrix.shape(0)));
+		PPK_ASSERT(j0 + m <= static_cast<size_t>(r_matrix.shape(1)));
 
 		size_t u = 0;
 		for (size_t i = 0; i < n; i++) {
-			auto row = r_matrix.row(i + i0);
+			auto row = xt::view(r_matrix, i + i0, xt::all());
 			const token_t s = p_a[i];
 
 			if (s >= 0) {
@@ -184,7 +184,7 @@ public:
 
 				u++;
 			} else {
-				row.setZero();
+				row.fill(0.0f);
 			}
 		}
 	}

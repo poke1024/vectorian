@@ -10,7 +10,7 @@ protected:
 	const py::dict m_options;
 	const py::dict m_alignment_def;
 
-	MatrixXf m_similarity;
+	xt::xtensor<float, 2> m_similarity;
 	ArrayXf m_mag_s;
 	ArrayXf m_mag_t;
 
@@ -26,7 +26,8 @@ protected:
 			for (size_t i = 0; i < n; i++) {
 				const token_t k = x(i);
 				if (k >= 0) {
-					m_mag_s(offset + i) = p_embeddings.unmodified.row(k).norm();
+					const auto row = xt::view(p_embeddings.unmodified, k, xt::all());
+					m_mag_s(offset + i) = xt::linalg::norm(row);
 				} else {
 					m_mag_s(offset + i) = 0.0f;
 				}
@@ -37,7 +38,8 @@ protected:
 		for (size_t j = 0; j < p_needle.size(); j++) {
 			const token_t k = p_needle.embedding_token_ids()[j];
 			if (k >= 0) {
-				m_mag_t(j) = p_embeddings.unmodified.row(k).norm();
+				const auto row = xt::view(p_embeddings.unmodified, k, xt::all());
+				m_mag_t(j) = xt::linalg::norm(row);
 			} else {
 				m_mag_t(j) = 0.0f;
 			}
@@ -75,7 +77,7 @@ public:
 
 		if (p_sent_metric_def.contains("similarity_falloff")) {
 			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
-			m_similarity = m_similarity.array().pow(similarity_falloff);
+			m_similarity = xt::pow(m_similarity, similarity_falloff);
 		}
 
 		// FIXME do not do this always.
@@ -89,7 +91,7 @@ public:
 		return m_options;
 	}
 
-	inline const MatrixXf &similarity() const {
+	inline const xt::xtensor<float, 2> &similarity() const {
 		return m_similarity;
 	}
 
