@@ -106,7 +106,7 @@ TokenVectorRef unpack_tokens(
 }
 
 MetricRef QueryVocabulary::create_metric(
-	const std::vector<Token> &p_needle,
+	const QueryRef &p_query,
 	const py::dict &p_sent_metric_def,
 	const py::dict &p_word_metric_def) {
 
@@ -119,21 +119,21 @@ MetricRef QueryVocabulary::create_metric(
 	if (metric_def.name == "lerp") {
 
 		return std::make_shared<LerpMetric>(
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
 			metric_def.options["t"].cast<float>());
 
 	} else if (metric_def.name == "min") {
 
 		return std::make_shared<MinMetric>(
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 	} else if (metric_def.name == "max") {
 
 		return std::make_shared<MaxMetric>(
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_needle, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
+			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
 	} else {
 
@@ -149,9 +149,9 @@ MetricRef QueryVocabulary::create_metric(
 		vocabulary_to_embedding.append(get_embedding_map(it->second));
 
 		return m_embeddings[it->second].embedding->create_metric(
+			p_query,
 			metric_def,
 			p_sent_metric_def,
-			vocabulary_to_embedding,
-			p_needle);
+			vocabulary_to_embedding);
 	}
 }

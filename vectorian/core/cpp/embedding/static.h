@@ -43,52 +43,22 @@ public:
 };
 
 class Needle {
-	const std::vector<Token> &m_needle;
+	const QueryRef m_query;
+	const TokenVectorRef m_needle;
 	TokenIdArray m_needle_vocabulary_token_ids;
 	TokenIdArray m_needle_embedding_token_ids;
 
 public:
 	Needle(
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle) :
+		const QueryRef &p_query,
+		const VocabularyToEmbedding &p_vocabulary_to_embedding);
 
-		m_needle(p_needle) {
-
-		m_needle_vocabulary_token_ids.resize({p_needle.size()});
-		for (size_t i = 0; i < p_needle.size(); i++) {
-			m_needle_vocabulary_token_ids(i) = p_needle[i].id;
-		}
-
-		// p_a maps from a Vocabulary corpus token id to an Embedding token id,
-		// e.g. 3 in the corpus and 127 in the embedding.
-
-		// p_b are the needle's Vocabulary token ids (not yet mapped to Embedding)
-
-		m_needle_embedding_token_ids.resize({p_needle.size()});
-
-		for (size_t i = 0; i < p_needle.size(); i++) {
-			const token_t t = m_needle_vocabulary_token_ids(i);
-			if (t >= 0) {
-				token_t mapped = -1;
-				token_t r = t;
-				for (const auto &x : p_vocabulary_to_embedding.unpack()) {
-					if (r < static_cast<ssize_t>(x.shape(0))) {
-						mapped = x[r];
-						break;
-					} else {
-						r -= x.shape(0);
-					}
-				}
-				PPK_ASSERT(mapped >= 0);
-				m_needle_embedding_token_ids(i) = mapped; // map to Embedding token ids
-			} else {
-				m_needle_embedding_token_ids(i) = -1;
-			}
-		}
+	const QueryRef &query() const {
+		return m_query;
 	}
 
 	const size_t size() const {
-		return m_needle.size();
+		return m_needle->size();
 	}
 
 	const TokenIdArray &vocabulary_token_ids() const {
@@ -189,10 +159,10 @@ public:
 	}
 
 	virtual MetricRef create_metric(
+		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle);
+		const VocabularyToEmbedding &p_vocabulary_to_embedding);
 
 	py::dict py_vectors() const {
 		return m_embeddings.to_py();

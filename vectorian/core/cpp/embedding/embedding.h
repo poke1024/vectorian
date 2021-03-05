@@ -22,10 +22,10 @@ public:
 		const size_t p_offset) const = 0;
 
 	virtual MetricRef create_metric(
+		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle) = 0;
+		const VocabularyToEmbedding &p_vocabulary_to_embedding) = 0;
 
 	const std::string &name() const {
 		return m_name;

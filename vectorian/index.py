@@ -45,11 +45,12 @@ class Query:
 		token_table = TokenTable(self._index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
-		return core.Query(
-			self._vocab,
+		query = core.Query(self._vocab)
+		query.initialize(
 			token_table.to_arrow(),
 			token_table.normalized_tokens,
 			**self._options)
+		return query
 
 
 Region = namedtuple('Region', [
@@ -201,13 +202,15 @@ class Index:
 
 	def find(
 		self, text,
-		n=10, min_score=0.2,
+		n=10, min_score=0.2, debug=None,
 		options: dict = dict()):
 
 		options = options.copy()
 
 		options["max_matches"] = n
 		options["min_score"] = min_score
+		if debug is not None:
+			options["debug"] = debug
 		options["partition"] = self._partition.to_args()
 
 		metric_args = self._metric.to_args(self._partition)

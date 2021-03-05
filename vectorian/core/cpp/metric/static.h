@@ -53,37 +53,11 @@ public:
 	}
 
 	StaticEmbeddingMetric(
+		const QueryRef &p_query,
 		const StaticEmbeddingRef &p_embedding,
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
-		const std::vector<Token> &p_needle) :
-
-		m_embedding(p_embedding),
-		m_options(p_sent_metric_def),
-		m_alignment_def(m_options["alignment"].cast<py::dict>()) {
-
-		const auto builder = p_metric.instantiate(
-			p_embedding->embeddings());
-
-		const Needle needle(p_vocabulary_to_embedding, p_needle);
-
-		builder->build_similarity_matrix(
-			p_vocabulary_to_embedding,
-			needle,
-			m_similarity);
-
-		if (p_sent_metric_def.contains("similarity_falloff")) {
-			const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
-			m_similarity = xt::pow(m_similarity, similarity_falloff);
-		}
-
-		// FIXME do not do this always.
-		compute_magnitudes(
-			p_embedding->embeddings(),
-			p_vocabulary_to_embedding,
-			needle);
-	}
+		const VocabularyToEmbedding &p_vocabulary_to_embedding);
 
 	inline const py::dict &options() const {
 		return m_options;

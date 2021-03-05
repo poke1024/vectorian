@@ -5,6 +5,48 @@
 #include "metric/alignment.h"
 #include "metric/factory.h"
 
+StaticEmbeddingMetric::StaticEmbeddingMetric(
+	const QueryRef &p_query,
+	const StaticEmbeddingRef &p_embedding,
+	const WordMetricDef &p_metric,
+	const py::dict &p_sent_metric_def,
+	const VocabularyToEmbedding &p_vocabulary_to_embedding) :
+
+	m_embedding(p_embedding),
+	m_options(p_sent_metric_def),
+	m_alignment_def(m_options["alignment"].cast<py::dict>()) {
+
+	const auto builder = p_metric.instantiate(
+		p_embedding->embeddings());
+
+	const Needle needle(p_query, p_vocabulary_to_embedding);
+
+	builder->build_similarity_matrix(
+		needle,
+		p_vocabulary_to_embedding,
+		m_similarity);
+
+	if (p_sent_metric_def.contains("similarity_falloff")) {
+		const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
+		m_similarity = xt::pow(m_similarity, similarity_falloff);
+	}
+
+	std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
+
+	if (p_query->debug_hook().has_value()) {
+		py::dict args;
+		args[py::str("hook")] = "sim_matrix";
+		args[py::str("matrix")] = xt::pyarray<float>(m_similarity);
+		(*p_query->debug_hook())(args);
+	}
+
+	// FIXME do not do this always.
+	compute_magnitudes(
+		p_embedding->embeddings(),
+		p_vocabulary_to_embedding,
+		needle);
+}
+
 std::vector<float> parse_tag_weights(
 	const QueryRef &p_query,
 	py::dict tag_weights) {

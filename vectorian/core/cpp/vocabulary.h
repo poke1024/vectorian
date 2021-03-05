@@ -372,6 +372,10 @@ public:
 		//std::cout << "destroying query vocabulary at " << this << "\n";
 	}
 
+	inline const VocabularyRef &base() const {
+		return m_vocab;
+	}
+
 	inline size_t size() const {
 		return m_tokens->size();
 	}
@@ -408,7 +412,7 @@ public:
 	}
 
 	MetricRef create_metric(
-		const std::vector<Token> &p_needle,
+		const QueryRef &p_query,
 		const py::dict &p_sent_metric_def,
 		const py::dict &p_word_metric_def);
 

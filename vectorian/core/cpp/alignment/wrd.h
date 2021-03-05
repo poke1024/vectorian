@@ -311,8 +311,12 @@ class WRD {
 
 		data[py::str("success")] = success;
 
+		py::dict args;
+		args[py::str("hook")] = "alignment_wrd";
+		args[py::str("data")] = data;
+
 		const auto callback = *p_query->debug_hook();
-		callback(data);
+		callback(args);
 
 		/*const auto fmt_matrix = [&] (const MappedMatrixXf &data) {
 			fort::char_table table;
@@ -373,7 +377,7 @@ public:
 		for (size_t i = 0; i < len_s; i++) {
 			for (size_t j = 0; j < len_t; j++) {
 				cost(i, j) = 1.0f - slice.similarity(i, j);
-				outfile << cost(i, j) << "\n";
+				outfile << cost(i, j) << "; " << slice.similarity(i, j) << "\n";
 			}
 		}
 

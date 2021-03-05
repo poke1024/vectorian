@@ -87,8 +87,8 @@ SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 }
 
 void SimilarityMatrixBuilder::build_similarity_matrix(
-	const VocabularyToEmbedding &p_vocabulary_to_embedding,
 	const Needle &p_needle,
+	const VocabularyToEmbedding &p_vocabulary_to_embedding,
 	xt::xtensor<float, 2> &r_matrix) const {
 
 	py::gil_scoped_release release;
@@ -116,5 +116,4 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 			r_matrix(k, j) = 1.0f;
 		}
 	}
-
 }

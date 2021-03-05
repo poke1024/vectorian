@@ -28,8 +28,8 @@ public:
 		xt::xtensor<float, 2> &r_matrix) const = 0;
 
 	void build_similarity_matrix(
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		const Needle &p_needle,
+		const VocabularyToEmbedding &p_vocabulary_to_embedding,
 		xt::xtensor<float, 2> &r_matrix) const;
 };
 

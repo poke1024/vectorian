@@ -64,14 +64,16 @@ class Query : public std::enable_shared_from_this<Query> {
 	std::optional<py::object> m_debug_hook;
 
 public:
-	Query(
-		VocabularyRef p_vocab,
-		const py::object &p_tokens_table,
-		const py::list &p_tokens_strings,
-		py::kwargs p_kwargs) :
+	Query(VocabularyRef p_vocab) :
 
 		m_vocab(std::make_shared<QueryVocabulary>(p_vocab)),
 		m_aborted(false) {
+	}
+
+	void initialize(
+		const py::object &p_tokens_table,
+		const py::list &p_tokens_strings,
+		py::kwargs p_kwargs) {
 
 		// FIXME: assert that we are in main thread here.
 
@@ -79,7 +81,7 @@ public:
 		    unwrap_table(p_tokens_table.ptr()));
 
 		m_t_tokens = unpack_tokens(
-			p_vocab, table, p_tokens_strings);
+			m_vocab, table, p_tokens_strings);
 
 		m_py_t_tokens = to_py_array(m_t_tokens);
 
@@ -120,12 +122,12 @@ public:
             false;
 
 		m_token_filter.pos = parse_filter_mask(p_kwargs, "pos_filter",
-			[&p_vocab] (const std::string &s) -> int {
-				return p_vocab->unsafe_pos_id(s);
+			[this] (const std::string &s) -> int {
+				return m_vocab->base()->unsafe_pos_id(s);
 			});
 		m_token_filter.tag = parse_filter_mask(p_kwargs, "tag_filter",
-			[&p_vocab] (const std::string &s) -> int {
-				return p_vocab->unsafe_tag_id(s);
+			[this] (const std::string &s) -> int {
+				return m_vocab->base()->unsafe_tag_id(s);
 			});
 
 		m_max_matches = (p_kwargs && p_kwargs.contains("max_matches")) ?
@@ -140,7 +142,7 @@ public:
 			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
 			m_metrics.push_back(m_vocab->create_metric(
-				*m_t_tokens.get(),
+				shared_from_this(),
 				metric_def_dict,
 				metric_def_dict["word_metric"]));
 		}
