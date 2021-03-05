@@ -10,15 +10,10 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include <pybind11/eigen.h>
 
 #include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <arrow/python/pyarrow.h>
-
-#include <Eigen/Core>
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
 
 #include <vector>
 #include <set>
@@ -28,11 +23,6 @@
 
 
 namespace py = pybind11;
-
-static_assert(
-	std::make_tuple<int, int, int>(EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION) >=
-		std::make_tuple<int, int, int>(3, 3, 90),
-	"Vectorian requires Eigen >= 3.3.90"); // this is a dev version as of 2021-02-15
 
 typedef int32_t token_t;
 typedef int32_t wvec_t;

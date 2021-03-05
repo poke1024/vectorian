@@ -32,8 +32,6 @@ struct WordVectors {
 		d[py::str("normalized")] = xt::pyarray<float>(normalized);
 		return d;
 	}
-
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 #endif // __VECTORIAN_WORD_VECTORS_H__

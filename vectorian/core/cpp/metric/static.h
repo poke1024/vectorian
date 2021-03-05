@@ -47,8 +47,6 @@ protected:
 	}
 
 public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
 	StaticEmbeddingMetric(const py::dict &p_sent_metric_def) :
 		m_options(p_sent_metric_def),
 		m_alignment_def(m_options["alignment"].cast<py::dict>()){

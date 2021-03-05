@@ -1,9 +1,6 @@
 // Author: Bernhard Liebl, 2020
 // Released under a MIT license.
 
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
-
 // Aligner always computes one best alignment, but there
 // might be multiple such alignments.
 
@@ -55,8 +52,8 @@ private:
 	const size_t _max_len_s;
 	const size_t _max_len_t;
 
-	Eigen::Tensor<SimilarityScore, 2> _values;
-	Eigen::Tensor<std::pair<Index, Index>, 2> _traceback;
+	xt::xtensor<SimilarityScore, 2> _values;
+	xt::xtensor<std::pair<Index, Index>, 2> _traceback;
 
 	SimilarityScore _best_score;
 	std::vector<Index> _best_match;
@@ -118,8 +115,8 @@ public:
 		_max_len_s(max_len_s),
 		_max_len_t(max_len_t) {
 
-		_values.resize(max_len_s, max_len_t);
-		_traceback.resize(max_len_s, max_len_t);
+		_values.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t)});
+		_traceback.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t)});
 		_best_match.reserve(max_len_t);
 	}
 

@@ -99,9 +99,9 @@ class OptimalTransport {
 	// EMD_wrap itself is a port of
 	// https://github.com/PythonOT/POT/blob/master/ot/lp/EMD_wrapper.cpp
 
-	Eigen::MatrixXf m_G_storage;
-	Eigen::VectorXf m_alpha_storage;
-	Eigen::VectorXf m_beta_storage;
+	xt::xtensor<float, 2> m_G_storage;
+	xt::xtensor<float, 1> m_alpha_storage;
+	xt::xtensor<float, 1> m_beta_storage;
 
 	/*enum ProblemType {
 		INFEASIBLE,
@@ -114,12 +114,12 @@ class OptimalTransport {
     typedef lemon::FullBipartiteDigraph Digraph;
     DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
 
-	template<typename Vector, typename Matrix>
+	template<typename Vector, typename VectorOut, typename MatrixD, typename MatrixG>
 	std::tuple<bool, float> EMD_wrap(
 		const int n1, const int n2,
 		const Vector &X, const Vector &Y,
-		const Matrix &D, Matrix &G,
-        Vector &alpha, Vector &beta,
+		const MatrixD &D, MatrixG &G,
+        VectorOut &alpha, VectorOut &beta,
         const int maxIter) {
 
 	    int n, m, cur;
@@ -211,19 +211,20 @@ class OptimalTransport {
 
 public:
 	void resize(const size_t max_n1, const size_t max_n2) {
-		m_G_storage.resize(max_n1, max_n2);
-		m_alpha_storage.resize(max_n1);
-		m_beta_storage.resize(max_n2);
+		m_G_storage.resize({max_n1, max_n2});
+		m_alpha_storage.resize({max_n1});
+		m_beta_storage.resize({max_n2});
 	}
 
+	template<typename Matrix>
 	struct Result {
 		bool success;
 		float opt_cost;
-		xt::xtensor<float, 2> G; // FIXME
+		Matrix G;
 	};
 
 	template<typename Vector, typename Matrix>
-	inline Result emd_c(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter) {
+	inline auto emd_c(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter) {
 	    const size_t n1 = M.shape(0);
 	    const size_t n2 = M.shape(1);
 	    //const size_t nmax = n1 + n2 - 1;
@@ -231,24 +232,12 @@ public:
 		PPK_ASSERT(a.shape(0) == M.shape(0));
 		PPK_ASSERT(b.shape(0) == M.shape(1));
 
-	    PPK_ASSERT(n1 <= static_cast<size_t>(m_alpha_storage.rows()));
-	    PPK_ASSERT(n2 <= static_cast<size_t>(m_beta_storage.rows()));
+	    PPK_ASSERT(n1 <= static_cast<size_t>(m_alpha_storage.shape(0)));
+	    PPK_ASSERT(n2 <= static_cast<size_t>(m_beta_storage.shape(0)));
 
-	    /*auto G = MappedMatrixXf(&m_G_storage(0, 0), n1, n2);
-	    G.setZero();
-
-	    auto alpha = MappedVectorXf(&m_alpha_storage(0), n1);
-	    alpha.setZero();
-
-	    auto beta = MappedVectorXf(&m_beta_storage(0), n2);
-	    beta.setZero();*/
-
-	    xt::xtensor<float, 2> G({n1, n2});
-		xt::xtensor<float, 1> alpha;
-		alpha.resize({n1});
-		xt::xtensor<float, 1> beta;
-		beta.resize({n2});
-		// FIXME
+	    auto G = xt::view(m_G_storage, xt::range(0, n1), xt::range(0, n2));
+	    auto alpha = xt::view(m_alpha_storage, xt::range(0, n1));
+	    auto beta = xt::view(m_beta_storage, xt::range(0, n2));
 
 	    G.fill(0.0f);
 	    alpha.fill(0.0f);
@@ -260,11 +249,11 @@ public:
             M, G,
             alpha, beta, max_iter);
 
-        return Result{std::get<0>(r), std::get<1>(r), G};
+        return Result<decltype(G)>{std::get<0>(r), std::get<1>(r), G};
 	}
 
 	template<typename Vector, typename Matrix>
-	inline Result emd2(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter=100000) {
+	inline auto emd2(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter=100000) {
 		return emd_c(a, b, M, max_iter);
 	}
 };
@@ -274,17 +263,17 @@ template<typename Index>
 class WRD {
 	std::vector<Index> m_match;
 
-	Eigen::VectorXf m_mag_s_storage;
-	Eigen::VectorXf m_mag_t_storage;
-	Eigen::MatrixXf m_cost_storage;
+	xt::xtensor<float, 1> m_mag_s_storage;
+	xt::xtensor<float, 1> m_mag_t_storage;
+	xt::xtensor<float, 2> m_cost_storage;
 	OptimalTransport m_ot;
 
-	template<typename Slice, typename Vector, typename Matrix>
+	template<typename Slice, typename Vector, typename MatrixD, typename MatrixG>
 	inline void call_debug_hook(
 		const QueryRef &p_query, const Slice &slice,
 		const int len_s, const int len_t,
 		const Vector &mag_s, const Vector &mag_t,
-		const Matrix &D, const Matrix &G,
+		const MatrixD &D, const MatrixG &G,
 		const bool success) {
 
 		py::gil_scoped_acquire acquire;
@@ -346,8 +335,8 @@ public:
 		const size_t len_s,
 		const size_t len_t) {
 
-		PPK_ASSERT(len_s <= static_cast<size_t>(m_cost_storage.rows()));
-		PPK_ASSERT(len_t <= static_cast<size_t>(m_cost_storage.cols()));
+		PPK_ASSERT(len_s <= static_cast<size_t>(m_cost_storage.shape(0)));
+		PPK_ASSERT(len_t <= static_cast<size_t>(m_cost_storage.shape(1)));
 
 		/*MappedVectorXf mag_s(
 			&m_mag_s_storage(0), len_s);
@@ -408,9 +397,9 @@ public:
 		const size_t max_len_s,
 		const size_t max_len_t) {
 
-		m_mag_s_storage.resize(max_len_s);
-		m_mag_t_storage.resize(max_len_t);
-		m_cost_storage.resize(max_len_s, max_len_t);
+		m_mag_s_storage.resize({max_len_s});
+		m_mag_t_storage.resize({max_len_t});
+		m_cost_storage.resize({max_len_s, max_len_t});
 		m_ot.resize(max_len_s, max_len_t);
 
 		m_match.reserve(max_len_t);

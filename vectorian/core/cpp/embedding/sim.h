@@ -119,8 +119,7 @@ inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
 			filtered_a[k++] = s;
 		}
 	}
-	filtered_a.reshape({k});
-	return filtered_a;
+	return xt::view(filtered_a, xt::range(0, k));
 }
 
 class CustomSimilarityMatrixBuilder : public SimilarityMatrixBuilder {

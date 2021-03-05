@@ -107,8 +107,6 @@ class StaticEmbedding : public Embedding {
 	std::map<std::string, SimilarityMatrixBuilderRef> m_similarity_measures;
 
 public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
 	StaticEmbedding(
 		const std::string &p_name,
 		py::object p_table) : Embedding(p_name) {

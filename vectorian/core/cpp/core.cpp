@@ -25,7 +25,6 @@ if platform.system() == 'Linux':
 	cfg['libraries'] = ['arrow', 'arrow_python']
 	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
-cfg['include_dirs'].append('../../../lib/eigen')
 #cfg['include_dirs'].append('../../../lib/xtensor/include')
 #cfg['include_dirs'].append('../../../lib/xtensor-python/include')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
@@ -93,8 +92,8 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
-	'embedding/sim.cpp',
 	'metric/static.cpp',
+	'embedding/sim.cpp',
 	'module.cpp',
 	'embedding/static.cpp',
 	'match/match.cpp',
