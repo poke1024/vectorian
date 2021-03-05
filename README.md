@@ -1,3 +1,9 @@
+conda install -c conda-forge xtl
+conda install -c conda-forge xtensor
+conda install -c conda-forge xsimd
+conda install -c conda-forge xtensor-python
+
+
 python >= 3.7
 
 http://martinweisser.org/corpora_site/diy_corpora.html

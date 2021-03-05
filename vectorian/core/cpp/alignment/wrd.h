@@ -219,18 +219,17 @@ public:
 	struct Result {
 		bool success;
 		float opt_cost;
-		//MappedMatrixXf G;
-		Eigen::MatrixXf G; // FIXME
+		xt::xtensor<float, 2> G; // FIXME
 	};
 
 	template<typename Vector, typename Matrix>
 	inline Result emd_c(const Vector &a, const Vector &b, const Matrix &M, const size_t max_iter) {
-	    const size_t n1 = M.rows();
-	    const size_t n2 = M.cols();
+	    const size_t n1 = M.shape(0);
+	    const size_t n2 = M.shape(1);
 	    //const size_t nmax = n1 + n2 - 1;
 
-		PPK_ASSERT(a.rows() == M.rows());
-		PPK_ASSERT(b.rows() == M.cols());
+		PPK_ASSERT(a.shape(0) == M.shape(0));
+		PPK_ASSERT(b.shape(0) == M.shape(1));
 
 	    PPK_ASSERT(n1 <= static_cast<size_t>(m_alpha_storage.rows()));
 	    PPK_ASSERT(n2 <= static_cast<size_t>(m_beta_storage.rows()));
@@ -244,16 +243,16 @@ public:
 	    auto beta = MappedVectorXf(&m_beta_storage(0), n2);
 	    beta.setZero();*/
 
-	    MatrixXf G;
-	    G.resize(n1, n2);
-	    VectorXf alpha;
-	    alpha.resize(n1);
-	    VectorXf beta;
-	    beta.resize(n2); // FIXME
+	    xt::xtensor<float, 2> G({n1, n2});
+		xt::xtensor<float, 1> alpha;
+		alpha.resize({n1});
+		xt::xtensor<float, 1> beta;
+		beta.resize({n2});
+		// FIXME
 
-	    G.setZero();
-	    alpha.setZero();
-	    beta.setZero();
+	    G.fill(0.0f);
+	    alpha.fill(0.0f);
+	    beta.fill(0.0f);
 
 		const auto r = EMD_wrap(
             n1, n2,
@@ -285,7 +284,8 @@ class WRD {
 		const QueryRef &p_query, const Slice &slice,
 		const int len_s, const int len_t,
 		const Vector &mag_s, const Vector &mag_t,
-		const Matrix &D, const Matrix &G) {
+		const Matrix &D, const Matrix &G,
+		const bool success) {
 
 		py::gil_scoped_acquire acquire;
 
@@ -309,11 +309,13 @@ class WRD {
 			return slice.t(i).id;
 		}, len_t);
 
-		data[py::str("mag_s")] = to_py_array(mag_s);
-		data[py::str("mag_t")] = to_py_array(mag_t);
+		data[py::str("mag_s")] = xt::pyarray<float>(mag_s);
+		data[py::str("mag_t")] = xt::pyarray<float>(mag_t);
 
-		data[py::str("D")] = to_py_array(D);
-		data[py::str("G")] = to_py_array(G);
+		data[py::str("D")] = xt::pyarray<float>(D);
+		data[py::str("G")] = xt::pyarray<float>(G);
+
+		data[py::str("success")] = success;
 
 		const auto callback = *p_query->debug_hook();
 		callback(data);
@@ -354,36 +356,48 @@ public:
 		MappedMatrixXf cost(
 			&m_cost_storage(0, 0), len_s, len_t);*/
 
-		VectorXf mag_s;
-		mag_s.resize(len_s);
-		VectorXf mag_t;
-		mag_t.resize(len_t);
-		MatrixXf cost;
-		cost.resize(len_s, len_t); // FIXME
+		xt::xtensor<float, 1> mag_s;
+		mag_s.resize({len_s});
+		xt::xtensor<float, 1> mag_t;
+		mag_t.resize({len_t});
+		xt::xtensor<float, 2> cost({len_s, len_t});
 
 		for (size_t i = 0; i < len_s; i++) {
 			mag_s(i) = slice.magnitude_s(i);
 		}
-		mag_s /= mag_s.sum();
+		mag_s /= xt::sum(mag_s);
 
 		for (size_t i = 0; i < len_t; i++) {
 			mag_t(i) = slice.magnitude_t(i);
 		}
-		mag_t /= mag_t.sum();
+		mag_t /= xt::sum(mag_t);
 
+		std::ofstream outfile;
+		outfile.open("/Users/arbeit/Desktop/debug_wrd.txt", std::ios_base::app);
+
+		outfile << "--- before:\n";
 		for (size_t i = 0; i < len_s; i++) {
 			for (size_t j = 0; j < len_t; j++) {
 				cost(i, j) = 1.0f - slice.similarity(i, j);
+				outfile << cost(i, j) << "\n";
 			}
 		}
 
 		const auto r = m_ot.emd2(mag_s, mag_t, cost);
 
-		if (r.success) {
-			if (p_query->debug_hook().has_value()) {
-				call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r.G);
-			}
+		if (p_query->debug_hook().has_value()) {
+			call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r.G, r.success);
+		}
 
+		outfile << "--- after:\n";
+		for (size_t i = 0; i < len_s; i++) {
+			for (size_t j = 0; j < len_t; j++) {
+				outfile << cost(i, j) << "\n";
+			}
+		}
+
+		if (r.success) {
+			outfile << "--- success.\n";
 			return 1.0f - r.opt_cost * 0.5f;
 		} else {
 			return 0.0f;

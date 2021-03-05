@@ -1,6 +1,11 @@
 #ifndef __VECTORIAN_COMMON_H__
 #define __VECTORIAN_COMMON_H__
 
+#include <xtensor/xarray.hpp>
+#include <xtensor/xio.hpp>
+#include <xtensor/xview.hpp>
+#include <xtensor-python/pyarray.hpp>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/eigen.h>

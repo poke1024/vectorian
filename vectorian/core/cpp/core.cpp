@@ -26,6 +26,8 @@ if platform.system() == 'Linux':
 	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
 cfg['include_dirs'].append('../../../lib/eigen')
+#cfg['include_dirs'].append('../../../lib/xtensor/include')
+#cfg['include_dirs'].append('../../../lib/xtensor-python/include')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
 cfg['include_dirs'].append('../../../lib/pot/ot/lp')
 
@@ -50,7 +52,7 @@ if os.environ.get('DEBUG_VECTORIAN_CORE', False):
 	cfg['compiler_args'].append('-g')
 	cfg['compiler_args'].append('-O1')
 
-	if False:
+	if os.environ.get('VECTORIAN_SANITIZE_ADDRESS', False):
 		cfg['compiler_args'].append('-fsanitize=address')
 		cfg['compiler_args'].append('-fno-omit-frame-pointer')
 		cfg['compiler_args'].append('-fno-optimize-sibling-calls')
@@ -91,12 +93,12 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'metric/static.cpp',
+	'module.cpp',
 	'embedding/static.cpp',
 	'match/match.cpp',
 	'match/matcher.cpp',
 	'metric/contextual.cpp',
-	'metric/static.cpp',
-	'module.cpp',
 	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',

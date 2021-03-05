@@ -1,5 +1,6 @@
 #include <iostream>
 
+#define FORCE_IMPORT_ARRAY
 #include "common.h"
 #include "match/region.h"
 #include "match/match.h"
@@ -60,6 +61,8 @@ py::str backend_build_time() {
 // caution: name in PYBIND11_MODULE below needs to match filename
 // !!!
 PYBIND11_MODULE(core, m) {
+	xt::import_numpy();
+
 	m.def("init_pyarrow", &init_pyarrow);
 	m.def("run_sanity_checks", &run_sanity_checks);
 	m.def("backend_build_time", &backend_build_time);

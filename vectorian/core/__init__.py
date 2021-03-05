@@ -8,7 +8,7 @@ logging.debug("cpp core: importing...")
 cppimport.set_quiet(False)
 cppimport.force_rebuild(False)
 
-if os.environ.get("DEBUG_VECTORIAN_CORE", False):
+if os.environ.get("DEBUG_VECTORIAN_FORCE_REBUILD", False):
 	cppimport.force_rebuild(True)
 
 # the following line is important on macOS so that the cppimport does not fail with a dyld error.
