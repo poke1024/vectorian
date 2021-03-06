@@ -6,8 +6,19 @@ struct WMDOptions {
 	bool one_target;
 };
 
+template<typename Index>
+class WMDBase {
+protected:
+	std::vector<Index> m_match;
+
+public:
+	inline const std::vector<Index> &match() const {
+		return m_match;
+	}
+};
+
 template<typename Index, typename WordId>
-class WMD {
+class WMD : public WMDBase<Index> {
 public:
 	struct RefToken {
 		WordId word_id;
@@ -56,8 +67,6 @@ public:
 	std::vector<DistanceRef> m_candidates;
 	std::vector<Index> m_result;
 
-	std::vector<Index> m_match;
-
 	void resize(
 		const size_t max_len_s,
 		const size_t max_len_t) {
@@ -75,7 +84,7 @@ public:
 		m_candidates.reserve(size);
 		m_result.resize(size);
 
-		m_match.resize(max_len_t);
+		this->m_match.resize(max_len_t);
 	}
 
 	inline void reset(const int k) {
@@ -216,7 +225,7 @@ public:
 		Document &doc_t = m_doc[1];
 		const Document * const docs[2] = {&doc_t, &doc_s};
 
-		m_match.resize(len_t);
+		this->m_match.resize(len_t);
 
 		float cost = 0;
 		for (int c = 0; c < 2; c++) {
@@ -297,7 +306,7 @@ public:
 				// vocab item i to query pos.
 				for (int i = 0; i < len_t; i++) {
 					const int j = m_result[doc_t.pos_to_vocab[i]];
-					m_match[i] = doc_s.vocab_to_pos[j]; // not ideal
+					this->m_match[i] = doc_s.vocab_to_pos[j]; // not ideal
 				}
 			} else { // w1 is s
 				// FIXME
@@ -370,11 +379,12 @@ public:
 	template<typename Slice, typename MakeWordId>
 	float relaxed(
 		const Slice &slice,
-		const size_t len_s,
-		const size_t len_t,
 		const MakeWordId &make_word_id,
 		const WMDOptions &p_options,
 		const float max_weighted_score) {
+
+		const int len_s = slice.len_s();
+		const int len_t = slice.len_t();
 
 		if (p_options.symmetric && !p_options.normalize_bow) {
 			throw std::runtime_error(
@@ -408,13 +418,5 @@ public:
 			len_s, len_t,
 			vocabulary_size,
 			p_options);
-	}
-
-	inline const std::vector<Index> &match() const {
-		return m_match;
-	}
-
-	inline std::vector<Index> &match() {
-		return m_match;
 	}
 };

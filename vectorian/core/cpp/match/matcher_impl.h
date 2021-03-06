@@ -14,97 +14,17 @@ protected:
 	MatchRef m_no_match;
 
 	template<typename Slice>
-	inline float reference_score(
-		const Slice &p_slice,
-		const float p_matched,
-		const float p_unmatched) const {
-
-		// m_matched_weight == 0 indicates that there
-		// is no higher relevance of matched content than
-		// unmatched content, both are weighted equal (see
-		// maximum_internal_score()).
-
-		const float total_score = p_slice.max_sum_of_similarities();
-
-		const float unmatched_weight = std::pow(
-			(total_score - p_matched) / total_score,
-			m_query->submatch_weight());
-
-		const float reference_score =
-			p_matched +
-			unmatched_weight * (total_score - p_matched);
-
-		return reference_score;
-	}
-
-	template<typename Slice>
-	inline float normalized_score(
-		const Slice &p_slice,
-		const float p_raw_score,
-		const std::vector<int16_t> &p_match) const {
-
-		//return p_raw_score / p_slice.len_t(); // FIXME
-
-		// unboosted version would be:
-		// return p_raw_score / m_total_score;
-
-		// a final boosting step allowing matched content
-		// more weight than unmatched content.
-
-		const size_t n = p_match.size();
-
-		float matched_score = 0.0f;
-		float unmatched_score = 0.0f;
-
-		for (size_t i = 0; i < n; i++) {
-
-			const float s = p_slice.max_similarity_for_t(i);
-
-			if (p_match[i] < 0) {
-				unmatched_score += s;
-			} else {
-				matched_score += s;
-			}
-		}
-
-		return p_raw_score / reference_score(
-			p_slice, matched_score, unmatched_score);
-	}
-
-	template<typename Slice, typename REVERSE>
 	inline MatchRef optimal_match(
 		const MatcherRef &matcher,
 		const Slice &slice,
-		const float p_min_score,
-		const REVERSE &reverse) {
+		const float p_min_score) {
 
-		const int len_t = slice.len_t();
-		if (len_t <= 0) {
-			return m_no_match;
-		}
+		const MatchRef m = m_aligner.make_match(
+			matcher, slice, p_min_score);
 
-		const int len_s = slice.len_s();
-		PPK_ASSERT(len_s > 0);
-
-		m_aligner(m_query, slice, len_s, len_t);
-
-		float raw_score = m_aligner.score();
-
-		float best_final_score = normalized_score(
-			slice, raw_score, m_aligner.match());
-
-		if (best_final_score > p_min_score) {
-
-			reverse(m_aligner.mutable_match(), len_s);
-
-			// m_aligner->make_match(matcher, slice, p_min_score)
-
-			return std::make_shared<Match>(
-				matcher,
-				MatchDigest(m_document, slice.id(), m_aligner.match()),
-				best_final_score);
+		if (m.get()) {
+			return m;
 		} else {
-
 			return m_no_match;
 		}
 	}
@@ -164,7 +84,7 @@ inline size_t compute_len_s(
 	return slice_data.token_at - p_token_at;
 }*/
 
-template<typename SliceFactory, typename Aligner, bool Bidirectional>
+template<typename SliceFactory, typename Aligner>
 class MatcherImpl : public MatcherBase<Aligner> {
 
 	const SliceFactory m_slice_factory;
@@ -183,7 +103,6 @@ public:
 			p_metric,
 			p_aligner),
 		m_slice_factory(p_slice_factory) {
-
 	}
 
 	virtual void match(
@@ -199,7 +118,10 @@ public:
 
 		const Token *s_tokens = this->m_document->tokens()->data();
 		const Token *t_tokens = this->m_query->tokens()->data();
-		const int len_t =  this->m_query->tokens()->size();
+		const int len_t = this->m_query->tokens()->size();
+		if (len_t < 1) {
+			return; // no matches
+		}
 
 		const MatcherRef matcher = this->shared_from_this();
 
@@ -222,20 +144,7 @@ public:
 			MatchRef m = this->optimal_match(
 				matcher,
 				slice,
-				p_matches->worst_score(),
-				[] (std::vector<int16_t> &match, int len_s) {});
-
-			if (Bidirectional) {
-				const MatchRef m_reverse = this->optimal_match(
-					matcher,
-					ReversedSlice(slice),
-					p_matches->worst_score(),
-					reverse_alignment);
-
-				if (m_reverse->score() > m->score()) {
-					m = m_reverse;
-				}
-			}
+				p_matches->worst_score());
 
 			if (m->score() > this->m_no_match->score()) {
 				m->compute_scores(

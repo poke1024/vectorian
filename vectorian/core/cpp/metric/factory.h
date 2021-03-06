@@ -6,13 +6,8 @@ MatcherRef make_matcher(
 	const SliceFactory &p_factory,
 	const Aligner &p_aligner) {
 
-	if (p_query->bidirectional()) {
-		return std::make_shared<MatcherImpl<SliceFactory, Aligner, true>>(
-			p_query, p_document, p_metric, p_aligner, p_factory);
-	} else {
-		return std::make_shared<MatcherImpl<SliceFactory, Aligner, false>>(
-			p_query, p_document, p_metric, p_aligner, p_factory);
-	}
+	return std::make_shared<MatcherImpl<SliceFactory, Aligner>>(
+		p_query, p_document, p_metric, p_aligner, p_factory);
 }
 
 template<typename MakeSlice>

@@ -274,9 +274,10 @@ public:
 	template<typename Slice>
 	float compute(
 		const QueryRef &p_query,
-		const Slice &slice,
-		const size_t len_s,
-		const size_t len_t) {
+		const Slice &slice) {
+
+		const size_t len_s = slice.len_s();
+		const size_t len_t = slice.len_t();
 
 		PPK_ASSERT(len_s <= static_cast<size_t>(m_cost_storage.shape(0)));
 		PPK_ASSERT(len_t <= static_cast<size_t>(m_cost_storage.shape(1)));

@@ -2,11 +2,87 @@
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 
+template<typename Slice>
+inline float reference_score(
+	const QueryRef &p_query,
+	const Slice &p_slice,
+	const float p_matched,
+	const float p_unmatched) {
+
+	// m_matched_weight == 0 indicates that there
+	// is no higher relevance of matched content than
+	// unmatched content, both are weighted equal (see
+	// maximum_internal_score()).
+
+	const float total_score = p_slice.max_sum_of_similarities();
+
+	const float unmatched_weight = std::pow(
+		(total_score - p_matched) / total_score,
+		p_query->submatch_weight());
+
+	const float reference_score =
+		p_matched +
+		unmatched_weight * (total_score - p_matched);
+
+	return reference_score;
+}
+
+template<typename Slice, typename Index>
+inline float normalized_score(
+	const QueryRef &p_query,
+	const Slice &p_slice,
+	const float p_raw_score,
+	const std::vector<Index> &p_match) {
+
+	//return p_raw_score / p_slice.len_t(); // FIXME
+
+	// unboosted version would be:
+	// return p_raw_score / m_total_score;
+
+	// a final boosting step allowing matched content
+	// more weight than unmatched content.
+
+	const size_t n = p_match.size();
+
+	float matched_score = 0.0f;
+	float unmatched_score = 0.0f;
+
+	for (size_t i = 0; i < n; i++) {
+
+		const float s = p_slice.max_similarity_for_t(i);
+
+		if (p_match[i] < 0) {
+			unmatched_score += s;
+		} else {
+			matched_score += s;
+		}
+	}
+
+	return p_raw_score / reference_score(
+		p_query, p_slice, matched_score, unmatched_score);
+}
+
 template<typename Index>
 class WatermanSmithBeyer {
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
 	const std::vector<float> m_gap_cost;
 	const float m_smith_waterman_zero;
+
+	template<typename Slice>
+	inline void compute(
+		const QueryRef &, const Slice &slice) const {
+
+		m_aligner->waterman_smith_beyer(
+			[&slice] (int i, int j) -> float {
+				return slice.similarity(i, j);
+			},
+			[this] (size_t len) -> float {
+				return this->gap_cost(len);
+			},
+			slice.len_s(),
+			slice.len_t(),
+			m_smith_waterman_zero);
+	}
 
 public:
 	WatermanSmithBeyer(
@@ -30,31 +106,24 @@ public:
 	}
 
 	template<typename Slice>
-	inline void operator()(
-		const QueryRef &, const Slice &slice, const int len_s, const int len_t) const {
+	inline MatchRef make_match(
+		const MatcherRef &p_matcher,
+		const Slice &p_slice,
+		const float p_min_score) const {
 
-		m_aligner->waterman_smith_beyer(
-			[&slice] (int i, int j) -> float {
-				return slice.similarity(i, j);
-			},
-			[this] (size_t len) -> float {
-				return this->gap_cost(len);
-			},
-			len_s,
-			len_t,
-			m_smith_waterman_zero);
-	}
+		compute(p_matcher->query(), p_slice);
 
-	inline float score() const {
-		return m_aligner->score();
-	}
+		const float score = normalized_score(
+			p_matcher->query(), p_slice, m_aligner->score(), m_aligner->match());
 
-	inline const std::vector<Index> &match() const {
-		return m_aligner->match();
-	}
-
-	inline std::vector<Index> &mutable_match() {
-		return m_aligner->mutable_match();
+		if (score > p_min_score) {
+			return std::make_shared<Match>(
+				p_matcher,
+				MatchDigest(p_matcher->document(), p_slice.id(), m_aligner->match()),
+				score);
+		} else {
+			return MatchRef();
+		}
 	}
 };
 
@@ -88,7 +157,53 @@ class RelaxedWordMoversDistance {
 	WMD<Index, token_t> m_wmd;
 	WMD<Index, TaggedTokenId> m_wmd_tagged;
 
-	float m_score;
+	struct Result {
+		float score;
+		const WMDBase<Index> &wmd;
+	};
+
+	template<typename Slice>
+	inline Result compute(
+		const QueryRef &p_query,
+		const Slice &slice) {
+
+		const bool pos_tag_aware = slice.similarity_depends_on_pos();
+		const auto &enc = slice.encoder();
+		const float max_cost = m_options.normalize_bow ?
+			1.0f : slice.max_sum_of_similarities();
+
+		if (pos_tag_aware) {
+			// perform WMD on a vocabulary
+			// built from (token id, pos tag).
+
+			const float score = m_wmd_tagged.relaxed(
+				slice,
+				[&enc] (const auto &t) {
+					return TaggedTokenId{
+						enc.to_embedding(t),
+						t.tag
+					};
+				},
+				m_options,
+				max_cost);
+
+			return Result{score, m_wmd_tagged};
+
+		} else {
+			// perform WMD on a vocabulary
+			// built from token ids.
+
+			const float score = m_wmd.relaxed(
+				slice,
+				[&enc] (const auto &t) {
+					return enc.to_embedding(t);
+				},
+				m_options,
+				max_cost);
+
+			return Result{score, m_wmd};
+		}
+	}
 
 public:
 	RelaxedWordMoversDistance(
@@ -112,62 +227,30 @@ public:
 	}
 
 	template<typename Slice>
-	inline void operator()(
-		const QueryRef &p_query,
-		const Slice &slice,
-		const int len_s,
-		const int len_t) {
+	inline MatchRef make_match(
+		const MatcherRef &p_matcher,
+		const Slice &p_slice,
+		const float p_min_score) {
 
-		const bool pos_tag_aware = slice.similarity_depends_on_pos();
-		const auto &enc = slice.encoder();
-		const float max_cost = m_options.normalize_bow ?
-			1.0f : slice.max_sum_of_similarities();
+		const auto r = compute(p_matcher->query(), p_slice);
 
-		if (pos_tag_aware) {
-			// perform WMD on a vocabulary
-			// built from (token id, pos tag).
+		const float score = normalized_score(
+			p_matcher->query(), p_slice, r.score, r.wmd.match());
 
-			m_score = m_wmd_tagged.relaxed(
-				slice, len_s, len_t,
-				[&enc] (const auto &t) {
-					return TaggedTokenId{
-						enc.to_embedding(t),
-						t.tag
-					};
-				},
-				m_options,
-				max_cost);
+		if (score > p_min_score) {
+			return std::make_shared<Match>(
+				p_matcher,
+				MatchDigest(p_matcher->document(), p_slice.id(), r.wmd.match()),
+				score);
 		} else {
-			// perform WMD on a vocabulary
-			// built from token ids.
-
-			m_score = m_wmd.relaxed(
-				slice, len_s, len_t,
-				[&enc] (const auto &t) {
-					return enc.to_embedding(t);
-				},
-				m_options,
-				max_cost);
+			return MatchRef();
 		}
-	}
-
-	inline float score() const {
-		return m_score;
-	}
-
-	inline const std::vector<Index> &match() const {
-		return m_wmd.match();
-	}
-
-	inline std::vector<Index> &mutable_match() {
-		return m_wmd.match();
 	}
 };
 
 template<typename Index>
 class WordRotatorsDistance {
 	WRD<Index> m_wrd;
-	float m_score;
 
 public:
 	WordRotatorsDistance() {
@@ -182,26 +265,25 @@ public:
 	}
 
 	template<typename Slice>
-	inline void operator()(
-		const QueryRef &p_query,
-		const Slice &slice,
-		const int len_s,
-		const int len_t) {
+	inline MatchRef make_match(
+		const MatcherRef &p_matcher,
+		const Slice &p_slice,
+		const float p_min_score) {
 
-		m_score = m_wrd.compute(
-			p_query, slice, len_s, len_t);
-	}
+		const float score0 = m_wrd.compute(
+			p_matcher->query(), p_slice);
 
-	inline float score() const {
-		return m_score;
-	}
+		const float score = normalized_score(
+			p_matcher->query(), p_slice, score0, m_wrd.match());
 
-	inline const std::vector<Index> &match() const {
-		return m_wrd.match();
-	}
-
-	inline std::vector<Index> &mutable_match() {
-		return m_wrd.match();
+		if (score > p_min_score) {
+			return std::make_shared<Match>(
+				p_matcher,
+				MatchDigest(p_matcher->document(), p_slice.id(), m_wrd.match()),
+				score);
+		} else {
+			return MatchRef();
+		}
 	}
 };
 
