@@ -2,4 +2,6 @@
 .rendered.core.cpp
 core.cpython*.so
 __pycache__
-lib
+lib/pot
+lib/ppk_assert
+

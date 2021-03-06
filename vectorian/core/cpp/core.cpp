@@ -25,10 +25,8 @@ if platform.system() == 'Linux':
 	cfg['libraries'] = ['arrow', 'arrow_python']
 	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
-#cfg['include_dirs'].append('../../../lib/xtensor/include')
-#cfg['include_dirs'].append('../../../lib/xtensor-python/include')
+cfg['include_dirs'].append('../../../lib')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
-cfg['include_dirs'].append('../../../lib/pot/ot/lp')
 
 old_pyarrow = 1 if compare_versions(
 	pyarrow.__version__, '0.12.1', operator.le) else 0

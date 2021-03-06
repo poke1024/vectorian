@@ -1,95 +1,6 @@
-/*
-ef emd_c(np.ndarray[double, ndim=1, mode="c"] a, np.ndarray[double, ndim=1, mode="c"]  b, np.ndarray[double, ndim=2, mode="c"]  M, int max_iter):
-    """
-        Solves the Earth Movers distance problem and returns the optimal transport matrix
-        gamm=emd(a,b,M)
-    .. math::
-        \gamma = arg\min_\gamma <\gamma,M>_F
-        s.t. \gamma 1 = a
-             \gamma\geq 0
-    where :
-    - M is the metric cost matrix
-    - a and b are the sample weights
-    .. warning::
-        Note that the M matrix needs to be a C-order :py.cls:`numpy.array`
-    .. warning::
-        The C++ solver discards all samples in the distributions with
-        zeros weights. This means that while the primal variable (transport
-        matrix) is exact, the solver only returns feasible dual potentials
-        on the samples with weights different from zero.
-    Parameters
-    ----------
-    a : (ns,) numpy.ndarray, float64
-        source histogram
-    b : (nt,) numpy.ndarray, float64
-        target histogram
-    M : (ns,nt) numpy.ndarray, float64
-        loss matrix
-    max_iter : int
-        The maximum number of iterations before stopping the optimization
-        algorithm if it has not converged.
-    Returns
-    -------
-    gamma: (ns x nt) numpy.ndarray
-        Optimal transportation matrix for the given parameters
-    """
-    cdef int n1= M.shape[0]
-    cdef int n2= M.shape[1]
-    cdef int nmax=n1+n2-1
-    cdef int result_code = 0
-    cdef int nG=0
-
-    cdef double cost=0
-    cdef np.ndarray[double, ndim=1, mode="c"] alpha=np.zeros(n1)
-    cdef np.ndarray[double, ndim=1, mode="c"] beta=np.zeros(n2)
-
-    cdef np.ndarray[double, ndim=2, mode="c"] G=np.zeros([0, 0])
-
-    cdef np.ndarray[double, ndim=1, mode="c"] Gv=np.zeros(0)
-    cdef np.ndarray[long, ndim=1, mode="c"] iG=np.zeros(0,dtype=np.int)
-    cdef np.ndarray[long, ndim=1, mode="c"] jG=np.zeros(0,dtype=np.int)
-
-    if not len(a):
-        a=np.ones((n1,))/n1
-
-    if not len(b):
-        b=np.ones((n2,))/n2
-
-    # init OT matrix
-    G=np.zeros([n1, n2])
-
-    # calling the function
-    with nogil:
-        result_code = EMD_wrap(
-            n1, n2,
-            <double*> a.data, <double*> b.data,
-            <double*> M.data, <double*> G.data,
-            <double*> alpha.data, <double*> beta.data,
-            <double*> &cost, max_iter)
-
-    return G, cost, alpha, beta, result_code
-*/
-
-/*
-
-
-typedef Matrix<float,1,Dynamic> MatrixType;
-typedef Map<MatrixType> MapType;
-typedef Map<const MatrixType> MapTypeConst;   // a read-only map
-const int n_dims = 5;
-
-MatrixType m1(n_dims), m2(n_dims);
-m1.setRandom();
-m2.setRandom();
-float *p = &m2(0);  // get the address storing the data for m2
-MapType m2map(p,m2.size());   // m2map shares data with m2
-MapTypeConst m2mapconst(p,m2.size());  // a read-only accessor for m2
-
-*/
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreorder"
-#include "network_simplex_simple.h"
+#include "lemon/network_simplex_simple.h"
 #pragma clang diagnostic pop
 
 class OptimalTransport {
@@ -101,13 +12,6 @@ class OptimalTransport {
 	xt::xtensor<float, 2> m_G_storage;
 	xt::xtensor<float, 1> m_alpha_storage;
 	xt::xtensor<float, 1> m_beta_storage;
-
-	/*enum ProblemType {
-		INFEASIBLE,
-		OPTIMAL,
-		UNBOUNDED,
-		MAX_ITER_REACHED
-	};*/
 
 	typedef unsigned int node_id_type;
     typedef lemon::FullBipartiteDigraph Digraph;
@@ -268,12 +172,12 @@ public:
 
 template<typename Index>
 class WRD {
-	std::vector<Index> m_match;
-
 	xt::xtensor<float, 1> m_mag_s_storage;
 	xt::xtensor<float, 1> m_mag_t_storage;
 	xt::xtensor<float, 2> m_cost_storage;
 	OptimalTransport m_ot;
+
+	std::vector<Index> m_match;
 
 	template<typename Slice, typename Vector, typename MatrixD, typename Solution>
 	inline void call_debug_hook(
@@ -393,11 +297,12 @@ public:
 		for (size_t i = 0; i < len_s; i++) {
 			mag_s(i) = slice.magnitude_s(i);
 		}
-		mag_s /= xt::sum(mag_s);
 
 		for (size_t i = 0; i < len_t; i++) {
 			mag_t(i) = slice.magnitude_t(i);
 		}
+
+		mag_s /= xt::sum(mag_s);
 		mag_t /= xt::sum(mag_t);
 
 		/*std::ofstream outfile;
