@@ -1,6 +1,3 @@
 [submodule "lib/ppk_assert"]
 	path = lib/ppk_assert
 	url = https://github.com/gpakosz/PPK_ASSERT
-[submodule "lib/pot"]
-	path = lib/pot
-	url = https://github.com/PythonOT/POT
