@@ -17,4 +17,7 @@ https://ota.bodleian.ox.ac.uk/repository/xmlui/bitstream/handle/20.500.12024/303
 
 * unsere WMD/WRT Implementation mit anderen überprüfen
 z.B. gensim, vgl. https://markroxor.github.io/gensim/static/notebooks/WMD_tutorial.html
+https://pypi.org/project/wmd/
+https://github.com/mkusner/wmd
+https://www.ibm.com/blogs/research/2018/11/word-movers-embedding/
 * die standard test sets aus dem WRT paper rechnen / Infrastruktur dafür

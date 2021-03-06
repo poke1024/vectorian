@@ -92,10 +92,11 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 	if (sentence_metric_kind == "alignment-isolated") {
 
 		const auto make_fast_slice = [metric] (
+			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
 
-	        return StaticEmbeddingSlice(metric.get(), s, t);
+	        return StaticEmbeddingSlice(metric.get(), slice_id, s, t);
 		};
 
 		const FactoryGenerator gen(make_fast_slice);
@@ -118,11 +119,12 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 		options.t_pos_weights_sum = sum;
 
 		const auto make_tag_weighted_slice = [metric, options] (
+			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
 
 			return TagWeightedSlice(
-				StaticEmbeddingSlice(metric.get(), s, t),
+				StaticEmbeddingSlice(metric.get(), slice_id, s, t),
 				options);
 		};
 

@@ -24,6 +24,7 @@ void Match::compute_scores(
 		const Token *t_tokens = query()->tokens()->data();
 
         const auto slice = p_factory.create_slice(
+            0,
             TokenSpan{s_tokens + token_at, p_len_s},
             TokenSpan{t_tokens, p_len_t});
         m_scores.reserve(match.size());

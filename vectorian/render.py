@@ -268,3 +268,52 @@ class LocationFormatter:
 			if x:
 				return x
 		return None
+
+
+'''
+https://medium.com/hackernoon/create-javascript-sankey-diagram-b68c0d508a38
+
+<html>
+<head>
+<script src="https://cdn.anychart.com/releases/v8/js/anychart-core.min.js"></script>
+<script src="https://cdn.anychart.com/releases/v8/js/anychart-sankey.min.js"></script>
+</head>
+<body>
+<div id="container"></div>
+<script>
+anychart.onDocumentReady(function(){
+ //creating the data
+ var data = [
+ {from: "Google", to: "Facebook", weight: 20000},
+ {from: "Google", to: "Twitter", weight: 17000},
+ {from: "Google", to: "YouTube", weight: 8000},
+ {from: "Google", to: "Wikipedia", weight: 11000},
+ {from: "Bing", to: "Facebook", weight: 7500},
+ {from: "Bing", to: "Twitter", weight: 5000},
+ {from: "Bing", to: "Wikipedia", weight: 4000}
+ ];
+//calling the Sankey function
+var sankey_chart = anychart.sankey(data);
+//customizing the width of the nodes
+sankey_chart.nodeWidth("20%");
+//setting the chart title
+sankey_chart.title("Sankey Diagram Customization Example");
+//customizing the vertical padding of the nodes
+sankey_chart.nodePadding(20);
+//customizing the visual appearance of nodes
+sankey_chart.node().normal().fill("#64b5f5 0.6");
+sankey_chart.node().hovered().fill(anychart.color.darken("#64b5f7"));
+sankey_chart.node().normal().stroke("#455a63", 2);
+//customizing the visual appearance of flows
+sankey_chart.flow().normal().fill("#ffa000 0.5");
+sankey_chart.flow().hovered().fill(anychart.color.darken("#ffa000"));
+sankey_chart.flow().hovered().stroke("#455a63");
+//setting the container id
+sankey_chart.container("container");
+//initiating drawing the Sankey diagram
+sankey_chart.draw();
+});
+</script>
+</body>
+</html>
+'''

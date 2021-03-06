@@ -22,6 +22,7 @@ class FactoryGenerator {
 public:
 	typedef typename std::invoke_result<
 		MakeSlice,
+		const size_t,
 		const TokenSpan&,
 		const TokenSpan&>::type Slice;
 

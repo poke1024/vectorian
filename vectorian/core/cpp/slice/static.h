@@ -39,6 +39,7 @@ public:
 
 class StaticEmbeddingSlice {
 	const StaticEmbeddingMetric *m_metric;
+	const size_t m_slice_id;
 	const Token * const s_tokens;
 	const int32_t m_len_s;
 	const Token * const t_tokens;
@@ -50,14 +51,20 @@ public:
 
 	inline StaticEmbeddingSlice(
 		const StaticEmbeddingMetric *metric,
+		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 
 		m_metric(metric),
+		m_slice_id(slice_id),
 		s_tokens(s.tokens),
 		m_len_s(s.len),
 		t_tokens(t.tokens),
 		m_len_t(t.len) {
+	}
+
+	size_t id() const {
+		return m_slice_id;
 	}
 
 	inline const TokenIdEncoder &encoder() const {
@@ -133,6 +140,10 @@ public:
 
 		m_delegate(p_delegate),
 		m_modifiers(p_modifiers) {
+	}
+
+	size_t id() const {
+		return m_delegate.id();
 	}
 
 	inline const typename Delegate::Encoder &encoder() const {
@@ -214,6 +225,10 @@ class ReversedSlice {
 public:
 	inline ReversedSlice(const Slice &slice) :
 		m_slice(slice) {
+	}
+
+	inline size_t id() const {
+		return m_slice.id();
 	}
 
 	inline typename Slice::Encoder encoder() const {
@@ -299,12 +314,13 @@ public:
 	}
 
 	inline Slice create_slice(
+		const size_t slice_id,
 		const TokenSpan &s_span,
 		const TokenSpan &t_span) const {
 
 		if (m_filter.all()) {
 			return m_delegate.create_slice(
-				s_span, t_span);
+				slice_id, s_span, t_span);
 
 		} else {
 
@@ -322,7 +338,7 @@ public:
 	        }
 
 			return m_delegate.create_slice(
-				TokenSpan{new_s, new_len_s}, t_span);
+				slice_id, TokenSpan{new_s, new_len_s}, t_span);
 		}
 	}
 };
@@ -334,6 +350,7 @@ class SliceFactory {
 public:
 	typedef typename std::invoke_result<
 		Make,
+		const size_t,
 		const TokenSpan&,
 		const TokenSpan&>::type Slice;
 
@@ -343,10 +360,11 @@ public:
 	}
 
 	inline Slice create_slice(
+		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) const {
 
-		return m_make(s, t);
+		return m_make(slice_id, s, t);
 	}
 };
 

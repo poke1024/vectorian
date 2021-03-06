@@ -76,6 +76,8 @@ py::dict Match::py_assignment() const {
 		d["w"] = PY_ARRAY_MEMBER(TokenScore, weight);
 	}
 
+	d["flow"] = xt::pyarray<float>(m_digest.flow);
+
 	return d;
 }
 

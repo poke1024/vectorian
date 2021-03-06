@@ -73,7 +73,7 @@ protected:
 
 	template<typename Slice, typename REVERSE>
 	inline MatchRef optimal_match(
-		const int32_t sentence_id,
+		const MatcherRef &matcher,
 		const Slice &slice,
 		const float p_min_score,
 		const REVERSE &reverse) {
@@ -97,14 +97,11 @@ protected:
 
 			reverse(m_aligner.mutable_match(), len_s);
 
-			/*std::ofstream outfile;
-			outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
-			outfile << "final score: " << best_final_score << "\n";
-			outfile << "\n";*/
+			// m_aligner->make_match(matcher, slice, p_min_score)
 
 			return std::make_shared<Match>(
-				this->shared_from_this(),
-				MatchDigest(m_document, sentence_id, m_aligner.match()),
+				matcher,
+				MatchDigest(m_document, slice.id(), m_aligner.match()),
 				best_final_score);
 		} else {
 
@@ -192,17 +189,6 @@ public:
 	virtual void match(
 		const ResultSetRef &p_matches) {
 
-		/*std::vector<Scores> good_scores;
-		good_scores.reserve(m_scores.size());
-		for (const auto &scores : m_scores) {
-			if (scores.good()) {
-				good_scores.push_back(scores);
-			}
-		}
-		if (good_scores.empty()) {
-			return;
-		}*/
-
 		const auto &slice_strategy = this->m_query->slice_strategy();
 
 		const auto spans = this->m_document->spans(slice_strategy.level);
@@ -215,10 +201,7 @@ public:
 		const Token *t_tokens = this->m_query->tokens()->data();
 		const int len_t =  this->m_query->tokens()->size();
 
-		/*std::ofstream debug("/Users/arbeit/Desktop/debug.txt");
-
-		debug << "slice on " << slice_strategy.level <<
-			" with window (" << slice_strategy.window_size << ", " << slice_strategy.window_step << ")\n";*/
+		const MatcherRef matcher = this->shared_from_this();
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
@@ -227,25 +210,24 @@ public:
 			const int len_s = spans->safe_len(
 				slice_id, slice_strategy.window_size);
 
-			//debug << "(" << token_at << ", " << len_s << ")\n";
-
 			if (len_s < 1) {
 				continue;
 			}
 
 			const auto slice = m_slice_factory.create_slice(
+				slice_id,
 			    TokenSpan{s_tokens + token_at, len_s},
 			    TokenSpan{t_tokens, len_t});
 
 			MatchRef m = this->optimal_match(
-				slice_id,
+				matcher,
 				slice,
 				p_matches->worst_score(),
 				[] (std::vector<int16_t> &match, int len_s) {});
 
 			if (Bidirectional) {
 				const MatchRef m_reverse = this->optimal_match(
-					slice_id,
+					matcher,
 					ReversedSlice(slice),
 					p_matches->worst_score(),
 					reverse_alignment);
