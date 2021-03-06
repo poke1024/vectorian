@@ -1,4 +1,5 @@
 #include "common.h"
+#include <xtensor/xadapt.hpp>
 
 struct WMDOptions {
 	bool normalize_bow;
@@ -63,7 +64,7 @@ public:
 	std::vector<RefToken> m_tokens;
 	Document m_doc[2]; // s, t
 
-	std::vector<float> m_dist;
+	xt::xtensor<float, 2> m_distance_matrix;
 	std::vector<DistanceRef> m_candidates;
 	std::vector<Index> m_result;
 
@@ -80,7 +81,7 @@ public:
 			m_doc[i].resize(size);
 		}
 
-		m_dist.resize(size * size);
+		m_distance_matrix.resize({size, size});
 		m_candidates.reserve(size);
 		m_result.resize(size);
 
@@ -176,14 +177,15 @@ public:
 	}
 
 	template<typename Similarity>
-	inline void compute_dist(
+	inline void compute_distance_matrix(
 		const int len_s, const int len_t,
 		const int p_size, const Similarity &sim) {
 
 		Document &doc_s = m_doc[0];
 		Document &doc_t = m_doc[1];
 
-		float *dist = m_dist.data();
+		auto dist = xt::view(
+			m_distance_matrix, xt::range(0, p_size), xt::range(0, p_size));
 
 #if 0
 		// since wmd_relaxed will only access dist entries
@@ -191,18 +193,14 @@ public:
 		// not need to initialize the full matrix, which saves
 		// us from quadratic time here.
 
-		for (int i = 0; i < p_size; i++) {
-			for (int j = 0; j < p_size; j++) {
-				dist[i * p_size + j] = 1.0f;
-			}
-		}
+		dist.fill(1.0f);
 #endif
 
 		for (const auto &u : doc_s.vocab) {
 			for (const auto &v : doc_t.vocab) {
 				const float d = 1.0f - sim(u.i, v.i);
-				dist[u.vocab * p_size + v.vocab] = d;
-				dist[v.vocab * p_size + u.vocab] = d;
+				dist(u.vocab, v.vocab) = d;
+				dist(v.vocab, u.vocab) = d;
 			}
 		}
 	}
@@ -212,6 +210,22 @@ public:
 		float sum;
 		const std::vector<VocabPair> *v;
 	};
+
+	/*float _full() {
+		auto distance_matrix = xt::view(
+			m_distance_matrix, xt::range(0, p_size), xt::range(0, p_size));
+
+		for (int c = 0; c < 2; c++) {
+
+			auto &w1 = docs[c]->bow;
+			auto &w2 = docs[1 - c]->bow;
+
+			auto xw1 = xt::adapt(w1.data(), {w1.size()});
+			auto xw2 = xt::adapt(w2.data(), {w2.size()});
+
+			const auto r = m_ot.emd2(xw1, xw2, distance_matrix);
+		}
+	}*/
 
 	// inspired by implementation in https://github.com/src-d/wmd-relax
 	float _relaxed(
@@ -226,6 +240,9 @@ public:
 		const Document * const docs[2] = {&doc_t, &doc_s};
 
 		this->m_match.resize(len_t);
+
+		const auto distance_matrix = xt::view(
+			m_distance_matrix, xt::range(0, size), xt::range(0, size));
 
 		float cost = 0;
 		for (int c = 0; c < 2; c++) {
@@ -247,7 +264,7 @@ public:
 					// find argmin.
 					for (const auto &v2_entry : v2) {
 						const int j = v2_entry.vocab;
-						const float d = m_dist[i * size + j];
+						const float d = distance_matrix(i, j);
 						if (d < best_dist) {
 							best_dist = d;
 							best_j = j;
@@ -269,7 +286,7 @@ public:
 
 					for (const auto &v2_entry : v2) {
 						const int j = v2_entry.vocab;
-						const float d = m_dist[i * size + j];
+						const float d = distance_matrix(i, j);
 						candidates.push_back(DistanceRef{
 							static_cast<Index>(j),
 							d});
@@ -306,6 +323,10 @@ public:
 				// vocab item i to query pos.
 				for (int i = 0; i < len_t; i++) {
 					const int j = m_result[doc_t.pos_to_vocab[i]];
+
+					// for j in doc_s.vocab_to_pos(j):
+					//  flow[j, i] = 1.0f  // s -> t
+
 					this->m_match[i] = doc_s.vocab_to_pos[j]; // not ideal
 				}
 			} else { // w1 is s
@@ -329,7 +350,7 @@ public:
 		const int len_s, const int len_t, const int vocabulary_size,
 		std::ostream &os) {
 
-		const QueryVocabularyRef vocab = p_query->vocabulary();
+		/*const QueryVocabularyRef vocab = p_query->vocabulary();
 
 		os << "s: ";
 		for (int i = 0; i < len_s; i++) {
@@ -373,7 +394,7 @@ public:
 				os << m_dist[i * vocabulary_size + j] << " ";
 			}
 			os << "\n";
-		}
+		}*/
 	}
 
 	template<typename Slice, typename MakeWordId>
@@ -401,7 +422,7 @@ public:
 			return 0.0f;
 		}
 
-		compute_dist(
+		compute_distance_matrix(
 			len_s, len_t,
 			vocabulary_size,
 			[&slice] (int i, int j) -> float {
