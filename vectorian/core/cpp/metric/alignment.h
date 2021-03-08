@@ -109,14 +109,16 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
-		const float p_min_score) const {
+		const ResultSetRef &p_result_set) const {
 
 		compute(p_matcher->query(), p_slice);
+
+		// flow = flow_factory->create_1_to_1(m_aligner->match());
 
 		const float score = normalized_score(
 			p_matcher->query(), p_slice, m_aligner->score(), m_aligner->match());
 
-		if (score > p_min_score) {
+		if (score > p_result_set->worst_score()) {
 			return std::make_shared<Match>(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), m_aligner->match()),
@@ -230,14 +232,14 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
-		const float p_min_score) {
+		const ResultSetRef &p_result_set) {
 
 		const auto r = compute(p_matcher->query(), p_slice);
 
 		const float score = normalized_score(
 			p_matcher->query(), p_slice, r.score, r.wmd.match());
 
-		if (score > p_min_score) {
+		if (score > p_result_set->worst_score()) {
 			return std::make_shared<Match>(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), r.wmd.match()),
@@ -268,7 +270,7 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
-		const float p_min_score) {
+		const ResultSetRef &p_result_set) {
 
 		const float score0 = m_wrd.compute(
 			p_matcher->query(), p_slice);
@@ -276,7 +278,7 @@ public:
 		const float score = normalized_score(
 			p_matcher->query(), p_slice, score0, m_wrd.match());
 
-		if (score > p_min_score) {
+		if (score > p_result_set->worst_score()) {
 			return std::make_shared<Match>(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), m_wrd.match()),
@@ -287,8 +289,24 @@ public:
 	}
 };
 
+inline std::string get_alignment_algorithm(
+	const py::dict &p_alignment_def) {
 
-template<typename SliceFactory>
+	if (p_alignment_def.contains("algorithm")) {
+		return p_alignment_def["algorithm"].cast<py::str>();
+	} else {
+		return "wsb"; // default
+	}
+}
+
+inline MatcherOptions create_alignment_matcher_options(
+	const py::dict &p_alignment_def) {
+
+	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
+	return MatcherOptions{algorithm == "wrd"};
+}
+
+template<typename Index, typename SliceFactory>
 MatcherRef create_alignment_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
@@ -296,14 +314,7 @@ MatcherRef create_alignment_matcher(
 	const py::dict &p_alignment_def,
 	const SliceFactory &p_factory) {
 
-	// FIXME support different alignment algorithms here.
-
-	std::string algorithm;
-	if (p_alignment_def.contains("algorithm")) {
-		algorithm = p_alignment_def["algorithm"].cast<py::str>();
-	} else {
-		algorithm = "wsb"; // default
-	}
+	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
 
 	if (algorithm == "wsb") {
 		float zero = 0.5;
@@ -327,7 +338,7 @@ MatcherRef create_alignment_matcher(
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			std::move(WatermanSmithBeyer<int16_t>(gap_cost, zero)));
+			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)));
 
 	} else if (algorithm == "rwmd") {
 
@@ -347,13 +358,13 @@ MatcherRef create_alignment_matcher(
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			std::move(RelaxedWordMoversDistance<int16_t>(
+			std::move(RelaxedWordMoversDistance<Index>(
 				normalize_bow, symmetric, one_target)));
 
 	} else if (algorithm == "wrd") {
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
-			std::move(WordRotatorsDistance<int16_t>()));
+			std::move(WordRotatorsDistance<Index>()));
 
 	} else {
 

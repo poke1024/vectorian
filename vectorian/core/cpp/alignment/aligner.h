@@ -82,12 +82,14 @@ private:
 
 		_best_score = score;
 
+		//_best_match->initialize(len_t);
 		_best_match.resize(len_t);
 		std::fill(_best_match.begin(), _best_match.end(), -1);
 
 		Index u = best_u;
 		Index v = best_v;
 		while (u >= 0 && v >= 0 && values(u, v) > zero_similarity) {
+			// _best_match->set(v, u);
 			_best_match[v] = u;
 			std::tie(u, v) = traceback(u, v);
 		}

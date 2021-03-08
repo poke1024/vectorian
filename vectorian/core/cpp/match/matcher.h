@@ -49,16 +49,33 @@ typedef std::shared_ptr<MatcherFactory> MatcherFactoryRef;
 template<typename Make>
 class MatcherFactoryImpl;
 
+struct MatcherOptions {
+	bool needs_magnitudes;
+};
+
 class MatcherFactory {
+	const MatcherOptions m_options;
+
 public:
+	inline MatcherFactory(const MatcherOptions &p_options) : m_options(p_options) {
+	}
+
 	virtual MatcherRef create_matcher(const DocumentRef &p_document) const = 0;
+
+	inline const MatcherOptions &options() const {
+		return m_options;
+	}
 
 	virtual ~MatcherFactory() {
 	}
 
 	template<typename Make>
-	static inline MatcherFactoryRef create(const Make &p_make) {
-		return std::make_shared<MatcherFactoryImpl<Make>>(p_make);
+	static inline MatcherFactoryRef create(
+		const MatcherOptions &p_options,
+		const Make &p_make) {
+
+		return std::make_shared<MatcherFactoryImpl<Make>>(
+			p_options, p_make);
 	}
 };
 
@@ -67,7 +84,9 @@ class MatcherFactoryImpl : public MatcherFactory {
 	const Make m_make;
 
 public:
-    inline MatcherFactoryImpl(const Make &p_make) : m_make(p_make) {
+    inline MatcherFactoryImpl(
+		const MatcherOptions &p_options,
+        const Make &p_make) : MatcherFactory(p_options), m_make(p_make) {
 	}
 
 	virtual MatcherRef create_matcher(const DocumentRef &p_document) const {

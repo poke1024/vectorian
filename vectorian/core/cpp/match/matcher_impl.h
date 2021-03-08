@@ -13,22 +13,6 @@ protected:
 	Aligner m_aligner;
 	MatchRef m_no_match;
 
-	template<typename Slice>
-	inline MatchRef optimal_match(
-		const MatcherRef &matcher,
-		const Slice &slice,
-		const float p_min_score) {
-
-		const MatchRef m = m_aligner.make_match(
-			matcher, slice, p_min_score);
-
-		if (m.get()) {
-			return m;
-		} else {
-			return m_no_match;
-		}
-	}
-
 public:
 	MatcherBase(
 		const QueryRef &p_query,
@@ -124,7 +108,6 @@ public:
 		}
 
 		const MatcherRef matcher = this->shared_from_this();
-		//this->needs_magnitudes()
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
@@ -142,12 +125,10 @@ public:
 			    TokenSpan{s_tokens + token_at, len_s},
 			    TokenSpan{t_tokens, len_t});
 
-			MatchRef m = this->optimal_match(
-				matcher,
-				slice,
-				p_matches->worst_score());
+			const MatchRef m = this->m_aligner.make_match(
+				matcher, slice, p_matches);
 
-			if (m->score() > this->m_no_match->score()) {
+			if (m.get() && m->score() > this->m_no_match->score()) {
 				m->compute_scores(
 					m_slice_factory, len_s, len_t);
 

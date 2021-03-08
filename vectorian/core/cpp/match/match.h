@@ -8,12 +8,6 @@
 #include <list>
 
 template<typename Index>
-class FlowMemoryPool {
-	// foonathan::memory::memory_pool<> m_pool;
-	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
-};
-
-template<typename Index>
 class Flow {
 public:
 	virtual ~Flow() {
@@ -24,13 +18,19 @@ public:
 	virtual xt::xtensor<float, 2> to_matrix() const = 0;
 };
 
+typedef std::shared_ptr<Flow<int16_t>> FlowRef;
+
 template<typename Index>
 class OneToOneFlow : public Flow<Index> {
 	std::vector<Index> m_map;
 
 public:
-	OneToOneFlow(const Index p_source_size) {
+	inline void initialize(const Index p_source_size) {
 		m_map.resize(p_source_size);
+	}
+
+	inline void set(const Index i, const Index j) {
+		m_map[i] = j;
 	}
 };
 
@@ -47,6 +47,15 @@ public:
 template<typename Index>
 class NToNFlow : public Flow<Index> {
 	xt::xtensor<float, 2> m_matrix;
+};
+
+template<typename Index>
+class FlowFactory {
+	// foonathan::memory::memory_pool<> m_pool;
+	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
+public:
+	//OneToOneFlowRef create_1_to_1();
+	//OneToOneFlowRef create_1_to_1(const std::vector<Index> &p_match);
 };
 
 class MatchDigest {
