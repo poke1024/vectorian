@@ -128,11 +128,9 @@ public:
 			const MatchRef m = this->m_aligner.make_match(
 				matcher, slice, p_matches);
 
-			if (m.get() && m->score() > this->m_no_match->score()) {
+			if (m.get()) {
 				m->compute_scores(
 					m_slice_factory, len_s, len_t);
-
-				p_matches->add(m);
 			}
 
 			token_at += spans->safe_len(

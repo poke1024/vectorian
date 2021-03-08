@@ -49,7 +49,6 @@ class NToNFlow : public Flow<Index> {
 	xt::xtensor<float, 2> m_matrix;
 };
 
-template<typename Index>
 class FlowFactory {
 	// foonathan::memory::memory_pool<> m_pool;
 	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
@@ -57,6 +56,8 @@ public:
 	//OneToOneFlowRef create_1_to_1();
 	//OneToOneFlowRef create_1_to_1(const std::vector<Index> &p_match);
 };
+
+typedef std::shared_ptr<FlowFactory> FlowFactoryRef;
 
 class MatchDigest {
 public:

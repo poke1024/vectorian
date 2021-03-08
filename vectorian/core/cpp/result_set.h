@@ -20,6 +20,7 @@ public:
 		const size_t p_max_matches,
 		const float p_min_score) :
 
+		m_flow_factory(std::make_shared<FlowFactory>()),
 		m_max_matches(p_max_matches),
 		m_min_score(p_min_score) {
 
@@ -106,8 +107,27 @@ public:
 		return 0.0f; // to be implemented
 	}
 
+	MatchRef add_match(
+		const MatcherRef &p_matcher,
+		MatchDigest &&p_digest,
+		const float p_score) {
+
+		const MatchRef m = std::make_shared<Match>(
+			p_matcher,
+			std::move(p_digest),
+			p_score);
+
+		this->add(m);
+
+		return m;
+	}
+
+	const FlowFactoryRef &flow_factory() const {
+		return m_flow_factory;
+	}
+
 private:
-	const QueryRef m_query;
+	FlowFactoryRef m_flow_factory;
 
 	// a heap such that m_matches[0] contains the
 	// match with the worst/lowest score.

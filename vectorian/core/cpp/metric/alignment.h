@@ -119,7 +119,7 @@ public:
 			p_matcher->query(), p_slice, m_aligner->score(), m_aligner->match());
 
 		if (score > p_result_set->worst_score()) {
-			return std::make_shared<Match>(
+			return p_result_set->add_match(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), m_aligner->match()),
 				score);
@@ -240,7 +240,7 @@ public:
 			p_matcher->query(), p_slice, r.score, r.wmd.match());
 
 		if (score > p_result_set->worst_score()) {
-			return std::make_shared<Match>(
+			return p_result_set->add_match(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), r.wmd.match()),
 				score);
@@ -279,7 +279,7 @@ public:
 			p_matcher->query(), p_slice, score0, m_wrd.match());
 
 		if (score > p_result_set->worst_score()) {
-			return std::make_shared<Match>(
+			return p_result_set->add_match(
 				p_matcher,
 				MatchDigest(p_matcher->document(), p_slice.id(), m_wrd.match()),
 				score);
