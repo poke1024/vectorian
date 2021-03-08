@@ -3,9 +3,8 @@
 #include "query.h"
 #include "document.h"
 
-MatcherRef ContextualEmbeddingMetric::create_matcher(
-	const QueryRef &p_query,
-	const DocumentRef &p_document) {
+MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
+	const QueryRef &p_query) {
 
 	py::gil_scoped_acquire acquire;
 

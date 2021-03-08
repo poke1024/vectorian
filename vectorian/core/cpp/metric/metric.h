@@ -13,9 +13,8 @@ public:
 	virtual ~Metric() {
 	}
 
-	virtual MatcherRef create_matcher(
-		const QueryRef &p_query,
-		const DocumentRef &p_document) = 0;
+	virtual MatcherFactoryRef create_matcher_factory(
+		const QueryRef &p_query) = 0;
 
 	virtual const std::string &name() const = 0;
 
@@ -33,9 +32,8 @@ public:
 	ExternalMetric(const std::string &p_name) : m_name(p_name) {
 	}
 
-	virtual MatcherRef create_matcher(
-		const QueryRef &p_query,
-		const DocumentRef &p_document) {
+	virtual MatcherFactoryRef create_matcher_factory(
+		const QueryRef &p_query) {
 
 		throw std::runtime_error(
 			"ExternalMetric cannot create matchers");

@@ -75,9 +75,8 @@ public:
 		return m_mag_t(i);
 	}
 
-	virtual MatcherRef create_matcher(
-		const QueryRef &p_query,
-		const DocumentRef &p_document);
+	virtual MatcherFactoryRef create_matcher_factory(
+		const QueryRef &p_query);
 
 	virtual const std::string &name() const;
 

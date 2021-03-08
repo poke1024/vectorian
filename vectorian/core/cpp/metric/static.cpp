@@ -76,9 +76,8 @@ std::vector<float> parse_tag_weights(
 	return t_tokens_pos_weights;
 }
 
-MatcherRef StaticEmbeddingMetric::create_matcher(
-	const QueryRef &p_query,
-	const DocumentRef &p_document) {
+MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
+	const QueryRef &p_query) {
 
 	py::gil_scoped_acquire acquire;
 
@@ -87,23 +86,25 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 
 	const std::string sentence_metric_kind =
 		m_options["metric"].cast<py::str>();
-	const auto &token_filter = p_query->token_filter();
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
-		const auto make_fast_slice = [metric] (
-			const size_t slice_id,
-			const TokenSpan &s,
-			const TokenSpan &t) {
+		return MatcherFactory::create([p_query, metric] (const DocumentRef &p_document) {
+			const auto make_fast_slice = [metric] (
+				const size_t slice_id,
+				const TokenSpan &s,
+				const TokenSpan &t) {
 
-	        return StaticEmbeddingSlice(metric.get(), slice_id, s, t);
-		};
+		        return StaticEmbeddingSlice(metric.get(), slice_id, s, t);
+			};
 
-		const FactoryGenerator gen(make_fast_slice);
+			const FactoryGenerator gen(make_fast_slice);
+			const auto &token_filter = p_query->token_filter();
 
-		return create_alignment_matcher(
-			p_query, p_document, metric, metric->alignment_def(),
-			gen.create_filtered(p_query, p_document, token_filter));
+			return create_alignment_matcher(
+				p_query, p_document, metric, metric->alignment_def(),
+				gen.create_filtered(p_query, p_document, token_filter));
+		});
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
@@ -118,21 +119,26 @@ MatcherRef StaticEmbeddingMetric::create_matcher(
 		}
 		options.t_pos_weights_sum = sum;
 
-		const auto make_tag_weighted_slice = [metric, options] (
-			const size_t slice_id,
-			const TokenSpan &s,
-			const TokenSpan &t) {
+		return MatcherFactory::create([p_query, metric, options] (const DocumentRef &p_document) {
 
-			return TagWeightedSlice(
-				StaticEmbeddingSlice(metric.get(), slice_id, s, t),
-				options);
-		};
+			const auto make_tag_weighted_slice = [metric, options] (
+				const size_t slice_id,
+				const TokenSpan &s,
+				const TokenSpan &t) {
 
-		const FactoryGenerator gen(make_tag_weighted_slice);
+				return TagWeightedSlice(
+					StaticEmbeddingSlice(metric.get(), slice_id, s, t),
+					options);
+			};
 
-		return create_alignment_matcher(
-			p_query, p_document, metric, metric->alignment_def(),
-			gen.create_filtered(p_query, p_document, token_filter));
+			const FactoryGenerator gen(make_tag_weighted_slice);
+			const auto &token_filter = p_query->token_filter();
+
+			return create_alignment_matcher(
+				p_query, p_document, metric, metric->alignment_def(),
+				gen.create_filtered(p_query, p_document, token_filter));
+		});
+
 	} else {
 
 		std::ostringstream err;

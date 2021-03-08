@@ -43,6 +43,38 @@ public:
 
 typedef std::shared_ptr<Matcher> MatcherRef;
 
+class MatcherFactory;
+typedef std::shared_ptr<MatcherFactory> MatcherFactoryRef;
+
+template<typename Make>
+class MatcherFactoryImpl;
+
+class MatcherFactory {
+public:
+	virtual MatcherRef create_matcher(const DocumentRef &p_document) const = 0;
+
+	virtual ~MatcherFactory() {
+	}
+
+	template<typename Make>
+	static inline MatcherFactoryRef create(const Make &p_make) {
+		return std::make_shared<MatcherFactoryImpl<Make>>(p_make);
+	}
+};
+
+template<typename Make>
+class MatcherFactoryImpl : public MatcherFactory {
+	const Make m_make;
+
+public:
+    inline MatcherFactoryImpl(const Make &p_make) : m_make(p_make) {
+	}
+
+	virtual MatcherRef create_matcher(const DocumentRef &p_document) const {
+		return m_make(p_document);
+	}
+};
+
 class ExternalMatcher : public Matcher {
 public:
 	ExternalMatcher(const QueryRef &p_query,

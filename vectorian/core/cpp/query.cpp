@@ -9,12 +9,8 @@ ResultSetRef Query::match(
 	ResultSetRef matches = std::make_shared<ResultSet>(
 		max_matches(), min_score());
 
-	const auto me = shared_from_this();
-
-	for (const auto &metric : m_metrics) {
-		const auto matcher = metric->create_matcher(
-			me,
-			p_document);
+	for (const auto &strategy : m_match_strategies) {
+		const auto matcher = strategy.matcher_factory->create_matcher(p_document);
 
 		matcher->initialize();
 

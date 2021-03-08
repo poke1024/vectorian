@@ -76,6 +76,8 @@ class Metric;
 typedef std::shared_ptr<Metric> MetricRef;
 class Matcher;
 typedef std::shared_ptr<Matcher> MatcherRef;
+class MatcherFactory;
+typedef std::shared_ptr<MatcherFactory> MatcherFactoryRef;
 class Match;
 typedef std::shared_ptr<Match> MatchRef;
 class ResultSet;

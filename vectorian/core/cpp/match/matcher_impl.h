@@ -124,6 +124,7 @@ public:
 		}
 
 		const MatcherRef matcher = this->shared_from_this();
+		//this->needs_magnitudes()
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
