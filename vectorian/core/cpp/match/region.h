@@ -1,6 +1,13 @@
+#ifndef __VECTORIAN_REGION_H__
+#define __VECTORIAN_REGION_H__
+
 #include "common.h"
 #include "vocabulary.h"
-#include "match/match.h"
+
+struct TokenScore {
+	float similarity;
+	float weight;
+};
 
 class Region {
 	const Slice m_s;
@@ -104,3 +111,5 @@ public:
 };
 
 typedef std::shared_ptr<MatchedRegion> MatchedRegionRef;
+
+#endif // __VECTORIAN_REGION_H__

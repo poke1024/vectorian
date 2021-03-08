@@ -1,13 +1,14 @@
-template<typename SliceFactory, typename Aligner>
+template<typename SliceFactory, typename Aligner, typename Finalizer>
 MatcherRef make_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
 	const SliceFactory &p_factory,
-	Aligner &&p_aligner) {
+	Aligner &&p_aligner,
+	const Finalizer &p_finalizer) {
 
-	return std::make_shared<MatcherImpl<SliceFactory, Aligner>>(
-		p_query, p_document, p_metric, std::move(p_aligner), p_factory);
+	return std::make_shared<MatcherImpl<SliceFactory, Aligner, Finalizer>>(
+		p_query, p_document, p_metric, std::move(p_aligner), p_finalizer, p_factory);
 }
 
 template<typename MakeSlice>

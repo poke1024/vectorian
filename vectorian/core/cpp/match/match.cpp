@@ -14,11 +14,11 @@ struct MatchDigest::compare {
 			if (C<int32_t>()(a.slice_id, b.slice_id)) {
 				return true;
 			} else {
+				return a.flow.get() < b.flow.get();
 
-				return std::lexicographical_compare(
+				/*return std::lexicographical_compare(
 					a.match.begin(), a.match.end(),
-					b.match.begin(), b.match.end());
-
+					b.match.begin(), b.match.end());*/
 			}
 		} else {
 			PPK_ASSERT(a.document.get() && b.document.get());
@@ -45,42 +45,17 @@ Match::Match(
 	const MatcherRef &p_matcher,
 	const DocumentRef &p_document,
 	const int32_t p_slice_id,
-	const std::vector<int16_t> &p_match,
+	const FlowRef<int16_t> &p_flow,
 	const float p_score) :
 
 	m_matcher(p_matcher),
-	m_digest(MatchDigest(p_document, p_slice_id, p_match)),
+	m_digest(MatchDigest(p_document, p_slice_id, p_flow)),
 	m_score(p_score) {
 }
 
-py::dict Match::py_assignment() const {
-	py::dict d;
-
-	// "idx" is index into aligned doc slice token for each query token.
-	{
-		const std::vector<ssize_t> shape = {
-			static_cast<ssize_t>(m_digest.match.size())};
-		d["idx"] = py::array_t<int16_t>(
-	        shape,                  // shape
-	        {sizeof(int16_t)},      // strides
-	        m_digest.match.data()); // data pointer
-	}
-
-	{
-		const std::vector<ssize_t> shape = {
-			static_cast<ssize_t>(m_scores.size())};
-		const uint8_t* const data =
-			reinterpret_cast<const uint8_t*>(m_scores.data());
-
-		d["sim"] = PY_ARRAY_MEMBER(TokenScore, similarity);
-		d["w"] = PY_ARRAY_MEMBER(TokenScore, weight);
-	}
-
-	d["flow"] = xt::pyarray<float>(m_digest.flow);
-
-	return d;
+py::dict Match::flow_to_py() const {
+	return m_digest.flow->to_py();
 }
-
 
 Slice Match::slice() const {
 	const auto &level = query()->slice_strategy().level;
@@ -89,142 +64,10 @@ Slice Match::slice() const {
 
 py::list Match::regions(const int window_size) const {
 	PPK_ASSERT(document().get() != nullptr);
-
-	const auto &s_tokens_ref = document()->tokens();
-	const auto &t_tokens_ref = query()->tokens();
-	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
-	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
-
-	const auto token_at = slice().idx;
-
-	const auto &match = this->match();
-	const auto &scores = m_scores;
-	py::list regions;
-
-	if (match.size() < 1) {
-		const auto &s0 = s_tokens.at(token_at);
-		const auto &s1 = s_tokens.at(std::min(
-			static_cast<size_t>(token_at + slice().len), s_tokens.size() - 1));
-		regions.append(std::make_shared<Region>(Slice{s0.idx, s1.idx - s0.idx}, 0.0f));
-		return regions;
-	}
-
-	PPK_ASSERT(match.size() == scores.size());
-
-	int match_0 = 0;
-	for (auto m : match) {
-		if (m >= 0) {
-			match_0 = m;
-			break;
-		}
-	}
-
-	int32_t last_anchor = std::max(0, token_at + match_0 - window_size);
-	bool last_matched = false;
-
-	const int32_t n = static_cast<int32_t>(match.size());
-
-	const TokenFilter &token_filter = query()->token_filter();
-	std::vector<int16_t> index_map;
-	if (!token_filter.all()) {
-		int16_t k = 0;
-		const auto len = slice().len;
-		index_map.resize(len);
-		for (int32_t i = 0; i < len; i++) {
-			index_map[k] = i;
-			if (token_filter(s_tokens.at(token_at + i))) {
-				k++;
-			}
-		}
-	}
-
-	struct MatchLoc {
-		int32_t i;
-		int32_t match_at_i;
-	};
-	std::vector<MatchLoc> locs;
-	locs.reserve(n);
-
-	for (int32_t i = 0; i < n; i++) {
-	    int match_at_i = match[i];
-
-		if (match_at_i < 0) {
-			continue;
-		}
-
-		if (!index_map.empty()) {
-			match_at_i = index_map[match_at_i];
-		}
-
-		locs.emplace_back(MatchLoc{i, match_at_i});
-	}
-
-	std::sort(locs.begin(), locs.end(), [] (const MatchLoc &a, const MatchLoc &b) {
-		return a.match_at_i < b.match_at_i;
-	});
-
-	for (const auto &loc : locs) {
-		const auto i = loc.i;
-		const auto match_at_i = loc.match_at_i;
-
-		const auto &s = s_tokens.at(token_at + match_at_i);
-		const auto &t = t_tokens.at(i);
-
-		const int32_t idx0 = s_tokens.at(last_anchor).idx;
-		if (s.idx > idx0) {
-
-			// this is for displaying the relative (!) penalty in the UI.
-
-			float p;
-
-			if (last_matched) {
-				p = m_matcher->gap_cost(token_at + match_at_i - last_anchor);
-			} else {
-				p = 0.0f;
-			}
-
-			regions.append(std::make_shared<Region>(
-				Slice{idx0, s.idx - idx0}, p));
-		}
-
-		regions.append(std::make_shared<MatchedRegion>(
-			scores[i],
-			Slice{s.idx, s.len},
-			Slice{t.idx, t.len},
-			query()->vocabulary(),
-			TokenRef{s_tokens_ref, token_at + match_at_i},
-			TokenRef{t_tokens_ref, i},
-			metric()->origin(s.id, i)
-		));
-
-		last_anchor = token_at + match_at_i + 1;
-		last_matched = true;
-	}
-
-	const int32_t up_to = std::min(last_anchor + window_size, int32_t(s_tokens.size() - 1));
-	if (up_to > last_anchor) {
-		const int32_t idx0 = s_tokens.at(last_anchor).idx;
-		regions.append(std::make_shared<Region>(
-			Slice{idx0, s_tokens.at(up_to).idx - idx0}));
-	}
-
-	return regions;
+	return flow()->py_regions(this, window_size);
 }
 
 py::list Match::omitted() const {
-
-	const auto &t_tokens_ref = query()->tokens();
-	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
-
-	py::list not_used;
-
-	const auto &match = this->match();
-	for (int i = 0; i < int(match.size()); i++) {
-		if (match[i] < 0) {
-			const auto &t = t_tokens.at(i);
-			not_used.append(Slice{t.idx, t.len}.to_py());
-		}
-	}
-
-	return not_used;
+	return flow()->py_omitted(this);
 }
+

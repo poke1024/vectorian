@@ -55,11 +55,11 @@ PYBIND11_MODULE(core, m) {
 	match.def(py::init<const MatcherRef&,
 		const DocumentRef&,
 		const int32_t,
-		const std::vector<int16_t>&,
+		const FlowRef<int16_t>&,
 		const float>());
 	match.def_property_readonly("query", &Match::query);
 	match.def_property_readonly("document", &Match::document);
-	match.def_property_readonly("assignment", &Match::py_assignment);
+	match.def_property_readonly("flow", &Match::flow_to_py);
 	match.def_property_readonly("score", &Match::score);
 	match.def_property_readonly("metric", &Match::metric_name);
 	match.def_property_readonly("slice_id", &Match::slice_id);

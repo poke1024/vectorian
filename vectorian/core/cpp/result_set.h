@@ -20,7 +20,7 @@ public:
 		const size_t p_max_matches,
 		const float p_min_score) :
 
-		m_flow_factory(std::make_shared<FlowFactory>()),
+		m_flow_factory(std::make_shared<FlowFactory<int16_t>>()),
 		m_max_matches(p_max_matches),
 		m_min_score(p_min_score) {
 
@@ -57,6 +57,10 @@ public:
 			m_matches.begin(),
 			m_matches.end(),
 			Match::is_greater());
+	}
+
+	inline const std::vector<MatchRef> &matches() const {
+		return m_matches;
 	}
 
 	inline size_t size() const {
@@ -109,12 +113,16 @@ public:
 
 	MatchRef add_match(
 		const MatcherRef &p_matcher,
-		MatchDigest &&p_digest,
+		const int32_t p_slice_id,
+		const FlowRef<int16_t> &p_flow,
 		const float p_score) {
 
 		const MatchRef m = std::make_shared<Match>(
 			p_matcher,
-			std::move(p_digest),
+			MatchDigest(
+				p_matcher->document(),
+				p_slice_id,
+				p_flow),
 			p_score);
 
 		this->add(m);
@@ -122,12 +130,19 @@ public:
 		return m;
 	}
 
-	const FlowFactoryRef &flow_factory() const {
+	const FlowFactoryRef<int16_t> &flow_factory() const {
 		return m_flow_factory;
 	}
 
+	template<typename Apply>
+	void modify(const Apply &p_apply) {
+		for (const auto &m : m_matches) {
+			p_apply(m);
+		}
+	}
+
 private:
-	FlowFactoryRef m_flow_factory;
+	FlowFactoryRef<int16_t> m_flow_factory;
 
 	// a heap such that m_matches[0] contains the
 	// match with the worst/lowest score.

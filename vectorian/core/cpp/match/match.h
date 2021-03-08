@@ -5,7 +5,11 @@
 #include "metric/metric.h"
 #include "query.h"
 #include "match/matcher.h"
+#include "match/region.h"
 #include <list>
+
+template<typename Index>
+class OneToOneFlow;
 
 template<typename Index>
 class Flow {
@@ -13,25 +17,73 @@ public:
 	virtual ~Flow() {
 	}
 
-	virtual const std::vector<Index> &to_map() const = 0;
-
 	virtual xt::xtensor<float, 2> to_matrix() const = 0;
+
+	virtual py::dict to_py() const = 0;
+	virtual py::list py_regions(const Match *p_match, const int window_size) const = 0;
+	virtual py::list py_omitted(const Match *p_match) const = 0;
 };
 
-typedef std::shared_ptr<Flow<int16_t>> FlowRef;
+template<typename Index>
+using FlowRef = std::shared_ptr<Flow<Index>>;
 
 template<typename Index>
 class OneToOneFlow : public Flow<Index> {
-	std::vector<Index> m_map;
+public:
+	struct Edge {
+		Index target;
+		float similarity;
+		float weight;
+	};
+
+private:
+	std::vector<Edge> m_mapping;
 
 public:
+	inline OneToOneFlow() {
+	}
+
+	inline OneToOneFlow(const std::vector<Index> &p_map) {
+		m_mapping.reserve(p_map.size());
+		for (Index i : p_map) {
+			m_mapping.emplace_back(Edge{i, 0.0f, 0.0f});
+		}
+	}
+
+	inline std::vector<Edge> &mapping() {
+		return m_mapping;
+	}
+
 	inline void initialize(const Index p_source_size) {
-		m_map.resize(p_source_size);
+		m_mapping.resize(p_source_size);
 	}
 
 	inline void set(const Index i, const Index j) {
-		m_map[i] = j;
+		m_mapping[i].target = j;
 	}
+
+	virtual xt::xtensor<float, 2> to_matrix() const {
+		return xt::xtensor<float, 2>();
+	}
+
+	virtual py::dict to_py() const {
+		py::dict d;
+
+		const std::vector<ssize_t> shape = {
+			static_cast<ssize_t>(m_mapping.size())};
+		const uint8_t* const data =
+			reinterpret_cast<const uint8_t*>(m_mapping.data());
+
+		d["type"] = py::str("1:1");
+		d["idx"] = PY_ARRAY_MEMBER(Edge, target);
+		d["sim"] = PY_ARRAY_MEMBER(Edge, similarity);
+		d["w"] = PY_ARRAY_MEMBER(Edge, weight);
+
+		return d;
+	}
+
+	virtual py::list py_regions(const Match *p_match, const int window_size) const;
+	virtual py::list py_omitted(const Match *p_match) const;
 };
 
 template<typename Index>
@@ -45,26 +97,33 @@ public:
 };
 
 template<typename Index>
+using OneToOneFlowRef = std::shared_ptr<OneToOneFlow<Index>>;
+
+template<typename Index>
 class NToNFlow : public Flow<Index> {
 	xt::xtensor<float, 2> m_matrix;
 };
 
+template<typename Index>
 class FlowFactory {
 	// foonathan::memory::memory_pool<> m_pool;
 	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
 public:
-	//OneToOneFlowRef create_1_to_1();
-	//OneToOneFlowRef create_1_to_1(const std::vector<Index> &p_match);
+	OneToOneFlowRef<Index> create_1_to_1(
+		const std::vector<Index> &p_match) {
+
+		return std::make_shared<OneToOneFlow<Index>>(p_match);
+	}
 };
 
-typedef std::shared_ptr<FlowFactory> FlowFactoryRef;
+template<typename Index>
+using FlowFactoryRef = std::shared_ptr<FlowFactory<Index>>;
 
 class MatchDigest {
 public:
 	DocumentRef document;
 	int32_t slice_id;
-	std::vector<int16_t> match;
-	xt::xtensor<float, 2> flow;
+	FlowRef<int16_t> flow;
 
 	template<template<typename> typename C>
 	struct compare;
@@ -72,26 +131,19 @@ public:
 	inline MatchDigest(
 		const DocumentRef &p_document,
 		const int32_t p_slice_id,
-		const std::vector<int16_t> &p_match) :
+		const FlowRef<int16_t> &p_flow) :
 
 		document(p_document),
 		slice_id(p_slice_id),
-		match(p_match) {
+		flow(p_flow) {
 	}
-};
-
-struct TokenScore {
-	float similarity;
-	float weight;
 };
 
 class Match {
 private:
 	MatcherRef m_matcher;
-
 	const MatchDigest m_digest;
 	float m_score; // overall score
-	std::vector<TokenScore> m_scores;
 
 public:
 	Match(
@@ -103,8 +155,12 @@ public:
 		const MatcherRef &p_matcher,
 		const DocumentRef &p_document,
 		const int32_t p_slice_id,
-		const std::vector<int16_t> &p_match,
+		const FlowRef<int16_t> &p_flow,
 		const float p_score);
+
+	inline const MatcherRef &matcher() const {
+		return m_matcher;
+	}
 
 	inline const QueryRef &query() const {
 		return m_matcher->query();
@@ -126,15 +182,11 @@ public:
 		return m_digest.slice_id;
 	}
 
-	inline const std::vector<int16_t> &match() const {
-		return m_digest.match;
-	}
-
-	inline const xt::xtensor<float, 2> flow() const {
+	inline const FlowRef<int16_t> &flow() const {
 		return m_digest.flow;
 	}
 
-	py::dict py_assignment() const;
+	py::dict flow_to_py() const;
 
 	Slice slice() const;
 
@@ -154,13 +206,13 @@ public:
 	using is_less = compare_by_score<std::less>;
 
 	template<typename Scores>
-	void compute_scores(const Scores &p_scores, int p_len_s, int p_len_t);
+	void compute_scores(const Scores &p_scores);
 
-	void print_scores() const {
+	/*void print_scores() const {
 		for (auto s : m_scores) {
 			printf("similarity: %f, weight: %f\n", s.similarity, s.weight);
 		}
-	}
+	}*/
 };
 
 typedef std::shared_ptr<Match> MatchRef;

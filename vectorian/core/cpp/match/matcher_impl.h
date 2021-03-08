@@ -33,7 +33,7 @@ public:
 	virtual void initialize() {
 		m_no_match = std::make_shared<Match>(
 			this->shared_from_this(),
-			MatchDigest(m_document, -1, std::vector<int16_t>()),
+			MatchDigest(m_document, -1, FlowRef<int16_t>()),
 			m_query->min_score()
 		);
 	}
@@ -54,23 +54,9 @@ void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	std::reverse(match.begin(), match.end());
 }
 
-/*template<typename S>
-inline size_t compute_len_s(
-	const S &p_slices,
-	const size_t p_token_at,
-	const size_t p_index,
-	const size_t p_window_size) {
-
-	const size_t n_slices = slices.size();
-
-	size_t len_s = 0;
-	const auto &slice_data = slices[p_index + p_window_size];
-	return slice_data.token_at - p_token_at;
-}*/
-
-template<typename SliceFactory, typename Aligner>
+template<typename SliceFactory, typename Aligner, typename Finalizer>
 class MatcherImpl : public MatcherBase<Aligner> {
-
+	const Finalizer m_finalizer;
 	const SliceFactory m_slice_factory;
 
 public:
@@ -79,6 +65,7 @@ public:
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
 		Aligner &&p_aligner,
+		const Finalizer &p_finalizer,
 		const SliceFactory &p_slice_factory) :
 
 		MatcherBase<Aligner>(
@@ -86,11 +73,14 @@ public:
 			p_document,
 			p_metric,
 			std::move(p_aligner)),
+		m_finalizer(p_finalizer),
 		m_slice_factory(p_slice_factory) {
 	}
 
 	virtual void match(
 		const ResultSetRef &p_matches) {
+
+		PPK_ASSERT(p_matches->size() == 0);
 
 		const auto &slice_strategy = this->m_query->slice_strategy();
 
@@ -128,13 +118,12 @@ public:
 			const MatchRef m = this->m_aligner.make_match(
 				matcher, slice, p_matches);
 
-			if (m.get()) {
-				m->compute_scores(
-					m_slice_factory, len_s, len_t);
-			}
-
 			token_at += spans->safe_len(
 				slice_id, slice_strategy.window_step);
 		}
+
+		p_matches->modify([this] (const auto &match) {
+			this->m_finalizer(match);
+		});
 	}
 };

@@ -121,11 +121,66 @@ public:
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
-				MatchDigest(p_matcher->document(), p_slice.id(), m_aligner->match()),
+				p_slice.id(),
+				p_result_set->flow_factory()->create_1_to_1(m_aligner->match()),
 				score);
 		} else {
 			return MatchRef();
 		}
+	}
+
+	template<typename SliceFactory>
+	class ScoreComputer {
+		const SliceFactory m_factory;
+
+	public:
+		inline ScoreComputer(const SliceFactory &p_factory) : m_factory(p_factory) {
+		}
+
+		void operator()(const MatchRef &p_match) const {
+			auto *flow = static_cast<OneToOneFlow<Index>*>(p_match->flow().get());
+			auto &mapping = flow->mapping();
+
+		    const auto match_slice = p_match->slice();
+	        const auto token_at = match_slice.idx;
+
+	        Index end = 0;
+	        for (auto m : mapping) {
+	            end = std::max(end, m.target);
+	        }
+
+			const Token *s_tokens = p_match->document()->tokens()->data();
+			const auto &t_tokens = p_match->query()->tokens();
+
+	        const auto slice = m_factory.create_slice(
+	            0,
+	            TokenSpan{s_tokens + token_at, match_slice.len},
+	            TokenSpan{t_tokens->data(), static_cast<int32_t>(t_tokens->size())});
+
+	        Index i = 0;
+	        for (auto &m : mapping) {
+	            if (m.target >= 0) {
+	                m.similarity = slice.unmodified_similarity(m.target, i);
+	                m.weight = 1.0f; // FIXME; was: slice.weight(m, i)
+	            } else {
+	                m.similarity = 0.0f;
+	                m.weight = 0.0f;
+	            }
+	            i++;
+	        }
+		}
+	};
+
+	template<typename SliceFactory>
+	static ScoreComputer<SliceFactory> create_score_computer(const SliceFactory &p_factory) {
+		return ScoreComputer<SliceFactory>(p_factory);
+	}
+};
+
+class NoScoreComputer {
+public:
+	inline void operator()(const MatchRef &) const {
+		// no op.
 	}
 };
 
@@ -242,7 +297,8 @@ public:
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
-				MatchDigest(p_matcher->document(), p_slice.id(), r.wmd.match()),
+				p_slice.id(),
+				p_result_set->flow_factory()->create_1_to_1(r.wmd.match()),
 				score);
 		} else {
 			return MatchRef();
@@ -281,7 +337,8 @@ public:
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
-				MatchDigest(p_matcher->document(), p_slice.id(), m_wrd.match()),
+				p_slice.id(),
+				p_result_set->flow_factory()->create_1_to_1(m_wrd.match()),
 				score);
 		} else {
 			return MatchRef();
@@ -338,7 +395,8 @@ MatcherRef create_alignment_matcher(
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)));
+			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)),
+			WatermanSmithBeyer<Index>::create_score_computer(p_factory));
 
 	} else if (algorithm == "rwmd") {
 
@@ -359,12 +417,14 @@ MatcherRef create_alignment_matcher(
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
 			std::move(RelaxedWordMoversDistance<Index>(
-				normalize_bow, symmetric, one_target)));
+				normalize_bow, symmetric, one_target)),
+			NoScoreComputer());
 
 	} else if (algorithm == "wrd") {
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
-			std::move(WordRotatorsDistance<Index>()));
+			std::move(WordRotatorsDistance<Index>()),
+			NoScoreComputer());
 
 	} else {
 
