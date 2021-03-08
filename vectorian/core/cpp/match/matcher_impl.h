@@ -34,10 +34,10 @@ public:
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
-		const Aligner &p_aligner) :
+		Aligner &&p_aligner) :
 
 		Matcher(p_query, p_document, p_metric),
-		m_aligner(p_aligner) {
+		m_aligner(std::move(p_aligner)) {
 
 		const auto &slice_strategy = p_query->slice_strategy();
 
@@ -94,14 +94,14 @@ public:
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
-		const Aligner &p_aligner,
+		Aligner &&p_aligner,
 		const SliceFactory &p_slice_factory) :
 
 		MatcherBase<Aligner>(
 			p_query,
 			p_document,
 			p_metric,
-			p_aligner),
+			std::move(p_aligner)),
 		m_slice_factory(p_slice_factory) {
 	}
 

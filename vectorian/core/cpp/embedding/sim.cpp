@@ -10,8 +10,8 @@ struct Cosine {
 		//PPK_ASSERT(p_s >= 0 && p_s < p_vectors.normalized.rows());
 		//PPK_ASSERT(p_t >= 0 && p_t < p_vectors.normalized.rows());
 
-		auto s = xt::view(p_vectors.normalized, p_s, xt::all());
-		auto t = xt::view(p_vectors.normalized, p_t, xt::all());
+		const auto s = xt::view(p_vectors.normalized, p_s, xt::all());
+		const auto t = xt::view(p_vectors.normalized, p_t, xt::all());
 		return xt::linalg::dot(s, t)();
 	}
 };

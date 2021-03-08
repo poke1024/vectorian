@@ -26,6 +26,8 @@ if platform.system() == 'Linux':
 	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
 cfg['include_dirs'].append('../../../lib')
+#cfg['include_dirs'].append('../../../lib/memory/include')
+#cfg['include_dirs'].append('../../../lib/memory/src')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
 
 old_pyarrow = 1 if compare_versions(

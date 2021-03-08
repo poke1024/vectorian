@@ -1,4 +1,5 @@
 #include "common.h"
+
 #include <xtensor/xadapt.hpp>
 
 struct WMDOptions {
@@ -42,6 +43,8 @@ public:
 		}
 	};
 
+	typedef std::vector<Index> IndexVector;
+
 	struct Document {
 		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
 		std::vector<float> bow; // (n)bow
@@ -49,15 +52,23 @@ public:
 		std::vector<VocabPair> vocab;
 		// Eigen::Array<Index, 2, Eigen::Dynamic> pos_to_vocab;
 		std::vector<Index> pos_to_vocab;
-		std::vector<Index> vocab_to_pos; // not correct, since 1:n
+		std::vector<IndexVector> vocab_to_pos; // 1:n
 
-		void resize(const size_t p_size) {
+		void resize(WMD &p_wmd, const size_t p_size) {
 			bow.resize(p_size);
 			vocab.reserve(p_size);
 			pos_to_vocab.resize(p_size);
-			vocab_to_pos.resize(p_size);
+			vocab_to_pos.reserve(p_size);
+			for (size_t i = 0; i < p_size; i++) {
+				vocab_to_pos.emplace_back(std::vector<Index>());
+				vocab_to_pos.back().reserve(p_size);
+			}
 		}
 	};
+
+#if VECTORIAN_MEMORY_POOLS
+	foonathan::memory::memory_pool<> m_pool;
+#endif
 
 	size_t m_size;
 
@@ -68,9 +79,17 @@ public:
 	std::vector<DistanceRef> m_candidates;
 	std::vector<Index> m_result;
 
+#if VECTORIAN_MEMORY_POOLS
+	WMD() : m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB) {
+	}
+#endif
+
 	void resize(
 		const size_t max_len_s,
 		const size_t max_len_t) {
+
+		PPK_ASSERT(max_len_s > 0);
+		PPK_ASSERT(max_len_t > 0);
 
 		const size_t size = max_len_s + max_len_t;
 
@@ -78,7 +97,7 @@ public:
 		m_tokens.resize(size);
 
 		for (int i = 0; i < 2; i++) {
-			m_doc[i].resize(size);
+			m_doc[i].resize(*this, size);
 		}
 
 		m_distance_matrix.resize({size, size});
@@ -127,8 +146,10 @@ public:
 		reset(k);
 
 		for (int i = 0; i < 2; i++) {
-			m_doc[i].w_sum = 0;
-			m_doc[i].vocab.clear();
+			auto &doc = m_doc[i];
+			doc.w_sum = 0;
+			doc.vocab.clear();
+			doc.vocab_to_pos[0].clear();
 		}
 
 		auto cur_word_id = m_tokens[0].word_id;
@@ -139,19 +160,20 @@ public:
 			const auto &token = m_tokens[i];
 			const auto new_word_id = token.word_id;
 
+			const int j = token.j;
+			auto &doc = m_doc[j];
+
 			if (new_word_id != cur_word_id) {
 				cur_word_id = new_word_id;
 				vocab += 1;
 				vocab_mask = 0;
+				doc.vocab_to_pos[vocab].clear();
 			}
-
-			const int j = token.j;
-			auto &doc = m_doc[j];
 
 			doc.bow[vocab] += 1.0f;
 			doc.w_sum += 1;
 			doc.pos_to_vocab[token.i] = vocab;
-			doc.vocab_to_pos[vocab] = token.i;
+			doc.vocab_to_pos[vocab].push_back(token.i);
 
 			if ((vocab_mask & (1 << j)) == 0) {
 				doc.vocab.emplace_back(
@@ -326,8 +348,8 @@ public:
 
 					// for j in doc_s.vocab_to_pos(j):
 					//  flow[j, i] = 1.0f  // s -> t
-
-					this->m_match[i] = doc_s.vocab_to_pos[j]; // not ideal
+					auto &items = doc_s.vocab_to_pos[j];
+					this->m_match[i] = items.front(); // not ideal
 				}
 			} else { // w1 is s
 				// FIXME

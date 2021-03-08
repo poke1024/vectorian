@@ -18,11 +18,16 @@ struct WordVectors {
 	}
 
 	void update_normalized() {
+		constexpr float eps = std::numeric_limits<float>::epsilon() * 100.0f;
 		normalized.resize({unmodified.shape(0), unmodified.shape(1)});
 		for (size_t j = 0; j < unmodified.shape(0); j++) {
 			const auto row = xt::view(unmodified, j, xt::all());
 			const float len = xt::linalg::norm(row);
-			xt::view(normalized, j, xt::all()) = row / len;
+			if (len > eps) {
+				xt::view(normalized, j, xt::all()) = row / len;
+			} else {
+				xt::view(normalized, j, xt::all()).fill(0.0f);
+			}
 		}
 	}
 

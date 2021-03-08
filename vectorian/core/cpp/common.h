@@ -5,6 +5,7 @@
 #include <xtensor/xmath.hpp>
 #include <xtensor/xview.hpp>
 #include <xtensor/xio.hpp>
+#include <xtensor/xnorm.hpp>
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor-python/pyarray.hpp>
 
@@ -20,6 +21,8 @@
 
 #define PPK_ASSERT_ENABLED 1
 #include <ppk_assert.h>
+
+#define VECTORIAN_MEMORY_POOLS 0
 
 
 namespace py = pybind11;

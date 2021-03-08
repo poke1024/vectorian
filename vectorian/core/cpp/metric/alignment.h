@@ -327,7 +327,7 @@ MatcherRef create_alignment_matcher(
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			WatermanSmithBeyer<int16_t>(gap_cost, zero));
+			std::move(WatermanSmithBeyer<int16_t>(gap_cost, zero)));
 
 	} else if (algorithm == "rwmd") {
 
@@ -347,13 +347,13 @@ MatcherRef create_alignment_matcher(
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			RelaxedWordMoversDistance<int16_t>(
-				normalize_bow, symmetric, one_target));
+			std::move(RelaxedWordMoversDistance<int16_t>(
+				normalize_bow, symmetric, one_target)));
 
 	} else if (algorithm == "wrd") {
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
-			WordRotatorsDistance<int16_t>());
+			std::move(WordRotatorsDistance<int16_t>()));
 
 	} else {
 
