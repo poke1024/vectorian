@@ -4,6 +4,7 @@ import time
 import string
 import collections
 import roman
+import json
 
 from yattag import Doc
 
@@ -26,7 +27,14 @@ class Renderer:
 		doc, tag, text = Doc().tagtext()
 		doc.asis('<!DOCTYPE html>')
 		self._html = (doc, tag, text)
+		self._flows = dict()
 		self._annotate = annotate or {}
+		self._id_base = f"vectorian-{time.time_ns()}-{id(self)}"
+		self._id_index = 0
+
+	def _next_unique_id(self):
+		self._id_index += 1
+		return self._id_base + f"-{self._id_index}"
 
 	def add_context_text(self, s):
 		doc, tag, text = self._html
@@ -103,24 +111,36 @@ class Renderer:
 		with tag('span', klass='has-text-weight-bold'):
 			text("%.1f%%" % (100 * match['score']))
 
-	def add_match(self, match):
+	def add_match(self, match_obj, location_formatter):
+		match = match_obj.to_json(location_formatter)
+
 		doc, tag, text = self._html
 		with tag('article', klass="media"):
 			with tag('div', klass='media-left'):
 				with tag('p', klass='image is-64x64'):
 					with tag('span', klass='buttons'):
 						self.add_match_score(match)
-						doc.stag('br')
-						with tag('div'):
-							if len(match['omitted']) <= 2:
-								for x in match['omitted']:
-									with tag('div', style='text-decoration: line-through;'):
-										text(x)
-							else:
-								with tag('div', style='white-space: nowrap;'):
-									text(f"{len(match['omitted'])} omitted")
 
-					# FIXME annotateDebug
+						if match['omitted']:
+							doc.stag('br')
+							with tag('div'):
+								if len(match['omitted']) <= 2:
+									for x in match['omitted']:
+										with tag('div', style='text-decoration: line-through;'):
+											text(x)
+								else:
+									with tag('div', style='white-space: nowrap;'):
+										text(f"{len(match['omitted'])} omitted")
+
+						if self._annotate.get('metadata'):
+							doc.stag('br')
+							with tag('div', klass="is-size-7"):
+								for k, v in match['document'].items():
+									if v:
+										with tag('div'):
+											text(f"doc/{k}: {v}")
+								with tag('div'):
+									text("slice: " + str(match['slice']))
 
 			with tag('div', klass='media-content'):
 				speaker = match['r_location']['speaker']
@@ -156,6 +176,54 @@ class Renderer:
 								if i < len(regions) - 1:
 									text(" ")
 
+					if self._annotate.get('flow'):
+						flow_div_id = self._next_unique_id()
+						with tag('div', id=flow_div_id):
+							self._flows[flow_div_id] = match_obj
+
+	def _flow_js(self, div_id, match, cutoff=0.1):
+		flow = match.flow
+		if flow is None:
+			return ''
+
+		'''
+		sankey = hv.Sankey([
+    ['A', 'X', 5],
+    ['A', 'Y', 7],
+    ['A', 'Z', 6],
+    ['B', 'X', 2],
+    ['B', 'Y', 9],
+    ['B', 'Z', 4]]
+)
+sankey.opts(width=600, height=400)
+		'''
+
+		template = string.Template('''
+anychart.onDocumentReady(function(){
+	var data = $data;
+	var sankey_chart = anychart.sankey(data);
+	sankey_chart.nodeWidth("20%");
+	sankey_chart.title("");
+	sankey_chart.nodePadding(20);
+	sankey_chart.container("$div_id");
+	sankey_chart.draw();
+});
+''')
+
+		if flow['type'] == 'sparse':
+			s_span = match.doc_span
+			t_span = match.query
+
+			data = []
+			for t, s, w in zip(flow['source'], flow['target'], flow['weight']):
+				if w > cutoff:
+					data.append({
+						'from': t_span[t].text,
+						'to': s_span[s].text,
+						'weight': w})
+
+		return template.safe_substitute(div_id=div_id, data=json.dumps(data))
+
 	def to_html(self):
 		doc, tag, text = self._html
 
@@ -166,22 +234,27 @@ class Renderer:
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>Vectorian</title>
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+		<script src="https://cdn.anychart.com/releases/v8/js/anychart-core.min.js"></script>
+		<script src="https://cdn.anychart.com/releases/v8/js/anychart-sankey.min.js"></script>
 	</head>
 	<body>
 		<div class="container" height="100%">
 			<div class="section">
 '''
-		epilog = '''
+		epilog = string.Template('''
 			</div>
 		</div>
+		<script>
+			$script_code
+		</script>
 	</body>
-</html>'''
+</html>''')
 
 		# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
 
-		iframe_id = f"vectorian-iframe-{time.time_ns()}"
+		iframe_id = self._next_unique_id()
 
-		iframe = string.Template("""
+		iframe = string.Template('''
 <iframe
 	id="$id"
 	width="$width"
@@ -191,16 +264,29 @@ class Renderer:
 	allowfullscreen
 ></iframe>
 <script>
-	var f = document.getElementById("$id");
-	f.onload = function() {
-		f.height = f.contentWindow.document.body.scrollHeight + "px";
-	};
+	$script_code
 </script>
-		""")
+''')
 
-		s = ''.join([prolog, doc.getvalue(), epilog])
-		return iframe.safe_substitute(dict(
-			id=iframe_id, width="100%", height="100%", srcdoc=html.escape(s)))
+		resize_script_code = string.Template('''
+var f = document.getElementById("$id");
+f.onload = function() {
+	f.height = f.contentWindow.document.body.scrollHeight + "px";
+};
+''')
+
+		scripts = []
+		for div_id, match_obj in self._flows.items():
+			scripts.append(self._flow_js(div_id, match_obj))
+		s = ''.join([
+			prolog,
+			doc.getvalue(),
+			epilog.safe_substitute(script_code="".join(scripts))])
+
+		return iframe.safe_substitute(
+			id=iframe_id, width="100%", height="100%",
+			srcdoc=html.escape(s),
+			script_code=resize_script_code.safe_substitute(id=iframe_id))
 
 
 Location = collections.namedtuple("Location", ["speaker", "location"])
@@ -268,52 +354,3 @@ class LocationFormatter:
 			if x:
 				return x
 		return None
-
-
-'''
-https://medium.com/hackernoon/create-javascript-sankey-diagram-b68c0d508a38
-
-<html>
-<head>
-<script src="https://cdn.anychart.com/releases/v8/js/anychart-core.min.js"></script>
-<script src="https://cdn.anychart.com/releases/v8/js/anychart-sankey.min.js"></script>
-</head>
-<body>
-<div id="container"></div>
-<script>
-anychart.onDocumentReady(function(){
- //creating the data
- var data = [
- {from: "Google", to: "Facebook", weight: 20000},
- {from: "Google", to: "Twitter", weight: 17000},
- {from: "Google", to: "YouTube", weight: 8000},
- {from: "Google", to: "Wikipedia", weight: 11000},
- {from: "Bing", to: "Facebook", weight: 7500},
- {from: "Bing", to: "Twitter", weight: 5000},
- {from: "Bing", to: "Wikipedia", weight: 4000}
- ];
-//calling the Sankey function
-var sankey_chart = anychart.sankey(data);
-//customizing the width of the nodes
-sankey_chart.nodeWidth("20%");
-//setting the chart title
-sankey_chart.title("Sankey Diagram Customization Example");
-//customizing the vertical padding of the nodes
-sankey_chart.nodePadding(20);
-//customizing the visual appearance of nodes
-sankey_chart.node().normal().fill("#64b5f5 0.6");
-sankey_chart.node().hovered().fill(anychart.color.darken("#64b5f7"));
-sankey_chart.node().normal().stroke("#455a63", 2);
-//customizing the visual appearance of flows
-sankey_chart.flow().normal().fill("#ffa000 0.5");
-sankey_chart.flow().hovered().fill(anychart.color.darken("#ffa000"));
-sankey_chart.flow().hovered().stroke("#455a63");
-//setting the container id
-sankey_chart.container("container");
-//initiating drawing the Sankey diagram
-sankey_chart.draw();
-});
-</script>
-</body>
-</html>
-'''

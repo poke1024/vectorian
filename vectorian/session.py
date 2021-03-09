@@ -200,17 +200,18 @@ class LabResult(Result):
 
 	def _render(self, r):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
-		for match in self.to_json(self._location_formatter):
-			r.add_match(match)
+		for match in self._matches:
+			r.add_match(match, self._location_formatter)
 		return r.to_html()
 
-	def annotate(self, tags=True, metric=True, penalties=True, **kwargs):
+	def annotate(self, *args):
+		# e.g. tags, metric, penalties, metadata, flow
 		return LabResult(
 			self.index,
 			self._matches,
 			self._duration,
 			self._location_formatter,
-			annotate=dict(tags=tags, metric=metric, penalties=penalties, **kwargs))
+			annotate=dict((k, True) for k in args))
 
 	def _repr_html_(self):
 		return self._render(Renderer(annotate=self._annotate))

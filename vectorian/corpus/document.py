@@ -183,6 +183,9 @@ class Document:
 
 
 class Token:
+	_css = 'background:	#DCDCDC; border-radius:0.25em;'
+	_html_template = '<span style="{style}">{text}</span>'
+
 	def __init__(self, doc, table, index):
 		self._doc = doc
 		self._table = table
@@ -197,7 +200,8 @@ class Token:
 		return self._doc.text[self.to_slice()]
 
 	def _repr_html_(self):
-		return f'<span style="background:lightgray; border-radius:0.25em;">{html.escape(self.text)}</span>'
+		return Token._html_template.format(
+			style=Token._css, text=html.escape(self.text))
 
 
 class Span:
