@@ -3,6 +3,7 @@ import pyarrow as pa
 import pandas as pd
 import vectorian.core as core
 import collections
+import html
 
 from functools import lru_cache
 from slugify import slugify
@@ -195,6 +196,9 @@ class Token:
 	def text(self):
 		return self._doc.text[self.to_slice()]
 
+	def _repr_html_(self):
+		return f'<span style="background:lightgray; border-radius:0.25em;">{html.escape(self.text)}</span>'
+
 
 class Span:
 	def __init__(self, doc, table, start, end):
@@ -221,6 +225,12 @@ class Span:
 			self._end - self._start, 1)
 
 		return self._doc.text[i0:i1]
+
+	def _repr_html_(self):
+		tokens = []
+		for i in range(self._end - self._start):
+			tokens.append(self[i]._repr_html_())
+		return " ".join(tokens)
 
 
 class PreparedDocument:

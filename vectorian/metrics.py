@@ -139,9 +139,9 @@ class SentenceSimilarityMetric:
 
 
 class AlignmentSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, word_metric: TokenSimilarityMetric, alignment=None):
-		if not isinstance(word_metric, TokenSimilarityMetric):
-			raise TypeError(word_metric)
+	def __init__(self, token_metric: TokenSimilarityMetric, alignment=None):
+		if not isinstance(token_metric, TokenSimilarityMetric):
+			raise TypeError(token_metric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -149,8 +149,16 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 		if not isinstance(alignment, AlignmentAlgorithm):
 			raise TypeError(alignment)
 
-		self._word_metric = word_metric
+		self._token_metric = token_metric
 		self._alignment = alignment
+
+	@property
+	def token_similarity_metric(self):
+		return self._token_metric
+
+	@property
+	def alignment(self):
+		return self._alignment
 
 	def create_index(self, partition, **kwargs):
 		return BruteForceIndex(partition, self, **kwargs)
@@ -158,7 +166,7 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 	def to_args(self, partition):
 		return {
 			'metric': 'alignment-isolated',
-			'word_metric': self._word_metric.to_args(),
+			'token_metric': self._token_metric.to_args(),
 			'alignment': self._alignment.to_args(partition)
 		}
 

@@ -25,6 +25,9 @@ class ConstantGapCost(GapCost):
 	def __init__(self, cost):
 		self._cost = cost
 
+	def to_description(self):
+		return f'ConstantGapCost({self._cost})'
+
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
 		c.fill(self._cost)
@@ -37,6 +40,9 @@ class LinearGapCost(GapCost):
 	def __init__(self, step, start=None):
 		self._step = step
 		self._start = step if start is None else start
+
+	def to_description(self):
+		return f'LinearGapCost({self._step}, {self._start})'
 
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
@@ -53,6 +59,9 @@ class ExponentialGapCost(GapCost):
 	def __init__(self, cutoff):
 		self._cutoff = cutoff
 
+	def to_description(self):
+		return f'ExponentialGapCost({self._cutoff})'
+
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
 		for i in range(n):
@@ -65,6 +74,9 @@ class CustomGapCost(GapCost):
 	def __init__(self, costs_fn):
 		self._costs_fn = costs_fn
 
+	def to_description(self):
+		return f'CustomGapCost({self._costs_fn})'
+
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
 		c[0] = 0
@@ -75,6 +87,9 @@ class CustomGapCost(GapCost):
 
 
 class AlignmentAlgorithm:
+	def to_description(self, partition):
+		raise NotImplementedError()
+
 	def to_args(self, partition):
 		raise NotImplementedError()
 
@@ -85,6 +100,14 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 			gap = ConstantGapCost(0)
 		self._gap = gap
 		self._zero = zero
+
+	def to_description(self, partition):
+		return {
+			'WatermanSmithBeyer': {
+				'gap': self._gap.to_description(),
+				'zero': self._zero
+			}
+		}
 
 	def to_args(self, partition):
 		return {
@@ -101,17 +124,17 @@ class WordMoversDistance(AlignmentAlgorithm):
 			'repr': 'nbow',
 			'symmetric': True
 		},
-		'relaxed-kusner': {
+		'relaxed/kusner': {
 			'multiplicity': '1:1',
 			'repr': 'nbow',
 			'symmetric': True
 		},
-		'relaxed-vectorian': {
+		'relaxed/vectorian': {
 			'multiplicity': '1:1',
 			'repr': 'bow',
 			'symmetric': False,
 		},
-		'relaxed-jablonsky': {
+		'relaxed/jablonsky': {
 			'multiplicity': '1:n',
 			'repr': 'nbow',
 			'symmetric': True,
@@ -121,13 +144,18 @@ class WordMoversDistance(AlignmentAlgorithm):
 	def __init__(self, variant=None, options=None):
 		if options is None:
 			if variant is None:
-				variant = 'relaxed-vectorian'
+				variant = 'relaxed/vectorian'
 			self._options = WordMoversDistance._variants.get(variant)
 			if self._options is None:
 				raise ValueError(f"unsupported WMD variant {variant}")
 		else:
 			assert variant is None
 			self._options = options
+
+	def to_description(self, partition):
+		return {
+			'WordMoversDistance': self._options
+		}
 
 	def to_args(self, partition):
 		multiplicity = self._options['multiplicity']
@@ -161,6 +189,11 @@ class WordMoversDistance(AlignmentAlgorithm):
 class WordRotatorsDistance(AlignmentAlgorithm):
 	def __init__(self):
 		pass
+
+	def to_description(self, partition):
+		return {
+			'WordRotatorsDistance': {}
+		}
 
 	def to_args(self, partition):
 		return {

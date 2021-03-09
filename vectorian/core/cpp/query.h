@@ -174,7 +174,7 @@ public:
 			const auto metric = m_vocab->create_metric(
 				shared_from_this(),
 				metric_def_dict,
-				metric_def_dict["word_metric"]);
+				metric_def_dict["token_metric"]);
 
 			const auto matcher_factory =
 				metric->create_matcher_factory(shared_from_this());

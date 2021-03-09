@@ -5,7 +5,9 @@ import time
 import numpy as np
 import bisect
 import json
+import yaml
 
+from cached_property import cached_property
 from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
@@ -68,10 +70,16 @@ class PreparedQuery:
 	def n_tokens(self):
 		return self._token_table.num_rows
 
-	@property
+	@cached_property
 	def span(self):
 		from vectorian.corpus.document import Span
 		return Span(self, self._token_table, 0, self.n_tokens)
+
+	def __getitem__(self, i):
+		return self.span[i]
+
+	def __len__(self):
+		return len(self.span)
 
 	def _filter(self, tokens, name, k):
 		f = self._query.options.get(name, None)
@@ -108,7 +116,7 @@ PartitionData = namedtuple('PartitionData', [
 
 class Match:
 	@property
-	def span(self):
+	def doc_span(self):
 		return self.document.span(self.query.index.partition, self.slice_id)
 
 	@property
@@ -327,6 +335,17 @@ class Index:
 	@property
 	def session(self):
 		return self._partition.session
+
+	@property
+	def metric(self):
+		return self._metric
+
+	def describe(self):
+		data = {
+			'partition': self._partition.to_args(),
+			'metric': self._metric.to_args(self._partition)
+		}
+		print(yaml.dump(data))
 
 	def find(
 		self, text,

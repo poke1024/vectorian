@@ -20,13 +20,8 @@ class WMD {
 public:
 	struct RefToken {
 		WordId word_id;
-		Index i; // index in s or t
-		int8_t j; // 0 for s, 1 for t
-	};
-
-	struct VocabPair {
-		Index vocab;
-		Index i;
+		Index pos; // index in s or t
+		int8_t doc; // 0 for s, 1 for t
 	};
 
 	struct DistanceRef {
@@ -45,7 +40,7 @@ public:
 		//Eigen::Array<float, Eigen::Dynamic, 1> w1;
 		std::vector<float> bow; // (n)bow
 		Index w_sum;
-		std::vector<VocabPair> vocab;
+		std::vector<Index> vocab;
 		// Eigen::Array<Index, 2, Eigen::Dynamic> pos_to_vocab;
 		std::vector<Index> pos_to_vocab;
 		std::vector<IndexVector> vocab_to_pos; // 1:n
@@ -120,19 +115,19 @@ public:
 	inline int init(
 		const Slice &slice,
 		const MakeWordId &make_word_id,
-		const int len_s, const int len_t,
+		const Index len_s, const Index len_t,
 		const WMDOptions &p_options) {
 
-		int k = 0;
+		Index k = 0;
 		std::vector<RefToken> &z = m_tokens;
 
-		for (int i = 0; i < len_s; i++) {
+		for (Index i = 0; i < len_s; i++) {
 			z[k++] = RefToken{
-				make_word_id(slice.s(i)), static_cast<Index>(i), 0};
+				make_word_id(slice.s(i)), i, 0};
 		}
-		for (int i = 0; i < len_t; i++) {
+		for (Index i = 0; i < len_t; i++) {
 			z[k++] = RefToken{
-				make_word_id(slice.t(i)), static_cast<Index>(i), 1};
+				make_word_id(slice.t(i)), i, 1};
 		}
 
 		if (k < 1) {
@@ -153,47 +148,53 @@ public:
 		}
 
 		auto cur_word_id = m_tokens[0].word_id;
-		int vocab = 0;
-		int vocab_mask = 0;
+		Index vocab = 0;
 
-		for (int i = 0; i < k; i++) {
+		for (Index i = 0; i < k; i++) {
 			const auto &token = m_tokens[i];
 			const auto new_word_id = token.word_id;
-
-			const int j = token.j;
-			auto &doc = m_doc[j];
 
 			if (new_word_id != cur_word_id) {
 				cur_word_id = new_word_id;
 				vocab += 1;
-				vocab_mask = 0;
-				doc.vocab_to_pos[vocab].clear();
+				for (int j = 0; j < 2; j++) {
+					m_doc[j].vocab_to_pos[vocab].clear();
+				}
 			}
+
+			const int doc_idx = token.doc;
+			auto &doc = m_doc[doc_idx];
 
 			doc.bow[vocab] += 1.0f;
 			doc.w_sum += 1;
-			doc.pos_to_vocab[token.i] = vocab;
-			doc.vocab_to_pos[vocab].push_back(token.i);
+			doc.pos_to_vocab[token.pos] = vocab;
 
-			if ((vocab_mask & (1 << j)) == 0) {
-				doc.vocab.emplace_back(
-					VocabPair{
-						static_cast<Index>(vocab),
-						token.i});
+			auto &to_pos = doc.vocab_to_pos[vocab];
+			if (to_pos.empty()) {
+				doc.vocab.push_back(vocab);
 			}
-
-			vocab_mask |= 1 << j;
+			to_pos.push_back(token.pos);
 		}
 
 		if (p_options.normalize_bow) {
 			for (int c = 0; c < 2; c++) {
 				float *w = m_doc[c].bow.data();
 				const float s = m_doc[c].w_sum;
-				for (const auto &u : m_doc[c].vocab) {
-					w[u.vocab] /= s;
+				for (const Index i : m_doc[c].vocab) {
+					w[i] /= s;
 				}
 			}
 		}
+
+#if 0
+		for (size_t di = 0; di < 2; di++) {
+			for (size_t k = 0; k <= vocab; k++) {
+				for (auto i : m_doc[di].vocab_to_pos[k]) {
+					;
+				}
+			}
+		}
+#endif
 
 		return vocab + 1;
 	}
@@ -219,10 +220,12 @@ public:
 #endif
 
 		for (const auto &u : doc_s.vocab) {
+			const Index i = doc_s.vocab_to_pos[u].front();
 			for (const auto &v : doc_t.vocab) {
-				const float d = 1.0f - sim(u.i, v.i);
-				dist(u.vocab, v.vocab) = d;
-				dist(v.vocab, u.vocab) = d;
+				const Index j = doc_t.vocab_to_pos[v].front();
+				const float d = 1.0f - sim(i, j);
+				dist(u, v) = d;
+				dist(v, u) = d;
 			}
 		}
 	}
@@ -230,7 +233,7 @@ public:
 	struct Weights {
 		const float *w;
 		float sum;
-		const std::vector<VocabPair> *v;
+		const std::vector<Index> *v;
 	};
 
 	/*float _full() {
@@ -272,12 +275,11 @@ public:
 
 			const float *w1 = docs[c]->bow.data();
 			const float *w2 = docs[1 - c]->bow.data();
-			const std::vector<VocabPair> &v1 = docs[c]->vocab;
-			const std::vector<VocabPair> &v2 = docs[1 - c]->vocab;
+			const std::vector<Index> &v1 = docs[c]->vocab;
+			const std::vector<Index> &v2 = docs[1 - c]->vocab;
 
 			float acc = 0;
-			for (const auto &v1_entry : v1) {
-				const Index i = v1_entry.vocab;
+			for (const Index i : v1) {
 
 				if (p_options.one_target) {
 					// 1:1 case
@@ -286,8 +288,7 @@ public:
 					Index best_j = -1;
 
 					// find argmin.
-					for (const auto &v2_entry : v2) {
-						const Index j = v2_entry.vocab;
+					for (const Index j : v2) {
 						const float d = distance_matrix(i, j);
 						if (d < best_dist) {
 							best_dist = d;
@@ -309,8 +310,7 @@ public:
 					auto &candidates = m_candidates;
 					candidates.clear();
 
-					for (const auto &v2_entry : v2) {
-						const int j = v2_entry.vocab;
+					for (const Index j : v2) {
 						const float d = distance_matrix(i, j);
 						candidates.push_back(DistanceRef{
 							static_cast<Index>(j),
