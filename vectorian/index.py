@@ -20,6 +20,10 @@ class Query:
 		self._options = options
 
 	@property
+	def index(self):
+		return self._index
+
+	@property
 	def text(self):
 		return self._text
 
@@ -27,33 +31,66 @@ class Query:
 	def options(self):
 		return self._options
 
+	def prepare(self, nlp):
+		return PreparedQuery(self, self._vocab, nlp)
+
+
+class PreparedQuery:
+	def __init__(self, query, vocab, nlp):
+		self._query = query
+		self._vocab = vocab
+
+		doc = nlp(self.text)
+
+		tokens = doc.to_json()["tokens"]
+		tokens = self._filter(tokens, 'pos_filter', 'pos')
+		tokens = self._filter(tokens, 'tag_filter', 'tag')
+
+		token_table = TokenTable(self.index.session.token_mapper('tokenizer'))
+		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
+
+		self._token_table = token_table.to_arrow()
+		self._token_str = token_table.normalized_tokens
+
+	@property
+	def index(self):
+		return self._query.index
+
+	@property
+	def text(self):
+		return self._query.text
+
+	@property
+	def options(self):
+		return self._query.options
+
+	@property
+	def n_tokens(self):
+		return self._token_table.num_rows
+
+	@property
+	def span(self):
+		from vectorian.corpus.document import Span
+		return Span(self, self._token_table, 0, self.n_tokens)
+
 	def _filter(self, tokens, name, k):
-		f = self._options.get(name, None)
+		f = self._query.options.get(name, None)
 		if f:
 			s = set(f)
 			return [t for t in tokens if t[k] not in s]
 		else:
 			return tokens
 
-	def to_core(self, nlp):
-		doc = nlp(self._text)
-
-		tokens = doc.to_json()["tokens"]
-		tokens = self._filter(tokens, 'pos_filter', 'pos')
-		tokens = self._filter(tokens, 'tag_filter', 'tag')
-
-		token_table = TokenTable(self._index.session.token_mapper('tokenizer'))
-		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
-
+	def to_core(self):
 		# make sure all core.Documents are instantiated at this point so that
 		# the interval vocabulary is setup and complete.
-		self._index.session.c_documents
+		self.index.session.c_documents
 
 		query = core.Query(self._vocab)
 		query.initialize(
-			token_table.to_arrow(),
-			token_table.normalized_tokens,
-			**self._options)
+			self._token_table,
+			self._token_str,
+			**self._query.options)
 		return query
 
 
@@ -68,82 +105,53 @@ TokenMatch = namedtuple('TokenMatch', [
 PartitionData = namedtuple('PartitionData', [
 	'level', 'window_size', 'window_step'])
 
+
 class Match:
-	def __init__(self, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
-		self._query = query
-		self._document = document
-		self._slice_id = slice_id
-		self._score = score
-		self._metric = metric or ""
-		self._omitted = omitted or []
-		self._regions = regions or []
-		self._level = level
+	@property
+	def span(self):
+		return self.document.span(self.query.index.partition, self.slice_id)
 
-	@staticmethod
-	def from_core(session, query, c_match):
-		document = session.documents[c_match.document.id]
-
-		s_text = document.text
-		t_text = query.text
-
-		regions = []
-		for r in c_match.regions(10):
-			if r.matched:
-				regions.append(Region(
-					s=s_text[slice(*r.s)],
-					match=TokenMatch(
-						t=t_text[slice(*r.t)],
-						pos_s=r.pos_s.decode('utf-8'),
-						pos_t=r.pos_t.decode('utf-8'),
-						similarity=r.similarity,
-						weight=r.weight,
-						metric=r.metric.decode('utf-8')),
-					gap_penalty=r.mismatch_penalty))
-			else:
-				regions.append(Region(
-					s=s_text[slice(*r.s)],
-					match=None,
-					gap_penalty=r.mismatch_penalty))
-
-		omitted = [t_text[slice(*s)] for s in c_match.omitted]
-
-		return Match(
-			query, document, c_match.slice_id, c_match.score,
-			c_match.metric, omitted, regions)
+	@property
+	def query(self):
+		raise NotImplementedError()
 
 	@property
 	def document(self):
-		return self._document
+		raise NotImplementedError()
 
 	@property
 	def slice_id(self):
-		return self._slice_id
+		raise NotImplementedError()
 
 	@property
 	def score(self):
-		return self._score
+		raise NotImplementedError()
 
 	@property
 	def metric(self):
-		return self._metric
+		raise NotImplementedError()
 
 	@property
 	def omitted(self):
-		return self._omitted
+		raise NotImplementedError()
 
 	@property
 	def regions(self):
-		return self._regions
+		raise NotImplementedError()
 
 	@property
 	def level(self):
-		return self._level
+		raise NotImplementedError()
+
+	@property
+	def flow(self):
+		return None
 
 	def to_json(self, location_formatter=None):
 		regions = []
 
 		doc = self.document
-		partition = self._query.options["partition"]
+		partition = self.query.options["partition"]
 
 		span_info = doc.span_info(
 			PartitionData(**partition), self.slice_id)
@@ -195,10 +203,126 @@ class Match:
 		return data
 
 
+class CoreMatch(Match):
+	def __init__(self, session, query, c_match):
+		self._session = session
+		self._query = query
+		self._c_match = c_match
+		self._level = "word"
+
+	@property
+	def query(self):
+		return self._query
+
+	@property
+	def document(self):
+		return self._session.documents[self._c_match.document.id]
+
+	@property
+	def slice_id(self):
+		return self._c_match.slice_id
+
+	@property
+	def score(self):
+		return self._c_match.score
+
+	@property
+	def metric(self):
+		return self._c_match.metric
+
+	@property
+	def omitted(self):
+		t_text = self._query.text
+		omitted = [t_text[slice(*s)] for s in self._c_match.omitted]
+		return omitted
+
+	@property
+	def regions(self):
+		s_text = self.document.text
+		t_text = self.query.text
+
+		regions = []
+		for r in self._c_match.regions(10):
+			if r.matched:
+				regions.append(Region(
+					s=s_text[slice(*r.s)],
+					match=TokenMatch(
+						t=t_text[slice(*r.t)],
+						pos_s=r.pos_s.decode('utf-8'),
+						pos_t=r.pos_t.decode('utf-8'),
+						similarity=r.similarity,
+						weight=r.weight,
+						metric=r.metric.decode('utf-8')),
+					gap_penalty=r.mismatch_penalty))
+			else:
+				regions.append(Region(
+					s=s_text[slice(*r.s)],
+					match=None,
+					gap_penalty=r.mismatch_penalty))
+
+		return regions
+
+	@property
+	def level(self):
+		return self._level
+
+	@property
+	def flow(self):
+		return self._c_match.flow
+
+
+class PyMatch:
+	def __init__(self, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
+		self._query = query
+		self._document = document
+		self._slice_id = slice_id
+		self._score = score
+		self._metric = metric or ""
+		self._omitted = omitted or []
+		self._regions = regions or []
+		self._level = level
+
+	@property
+	def query(self):
+		return self._query
+
+	@property
+	def document(self):
+		return self._document
+
+	@property
+	def slice_id(self):
+		return self._slice_id
+
+	@property
+	def score(self):
+		return self._score
+
+	@property
+	def metric(self):
+		return self._metric
+
+	@property
+	def omitted(self):
+		return self._omitted
+
+	@property
+	def regions(self):
+		return self._regions
+
+	@property
+	def level(self):
+		return self._level
+
+
 class Index:
 	def __init__(self, partition, metric):
 		self._partition = partition
 		self._metric = metric
+
+	@property
+	def partition(self):
+		return self._partition
 
 	@property
 	def session(self):
@@ -239,7 +363,8 @@ class BruteForceIndex(Index):
 		self._nlp = nlp
 
 	def _find(self, query, n_threads=None, progress=None):
-		c_query = query.to_core(self._nlp)
+		p_query = query.prepare(self._nlp)
+		c_query = p_query.to_core()
 
 		def find_in_doc(x):
 			return x, x.find(c_query)
@@ -264,7 +389,7 @@ class BruteForceIndex(Index):
 					progress(done / total)
 
 		session = self.session
-		return [Match.from_core(session, query, m) for m in results.best_n(-1)]
+		return [CoreMatch(session, p_query, m) for m in results.best_n(-1)]
 
 
 def chunks(x, n):
@@ -429,7 +554,7 @@ class SentenceEmbeddingIndex(Index):
 				s=span_text.strip(),
 				match=None, gap_penalty=0)]
 
-			matches.append(Match(
+			matches.append(PyMatch(
 				query,
 				doc,
 				sent_index,

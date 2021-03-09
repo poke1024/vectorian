@@ -14,10 +14,26 @@ struct MaximumScore {
 };
 
 template<typename Index>
-class OneToOneFlow;
+class InjectiveFlow;
 
 template<typename Index>
 class Flow {
+public:
+	struct Edge {
+		Index source;
+		Index target;
+		float weight;
+	};
+
+	struct HalfEdge {
+		Index target;
+		float weight;
+	};
+
+protected:
+	py::list py_regions(const Match *p_match, const std::vector<HalfEdge> &p_edges, const int p_window_size) const;
+	py::list py_omitted(const Match *p_match, const std::vector<HalfEdge> &p_edges) const;
+
 public:
 	virtual ~Flow() {
 	}
@@ -28,7 +44,7 @@ public:
 	virtual xt::pyarray<float, 2> py_dense() const = 0;*/
 
 	virtual py::dict to_py() const = 0;
-	virtual py::list py_regions(const Match *p_match, const int window_size) const = 0;
+	virtual py::list py_regions(const Match *p_match, const int p_window_size) const = 0;
 	virtual py::list py_omitted(const Match *p_match) const = 0;
 };
 
@@ -36,29 +52,25 @@ template<typename Index>
 using FlowRef = std::shared_ptr<Flow<Index>>;
 
 template<typename Index>
-class OneToOneFlow : public Flow<Index> {
+class InjectiveFlow : public Flow<Index> {
 public:
-	struct Edge {
-		Index target;
-		float similarity;
-		float weight;
-	};
+	typedef typename Flow<Index>::HalfEdge HalfEdge;
 
 private:
-	std::vector<Edge> m_mapping;
+	std::vector<HalfEdge> m_mapping;
 
 public:
-	inline OneToOneFlow() {
+	inline InjectiveFlow() {
 	}
 
-	inline OneToOneFlow(const std::vector<Index> &p_map) {
+	inline InjectiveFlow(const std::vector<Index> &p_map) {
 		m_mapping.reserve(p_map.size());
 		for (Index i : p_map) {
-			m_mapping.emplace_back(Edge{i, 0.0f, 0.0f});
+			m_mapping.emplace_back(HalfEdge{i, 0.0f});
 		}
 	}
 
-	inline std::vector<Edge> &mapping() {
+	inline std::vector<HalfEdge> &mapping() {
 		return m_mapping;
 	}
 
@@ -68,30 +80,15 @@ public:
 
 	inline void initialize(const Index p_size) {
 		m_mapping.clear();
-		m_mapping.resize(p_size, Edge{-1, 0.0f, 0.0f});
+		m_mapping.resize(p_size, HalfEdge{-1, 0.0f});
 	}
 
 	inline void set(const Index i, const Index j) {
 		m_mapping[i].target = j;
 	}
 
-	virtual py::dict to_py() const {
-		py::dict d;
-
-		const std::vector<ssize_t> shape = {
-			static_cast<ssize_t>(m_mapping.size())};
-		const uint8_t* const data =
-			reinterpret_cast<const uint8_t*>(m_mapping.data());
-
-		d["type"] = py::str("1:1");
-		d["idx"] = PY_ARRAY_MEMBER(Edge, target);
-		d["sim"] = PY_ARRAY_MEMBER(Edge, similarity);
-		d["w"] = PY_ARRAY_MEMBER(Edge, weight);
-
-		return d;
-	}
-
-	virtual py::list py_regions(const Match *p_match, const int window_size) const;
+	virtual py::dict to_py() const;
+	virtual py::list py_regions(const Match *p_match, const int p_window_size) const;
 	virtual py::list py_omitted(const Match *p_match) const;
 
 	template<typename Slice>
@@ -118,62 +115,50 @@ public:
 };
 
 template<typename Index>
-using OneToOneFlowRef = std::shared_ptr<OneToOneFlow<Index>>;
+using InjectiveFlowRef = std::shared_ptr<InjectiveFlow<Index>>;
 
 template<typename Index>
 class SparseFlow : public Flow<Index> {
-	struct Edge {
-		Index target;
-		float flow;
-	};
+public:
+	typedef typename Flow<Index>::HalfEdge HalfEdge;
+	typedef typename Flow<Index>::Edge Edge;
 
-	std::vector<std::vector<Edge>> m_mapping;
+private:
+	std::vector<Edge> m_edges;
+	size_t m_source_nodes;
+
+	std::vector<HalfEdge> to_injective() const;
 
 public:
-	inline SparseFlow() {
+	inline SparseFlow() : m_source_nodes(0) {
 	}
 
-	inline void resize(const Index p_size) {
-		m_mapping.resize(p_size);
+	inline void initialize(const Index p_size, const int p_degree_hint=2) {
+		// p_size is the source size.
+		m_edges.reserve(p_size * p_degree_hint);
+		m_source_nodes = p_size;
 	}
 
 	inline void add(const Index i, const Index j, const float w) {
-		m_mapping[i].emplace_back(Edge{j, w});
+		m_edges.emplace_back(Edge{i, j, w});
 	}
 
 	template<typename Slice>
 	inline MaximumScore max_score(
 		const Slice &p_slice) const {
 
-		const size_t n = m_mapping.size();
-
 		float matched_score = 0.0f;
-		float unmatched_score = 0.0f;
-
+		const size_t n = p_slice.len_t();
 		for (size_t i = 0; i < n; i++) {
-			const float s = p_slice.max_similarity_for_t(i);
-
-			if (m_mapping[i].empty()) {
-				unmatched_score += s;
-			} else {
-				matched_score += s;
-			}
+			matched_score += p_slice.max_similarity_for_t(i);
 		}
 
-		return MaximumScore{unmatched_score, matched_score};
+		return MaximumScore{0.0f, matched_score};
 	}
 
-	virtual py::dict to_py() const {
-		return py::list();
-	}
-
-	virtual py::list py_regions(const Match *p_match, const int window_size) const {
-		return py::list();
-	}
-
-	virtual py::list py_omitted(const Match *p_match) const {
-		return py::list();
-	}
+	virtual py::dict to_py() const;
+	virtual py::list py_regions(const Match *p_match, const int p_window_size) const;
+	virtual py::list py_omitted(const Match *p_match) const;
 };
 
 template<typename Index>
@@ -193,13 +178,13 @@ class FlowFactory {
 	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
 
 public:
-	OneToOneFlowRef<Index> create_1_to_1(
+	InjectiveFlowRef<Index> create_injective(
 		const std::vector<Index> &p_match) {
-		return std::make_shared<OneToOneFlow<Index>>(p_match);
+		return std::make_shared<InjectiveFlow<Index>>(p_match);
 	}
 
-	OneToOneFlowRef<Index> create_1_to_1() {
-		return std::make_shared<OneToOneFlow<Index>>();
+	InjectiveFlowRef<Index> create_injective() {
+		return std::make_shared<InjectiveFlow<Index>>();
 	}
 
 	SparseFlowRef<Index> create_sparse() {

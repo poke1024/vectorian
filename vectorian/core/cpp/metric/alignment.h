@@ -32,13 +32,13 @@ class WatermanSmithBeyer {
 	size_t m_max_len_t;
 	const std::vector<float> m_gap_cost;
 	const float m_smith_waterman_zero;
-	mutable OneToOneFlowRef<Index> m_cached_flow;
+	mutable InjectiveFlowRef<Index> m_cached_flow;
 
 	template<typename Slice>
 	inline void compute(
 		const QueryRef &,
 		const Slice &p_slice,
-		const OneToOneFlowRef<Index> &p_flow) const {
+		const InjectiveFlowRef<Index> &p_flow) const {
 
 		m_aligner->waterman_smith_beyer(
 			*p_flow.get(),
@@ -83,7 +83,7 @@ public:
 		const ResultSetRef &p_result_set) const {
 
 		if (!m_cached_flow) {
-			m_cached_flow = p_result_set->flow_factory()->create_1_to_1();
+			m_cached_flow = p_result_set->flow_factory()->create_injective();
 			m_cached_flow->reserve(m_max_len_t);
 		}
 
@@ -114,7 +114,7 @@ public:
 		}
 
 		void operator()(const MatchRef &p_match) const {
-			auto *flow = static_cast<OneToOneFlow<Index>*>(p_match->flow().get());
+			auto *flow = static_cast<InjectiveFlow<Index>*>(p_match->flow().get());
 			auto &mapping = flow->mapping();
 
 		    const auto match_slice = p_match->slice();
@@ -136,11 +136,11 @@ public:
 	        Index i = 0;
 	        for (auto &m : mapping) {
 	            if (m.target >= 0) {
-	                m.similarity = slice.unmodified_similarity(m.target, i);
-	                m.weight = 1.0f; // FIXME; was: slice.weight(m, i)
+	                m.weight = slice.unmodified_similarity(m.target, i);
+	                //m.weight = 1.0f; // FIXME; was: slice.weight(m, i)
 	            } else {
-	                m.similarity = 0.0f;
 	                m.weight = 0.0f;
+	                //m.weight = 0.0f;
 	            }
 	            i++;
 	        }
@@ -198,8 +198,6 @@ class RelaxedWordMoversDistance {
 
 		const bool pos_tag_aware = p_slice.similarity_depends_on_pos();
 		const auto &enc = p_slice.encoder();
-		const float max_cost = m_options.normalize_bow ?
-			1.0f : p_slice.max_sum_of_similarities();
 
 		if (pos_tag_aware) {
 			// perform WMD on a vocabulary
@@ -214,7 +212,6 @@ class RelaxedWordMoversDistance {
 					};
 				},
 				m_options,
-				max_cost,
 				p_flow_factory);
 
 		} else {
@@ -227,7 +224,6 @@ class RelaxedWordMoversDistance {
 					return enc.to_embedding(t);
 				},
 				m_options,
-				max_cost,
 				p_flow_factory);
 		}
 	}
@@ -317,7 +313,7 @@ public:
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				p_result_set->flow_factory()->create_1_to_1(m_wrd.match()),
+				p_result_set->flow_factory()->create_injective(m_wrd.match()),
 				score);
 		} else {
 			return MatchRef();

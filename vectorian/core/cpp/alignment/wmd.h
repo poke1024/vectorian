@@ -69,7 +69,7 @@ public:
 	struct Edge {
 		Index source;
 		Index target;
-		float flow;
+		float cost;
 	};
 
 	size_t m_size;
@@ -256,7 +256,7 @@ public:
 		const WMDOptions &p_options,
 		const SparseFlowRef<Index> &p_flow) {
 
-		constexpr float max_dist = 1; // assume max dist of 1
+		constexpr float max_dist = 1.0f; // assume max dist of 1
 
 		Document &doc_s = m_doc[0];
 		Document &doc_t = m_doc[1];
@@ -321,18 +321,18 @@ public:
 					while (!candidates.empty()) {
 						std::pop_heap(candidates.begin(), candidates.end());
 						const auto &r = candidates.back();
-						const Index w = r.i;
+						const Index target = r.i;
 
-						if (remaining <= w2[w]) {
+						if (remaining <= w2[target]) {
 							const float d_acc = remaining * r.d;
 							acc += d_acc;
-							m_results[c].emplace_back(Edge{i, w, d_acc});
+							m_results[c].emplace_back(Edge{i, target, d_acc});
 							break;
 						} else {
-							remaining -= w2[w];
-							const float d_acc = w2[w] * r.d;
+							remaining -= w2[target];
+							const float d_acc = w2[target] * r.d;
 							acc += d_acc;
-							m_results[c].emplace_back(Edge{i, w, d_acc});
+							m_results[c].emplace_back(Edge{i, target, d_acc});
 						}
 
 						candidates.pop_back();
@@ -362,10 +362,14 @@ public:
 		for (const auto &edge : m_results[tighter]) {
 			const auto &spos = doc_s.vocab_to_pos[tighter == 0 ? edge.target : edge.source];
 			const auto &tpos = doc_t.vocab_to_pos[tighter == 0 ? edge.source : edge.target];
-			const float f = edge.flow / (spos.size() * tpos.size());
+
+			const float max_cost = (p_options.normalize_bow ?
+				1.0f : docs[tighter]->bow[edge.source]);
+			const float score = (max_cost - edge.cost) / max_cost;
+
 			for (Index t : tpos) {
 				for (Index s : spos) {
-					p_flow->add(t, s, f);
+					p_flow->add(t, s, score);
 				}
 			}
 		}
@@ -428,14 +432,13 @@ public:
 
 	template<typename Slice, typename MakeWordId>
 	RelaxedWMDSolution<Index> relaxed(
-		const Slice &slice,
+		const Slice &p_slice,
 		const MakeWordId &make_word_id,
 		const WMDOptions &p_options,
-		const float max_weighted_score,
 		const FlowFactoryRef<Index> &p_flow_factory) {
 
-		const int len_s = slice.len_s();
-		const int len_t = slice.len_t();
+		const int len_s = p_slice.len_s();
+		const int len_t = p_slice.len_t();
 
 		if (p_options.symmetric && !p_options.normalize_bow) {
 			throw std::runtime_error(
@@ -443,23 +446,23 @@ public:
 		}
 
 		const float max_score = p_options.normalize_bow ?
-			1.0f : max_weighted_score;
+			1.0f : p_slice.max_sum_of_similarities();
 
 		const int vocabulary_size = init(
-			slice, make_word_id, len_s, len_t, p_options);
+			p_slice, make_word_id, len_s, len_t, p_options);
 
 		if (vocabulary_size == 0) {
 			return RelaxedWMDSolution<Index>{0.0f, SparseFlowRef<Index>()};
 		}
 
 		const auto flow = p_flow_factory->create_sparse();
-		flow->resize(len_t);
+		flow->initialize(len_t);
 
 		compute_distance_matrix(
 			len_s, len_t,
 			vocabulary_size,
-			[&slice] (int i, int j) -> float {
-				return slice.similarity(i, j);
+			[&p_slice] (int i, int j) -> float {
+				return p_slice.similarity(i, j);
 			});
 
 		const float score = max_score - _relaxed(

@@ -181,6 +181,48 @@ class Document:
 		return PreparedDocument(session, self._json)
 
 
+class Token:
+	def __init__(self, doc, table, index):
+		self._doc = doc
+		self._table = table
+		self._index = index
+
+	def to_slice(self):
+		offset = self._table["idx"][self._index].as_py()
+		return slice(offset, offset + self._table["len"][self._index].as_py())
+
+	@property
+	def text(self):
+		return self._doc.text[self.to_slice()]
+
+
+class Span:
+	def __init__(self, doc, table, start, end):
+		self._doc = doc
+		self._table = table
+		self._start = start
+		self._end = end
+
+	def __getitem__(self, i):
+		if i < 0 or i >= self._end - self._start:
+			raise ValueError(i)
+		return Token(self._doc, self._table, self._start + i)
+
+	def __len__(self):
+		return self._end - self._start
+
+	@property
+	def text(self):
+		col_tok_idx = self._table["idx"]
+		col_tok_len = self._table["len"]
+
+		i0, i1 = xspan(
+			col_tok_idx, col_tok_len, self._start,
+			self._end - self._start, 1)
+
+		return self._doc.text[i0:i1]
+
+
 class PreparedDocument:
 	def __init__(self, session, json):
 		self._session = session
@@ -251,10 +293,6 @@ class PreparedDocument:
 				f.write('"' + self._text[idx:idx + len_] + '"\n')
 
 	@property
-	def text(self):
-		return self._text
-
-	@property
 	def metadata(self):
 		return self._metadata
 
@@ -265,6 +303,13 @@ class PreparedDocument:
 	@property
 	def caching_name(self):
 		return slugify(self.unique_id)
+
+	@property
+	def text(self):
+		return self._text
+
+	def token(self, i):
+		return Token(self, self._token_table, i)
 
 	@property
 	def n_tokens(self):
@@ -283,15 +328,10 @@ class PreparedDocument:
 
 	@lru_cache(16)
 	def _cached_spans(self, name, window_size, window_step):
-		col_tok_idx = self._token_table["idx"]
-		col_tok_len = self._token_table["len"]
-
 		if name == "token":
 			def get(i):
-				start, end = xspan(
-					col_tok_idx, col_tok_len, i,
-					window_size, window_step)
-				return self._text[start:end]
+				pos = i * window_step
+				return Span(self, self._token_table, pos, pos + window_size)
 
 			return get
 		else:
@@ -303,11 +343,7 @@ class PreparedDocument:
 					col_token_at, col_n_tokens, i,
 					window_size, window_step)
 
-				i0, i1 = xspan(
-					col_tok_idx, col_tok_len, start,
-					end - start, 1)
-
-				return self._text[i0:i1]
+				return Span(self, self._token_table, start, end)
 
 			return get
 

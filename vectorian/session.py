@@ -20,6 +20,10 @@ class Result:
 	def index(self):
 		return self._index
 
+	@property
+	def matches(self):
+		return self._matches
+
 	def __iter__(self):
 		return self._matches
 
