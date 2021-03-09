@@ -58,7 +58,9 @@ private:
 	SimilarityScore _best_score;
 	std::vector<Index> _best_match;
 
+	template<typename Flow>
 	inline void reconstruct_local_alignment(
+		Flow &flow,
 		const Index len_t,
 		const Index len_s,
 		const SimilarityScore zero_similarity) {
@@ -82,32 +84,36 @@ private:
 
 		_best_score = score;
 
-		//_best_match->initialize(len_t);
-		_best_match.resize(len_t);
-		std::fill(_best_match.begin(), _best_match.end(), -1);
+		flow.initialize(len_t);
+		//_best_match.resize(len_t);
+		//std::fill(_best_match.begin(), _best_match.end(), -1);
 
 		Index u = best_u;
 		Index v = best_v;
 		while (u >= 0 && v >= 0 && values(u, v) > zero_similarity) {
-			// _best_match->set(v, u);
-			_best_match[v] = u;
+			flow.set(v, u);
+			//_best_match[v] = u;
 			std::tie(u, v) = traceback(u, v);
 		}
 	}
 
+	template<typename Flow>
 	inline void reconstruct_global_alignment(
+		Flow &flow,
 		const Index len_t,
 		const Index len_s) {
 
-		_best_match.resize(len_t);
-		std::fill(_best_match.begin(), _best_match.end(), -1);
+		flow.initialize(len_t);
+		//_best_match.resize(len_t);
+		//std::fill(_best_match.begin(), _best_match.end(), -1);
 
 		Index u = len_s - 1;
 		Index v = len_t - 1;
 		_best_score = _values(u, v);
 
 		while (u >= 0 && v >= 0) {
-			_best_match[v] = u;
+			flow.set(v, u);
+			//_best_match[v] = u;
 			std::tie(u, v) = _traceback(u, v);
 		}
 	}
@@ -119,22 +125,13 @@ public:
 
 		_values.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t)});
 		_traceback.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t)});
-		_best_match.reserve(max_len_t);
 	}
 
 	inline SimilarityScore score() const {
 		return _best_score;
 	}
 
-	inline const std::vector<Index> &match() const {
-		return _best_match;
-	}
-
-	inline std::vector<Index> &mutable_match() {
-		return _best_match;
-	}
-
-#if !defined(ALIGNER_SLIM)
+#if 0 && !defined(ALIGNER_SLIM)
 	std::string pretty_printed(
 		const std::string &s,
 		const std::string &t) {
@@ -176,8 +173,9 @@ public:
 	}
 #endif
 
-	template<typename Similarity>
+	template<typename Flow, typename Similarity>
 	void needleman_wunsch(
+		Flow &flow,
 		const Similarity &similarity,
 		const SimilarityScore gap_cost, // linear
 		const Index len_s,
@@ -229,11 +227,12 @@ public:
 			}
 		}
 
-		reconstruct_global_alignment(len_t, len_s);
+		reconstruct_global_alignment(flow, len_t, len_s);
 	}
 
-	template<typename Similarity>
+	template<typename Flow, typename Similarity>
 	void smith_waterman(
+		Flow &flow,
 		const Similarity &similarity,
 		const SimilarityScore gap_cost, // linear
 		const Index len_s,
@@ -284,11 +283,12 @@ public:
 			}
 		}
 
-		reconstruct_local_alignment(len_t, len_s, zero_similarity);
+		reconstruct_local_alignment(flow, len_t, len_s, zero_similarity);
 	}
 
-	template<typename Similarity, typename Gap>
+	template<typename Flow, typename Similarity, typename Gap>
 	void waterman_smith_beyer(
+		Flow &flow,
 		const Similarity &similarity,
 		const Gap &gap_cost,
 		const Index len_s,
@@ -339,6 +339,6 @@ public:
 			}
 		}
 
-		reconstruct_local_alignment(len_t, len_s, zero_similarity);
+		reconstruct_local_alignment(flow, len_t, len_s, zero_similarity);
 	}
 };

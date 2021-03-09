@@ -92,10 +92,10 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'metric/static.cpp',
 	'match/flow.cpp',
 	'match/match.cpp',
 	'match/matcher.cpp',
-	'metric/static.cpp',
 	'embedding/sim.cpp',
 	'module.cpp',
 	'embedding/static.cpp',

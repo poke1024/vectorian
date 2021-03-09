@@ -6,8 +6,7 @@ template<typename Slice>
 inline float reference_score(
 	const QueryRef &p_query,
 	const Slice &p_slice,
-	const float p_matched,
-	const float p_unmatched) {
+	const MaximumScore &p_max) {
 
 	// m_matched_weight == 0 indicates that there
 	// is no higher relevance of matched content than
@@ -17,70 +16,40 @@ inline float reference_score(
 	const float total_score = p_slice.max_sum_of_similarities();
 
 	const float unmatched_weight = std::pow(
-		(total_score - p_matched) / total_score,
+		(total_score - p_max.matched) / total_score,
 		p_query->submatch_weight());
 
 	const float reference_score =
-		p_matched +
-		unmatched_weight * (total_score - p_matched);
+		p_max.matched +
+		unmatched_weight * (total_score - p_max.matched);
 
 	return reference_score;
-}
-
-template<typename Slice, typename Index>
-inline float normalized_score(
-	const QueryRef &p_query,
-	const Slice &p_slice,
-	const float p_raw_score,
-	const std::vector<Index> &p_match) {
-
-	//return p_raw_score / p_slice.len_t(); // FIXME
-
-	// unboosted version would be:
-	// return p_raw_score / m_total_score;
-
-	// a final boosting step allowing matched content
-	// more weight than unmatched content.
-
-	const size_t n = p_match.size();
-
-	float matched_score = 0.0f;
-	float unmatched_score = 0.0f;
-
-	for (size_t i = 0; i < n; i++) {
-
-		const float s = p_slice.max_similarity_for_t(i);
-
-		if (p_match[i] < 0) {
-			unmatched_score += s;
-		} else {
-			matched_score += s;
-		}
-	}
-
-	return p_raw_score / reference_score(
-		p_query, p_slice, matched_score, unmatched_score);
 }
 
 template<typename Index>
 class WatermanSmithBeyer {
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
+	size_t m_max_len_t;
 	const std::vector<float> m_gap_cost;
 	const float m_smith_waterman_zero;
+	mutable OneToOneFlowRef<Index> m_cached_flow;
 
 	template<typename Slice>
 	inline void compute(
-		const QueryRef &, const Slice &slice) const {
+		const QueryRef &,
+		const Slice &p_slice,
+		const OneToOneFlowRef<Index> &p_flow) const {
 
 		m_aligner->waterman_smith_beyer(
-			[&slice] (int i, int j) -> float {
-				return slice.similarity(i, j);
+			*p_flow.get(),
+			[&p_slice] (int i, int j) -> float {
+				return p_slice.similarity(i, j);
 			},
 			[this] (size_t len) -> float {
 				return this->gap_cost(len);
 			},
-			slice.len_s(),
-			slice.len_t(),
+			p_slice.len_s(),
+			p_slice.len_t(),
 			m_smith_waterman_zero);
 	}
 
@@ -89,6 +58,7 @@ public:
 		const std::vector<float> &p_gap_cost,
 		float p_zero=0.5) :
 
+		m_max_len_t(0),
 		m_gap_cost(p_gap_cost),
 		m_smith_waterman_zero(p_zero) {
 
@@ -98,6 +68,7 @@ public:
 	void init(Index max_len_s, Index max_len_t) {
 		m_aligner = std::make_shared<Aligner<Index, float>>(
 			max_len_s, max_len_t);
+		m_max_len_t = max_len_t;
 	}
 
 	inline float gap_cost(size_t len) const {
@@ -111,18 +82,23 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) const {
 
-		compute(p_matcher->query(), p_slice);
+		if (!m_cached_flow) {
+			m_cached_flow = p_result_set->flow_factory()->create_1_to_1();
+			m_cached_flow->reserve(m_max_len_t);
+		}
 
-		// flow = flow_factory->create_1_to_1(m_aligner->match());
+		compute(p_matcher->query(), p_slice, m_cached_flow);
 
-		const float score = normalized_score(
-			p_matcher->query(), p_slice, m_aligner->score(), m_aligner->match());
+		const float score = m_aligner->score() / reference_score(
+			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
 
 		if (score > p_result_set->worst_score()) {
+			const auto flow = m_cached_flow;
+			m_cached_flow.reset();
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				p_result_set->flow_factory()->create_1_to_1(m_aligner->match()),
+				flow,
 				score);
 		} else {
 			return MatchRef();
@@ -214,27 +190,23 @@ class RelaxedWordMoversDistance {
 	WMD<Index, token_t> m_wmd;
 	WMD<Index, TaggedTokenId> m_wmd_tagged;
 
-	struct Result {
-		float score;
-		const WMDBase<Index> &wmd;
-	};
-
 	template<typename Slice>
-	inline Result compute(
+	inline RelaxedWMDSolution<Index> compute(
 		const QueryRef &p_query,
-		const Slice &slice) {
+		const Slice &p_slice,
+		const FlowFactoryRef<Index> &p_flow_factory) {
 
-		const bool pos_tag_aware = slice.similarity_depends_on_pos();
-		const auto &enc = slice.encoder();
+		const bool pos_tag_aware = p_slice.similarity_depends_on_pos();
+		const auto &enc = p_slice.encoder();
 		const float max_cost = m_options.normalize_bow ?
-			1.0f : slice.max_sum_of_similarities();
+			1.0f : p_slice.max_sum_of_similarities();
 
 		if (pos_tag_aware) {
 			// perform WMD on a vocabulary
 			// built from (token id, pos tag).
 
-			const float score = m_wmd_tagged.relaxed(
-				slice,
+			return m_wmd_tagged.relaxed(
+				p_slice,
 				[&enc] (const auto &t) {
 					return TaggedTokenId{
 						enc.to_embedding(t),
@@ -242,23 +214,21 @@ class RelaxedWordMoversDistance {
 					};
 				},
 				m_options,
-				max_cost);
-
-			return Result{score, m_wmd_tagged};
+				max_cost,
+				p_flow_factory);
 
 		} else {
 			// perform WMD on a vocabulary
 			// built from token ids.
 
-			const float score = m_wmd.relaxed(
-				slice,
+			return m_wmd.relaxed(
+				p_slice,
 				[&enc] (const auto &t) {
 					return enc.to_embedding(t);
 				},
 				m_options,
-				max_cost);
-
-			return Result{score, m_wmd};
+				max_cost,
+				p_flow_factory);
 		}
 	}
 
@@ -289,16 +259,23 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) {
 
-		const auto r = compute(p_matcher->query(), p_slice);
+		const auto r = compute(
+			p_matcher->query(),
+			p_slice,
+			p_result_set->flow_factory());
 
-		const float score = normalized_score(
-			p_matcher->query(), p_slice, r.score, r.wmd.match());
+		if (!r.flow) {
+			return MatchRef();
+		}
+
+		const float score = r.score / reference_score(
+			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				p_result_set->flow_factory()->create_1_to_1(r.wmd.match()),
+				r.flow,
 				score);
 		} else {
 			return MatchRef();
@@ -328,11 +305,13 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) {
 
-		const float score0 = m_wrd.compute(
+		return MatchRef();
+
+		/*const float score0 = m_wrd.compute(
 			p_matcher->query(), p_slice);
 
-		const float score = normalized_score(
-			p_matcher->query(), p_slice, score0, m_wrd.match());
+		const float score = r.score / reference_score(
+			p_query, p_slice, r.flow->max_score(p_slice));
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
@@ -342,7 +321,7 @@ public:
 				score);
 		} else {
 			return MatchRef();
-		}
+		}*/
 	}
 };
 

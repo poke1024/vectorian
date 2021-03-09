@@ -8,6 +8,11 @@
 #include "match/region.h"
 #include <list>
 
+struct MaximumScore {
+	float unmatched;
+	float matched;
+};
+
 template<typename Index>
 class OneToOneFlow;
 
@@ -17,7 +22,10 @@ public:
 	virtual ~Flow() {
 	}
 
-	virtual xt::xtensor<float, 2> to_matrix() const = 0;
+	//virtual xt::xtensor<float, 2> to_matrix() const = 0;
+
+	/*virtual py::list py_sparse() const = 0;
+	virtual xt::pyarray<float, 2> py_dense() const = 0;*/
 
 	virtual py::dict to_py() const = 0;
 	virtual py::list py_regions(const Match *p_match, const int window_size) const = 0;
@@ -54,16 +62,17 @@ public:
 		return m_mapping;
 	}
 
-	inline void initialize(const Index p_source_size) {
-		m_mapping.resize(p_source_size);
+	inline void reserve(const Index p_size) {
+		m_mapping.reserve(p_size);
+	}
+
+	inline void initialize(const Index p_size) {
+		m_mapping.clear();
+		m_mapping.resize(p_size, Edge{-1, 0.0f, 0.0f});
 	}
 
 	inline void set(const Index i, const Index j) {
 		m_mapping[i].target = j;
-	}
-
-	virtual xt::xtensor<float, 2> to_matrix() const {
-		return xt::xtensor<float, 2>();
 	}
 
 	virtual py::dict to_py() const {
@@ -84,15 +93,27 @@ public:
 
 	virtual py::list py_regions(const Match *p_match, const int window_size) const;
 	virtual py::list py_omitted(const Match *p_match) const;
-};
 
-template<typename Index>
-class OneToNFlow : public Flow<Index> {
-	std::vector<std::list<Index>> m_map;
+	template<typename Slice>
+	inline MaximumScore max_score(
+		const Slice &p_slice) const {
 
-public:
-	void add(const Index i, const Index j) {
-		m_map[i].push_back(j);
+		const size_t n = m_mapping.size();
+
+		float matched_score = 0.0f;
+		float unmatched_score = 0.0f;
+
+		for (size_t i = 0; i < n; i++) {
+			const float s = p_slice.max_similarity_for_t(i);
+
+			if (m_mapping[i].target < 0) {
+				unmatched_score += s;
+			} else {
+				matched_score += s;
+			}
+		}
+
+		return MaximumScore{unmatched_score, matched_score};
 	}
 };
 
@@ -100,19 +121,89 @@ template<typename Index>
 using OneToOneFlowRef = std::shared_ptr<OneToOneFlow<Index>>;
 
 template<typename Index>
-class NToNFlow : public Flow<Index> {
+class SparseFlow : public Flow<Index> {
+	struct Edge {
+		Index target;
+		float flow;
+	};
+
+	std::vector<std::vector<Edge>> m_mapping;
+
+public:
+	inline SparseFlow() {
+	}
+
+	inline void resize(const Index p_size) {
+		m_mapping.resize(p_size);
+	}
+
+	inline void add(const Index i, const Index j, const float w) {
+		m_mapping[i].emplace_back(Edge{j, w});
+	}
+
+	template<typename Slice>
+	inline MaximumScore max_score(
+		const Slice &p_slice) const {
+
+		const size_t n = m_mapping.size();
+
+		float matched_score = 0.0f;
+		float unmatched_score = 0.0f;
+
+		for (size_t i = 0; i < n; i++) {
+			const float s = p_slice.max_similarity_for_t(i);
+
+			if (m_mapping[i].empty()) {
+				unmatched_score += s;
+			} else {
+				matched_score += s;
+			}
+		}
+
+		return MaximumScore{unmatched_score, matched_score};
+	}
+
+	virtual py::dict to_py() const {
+		return py::list();
+	}
+
+	virtual py::list py_regions(const Match *p_match, const int window_size) const {
+		return py::list();
+	}
+
+	virtual py::list py_omitted(const Match *p_match) const {
+		return py::list();
+	}
+};
+
+template<typename Index>
+using SparseFlowRef = std::shared_ptr<SparseFlow<Index>>;
+
+template<typename Index>
+class DenseFlow : public Flow<Index> {
 	xt::xtensor<float, 2> m_matrix;
 };
+
+template<typename Index>
+using DenseFlowRef = std::shared_ptr<DenseFlow<Index>>;
 
 template<typename Index>
 class FlowFactory {
 	// foonathan::memory::memory_pool<> m_pool;
 	// m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB)
+
 public:
 	OneToOneFlowRef<Index> create_1_to_1(
 		const std::vector<Index> &p_match) {
-
 		return std::make_shared<OneToOneFlow<Index>>(p_match);
+	}
+
+	OneToOneFlowRef<Index> create_1_to_1() {
+		return std::make_shared<OneToOneFlow<Index>>();
+	}
+
+	SparseFlowRef<Index> create_sparse() {
+		return std::make_shared<SparseFlow<Index>>();
 	}
 };
 

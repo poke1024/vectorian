@@ -1,4 +1,5 @@
 #include "common.h"
+#include "match/match.h"
 
 #include <xtensor/xadapt.hpp>
 
@@ -9,18 +10,13 @@ struct WMDOptions {
 };
 
 template<typename Index>
-class WMDBase {
-protected:
-	std::vector<Index> m_match;
-
-public:
-	inline const std::vector<Index> &match() const {
-		return m_match;
-	}
+struct RelaxedWMDSolution {
+	float score;
+	SparseFlowRef<Index> flow;
 };
 
 template<typename Index, typename WordId>
-class WMD : public WMDBase<Index> {
+class WMD {
 public:
 	struct RefToken {
 		WordId word_id;
@@ -70,6 +66,12 @@ public:
 	foonathan::memory::memory_pool<> m_pool;
 #endif
 
+	struct Edge {
+		Index source;
+		Index target;
+		float flow;
+	};
+
 	size_t m_size;
 
 	std::vector<RefToken> m_tokens;
@@ -77,7 +79,7 @@ public:
 
 	xt::xtensor<float, 2> m_distance_matrix;
 	std::vector<DistanceRef> m_candidates;
-	std::vector<Index> m_result;
+	std::vector<Edge> m_results[2];
 
 #if VECTORIAN_MEMORY_POOLS
 	WMD() : m_pool(foonathan::memory::list_node_size<Index>::value, 4_KiB) {
@@ -98,13 +100,11 @@ public:
 
 		for (int i = 0; i < 2; i++) {
 			m_doc[i].resize(*this, size);
+			m_results[i].reserve(size * size);
 		}
 
 		m_distance_matrix.resize({size, size});
 		m_candidates.reserve(size);
-		m_result.resize(size);
-
-		this->m_match.resize(max_len_t);
 	}
 
 	inline void reset(const int k) {
@@ -251,9 +251,10 @@ public:
 
 	// inspired by implementation in https://github.com/src-d/wmd-relax
 	float _relaxed(
-		const int len_s, const int len_t,
-		const int size,
-		const WMDOptions &p_options) {
+		const Index len_s, const Index len_t,
+		const Index size,
+		const WMDOptions &p_options,
+		const SparseFlowRef<Index> &p_flow) {
 
 		constexpr float max_dist = 1; // assume max dist of 1
 
@@ -261,13 +262,14 @@ public:
 		Document &doc_t = m_doc[1];
 		const Document * const docs[2] = {&doc_t, &doc_s};
 
-		this->m_match.resize(len_t);
-
 		const auto distance_matrix = xt::view(
 			m_distance_matrix, xt::range(0, size), xt::range(0, size));
 
 		float cost = 0;
+		int tighter = 0;
 		for (int c = 0; c < 2; c++) {
+			m_results[c].clear();
+
 			const float *w1 = docs[c]->bow.data();
 			const float *w2 = docs[1 - c]->bow.data();
 			const std::vector<VocabPair> &v1 = docs[c]->vocab;
@@ -275,17 +277,17 @@ public:
 
 			float acc = 0;
 			for (const auto &v1_entry : v1) {
-				const int i = v1_entry.vocab;
+				const Index i = v1_entry.vocab;
 
 				if (p_options.one_target) {
 					// 1:1 case
 
 					float best_dist = std::numeric_limits<float>::max();
-					int best_j = -1;
+					Index best_j = -1;
 
 					// find argmin.
 					for (const auto &v2_entry : v2) {
-						const int j = v2_entry.vocab;
+						const Index j = v2_entry.vocab;
 						const float d = distance_matrix(i, j);
 						if (d < best_dist) {
 							best_dist = d;
@@ -295,8 +297,9 @@ public:
 
 					// move w1[i] completely to w2[j].
 					const float d = (best_j >= 0 ? best_dist : max_dist);
-					acc += w1[i] * d;
-					m_result[i] = best_j;
+					const float d_acc = w1[i] * d;
+					acc += d_acc;
+					m_results[c].emplace_back(Edge{i, best_j, d_acc});
 
 				} else {
 					// 1:n case
@@ -318,14 +321,18 @@ public:
 					while (!candidates.empty()) {
 						std::pop_heap(candidates.begin(), candidates.end());
 						const auto &r = candidates.back();
-						const int w = r.i;
+						const Index w = r.i;
 
 						if (remaining <= w2[w]) {
-							acc += remaining * r.d;
+							const float d_acc = remaining * r.d;
+							acc += d_acc;
+							m_results[c].emplace_back(Edge{i, w, d_acc});
 							break;
 						} else {
 							remaining -= w2[w];
-							acc += w2[w] * r.d;
+							const float d_acc = w2[w] * r.d;
+							acc += d_acc;
+							m_results[c].emplace_back(Edge{i, w, d_acc});
 						}
 
 						candidates.pop_back();
@@ -341,25 +348,25 @@ public:
 				acc /= docs[c]->w_sum;
 			}
 
-			if (c == 0) { // w1 is t
-				// vocab item i to query pos.
-				for (int i = 0; i < len_t; i++) {
-					const int j = m_result[doc_t.pos_to_vocab[i]];
-
-					// for j in doc_s.vocab_to_pos(j):
-					//  flow[j, i] = 1.0f  // s -> t
-					auto &items = doc_s.vocab_to_pos[j];
-					this->m_match[i] = items.front(); // not ideal
-				}
-			} else { // w1 is s
-				// FIXME
-			}
-
 			if (!p_options.symmetric) {
+				tighter = 0;
 				cost = acc;
 				break;
-			} else {
-				cost = std::max(cost, acc);
+			} else if (acc > cost) {
+				tighter = c;
+				cost = acc;
+			}
+		}
+
+		// best == 0 -> w1 is t, best == 1 -> w1 is s
+		for (const auto &edge : m_results[tighter]) {
+			const auto &spos = doc_s.vocab_to_pos[tighter == 0 ? edge.target : edge.source];
+			const auto &tpos = doc_t.vocab_to_pos[tighter == 0 ? edge.source : edge.target];
+			const float f = edge.flow / (spos.size() * tpos.size());
+			for (Index t : tpos) {
+				for (Index s : spos) {
+					p_flow->add(t, s, f);
+				}
 			}
 		}
 
@@ -420,11 +427,12 @@ public:
 	}
 
 	template<typename Slice, typename MakeWordId>
-	float relaxed(
+	RelaxedWMDSolution<Index> relaxed(
 		const Slice &slice,
 		const MakeWordId &make_word_id,
 		const WMDOptions &p_options,
-		const float max_weighted_score) {
+		const float max_weighted_score,
+		const FlowFactoryRef<Index> &p_flow_factory) {
 
 		const int len_s = slice.len_s();
 		const int len_t = slice.len_t();
@@ -441,8 +449,11 @@ public:
 			slice, make_word_id, len_s, len_t, p_options);
 
 		if (vocabulary_size == 0) {
-			return 0.0f;
+			return RelaxedWMDSolution<Index>{0.0f, SparseFlowRef<Index>()};
 		}
+
+		const auto flow = p_flow_factory->create_sparse();
+		flow->resize(len_t);
 
 		compute_distance_matrix(
 			len_s, len_t,
@@ -451,15 +462,12 @@ public:
 				return slice.similarity(i, j);
 			});
 
-		/*std::ofstream outfile;
-		outfile.open("/Users/arbeit/Desktop/debug_wmd.txt", std::ios_base::app);
-		print_debug(p_query, slice, len_s, len_t, vocabulary_size, outfile);*/
-
-		//p_query->t_tokens_pos_weights();
-
-		return max_score - _relaxed(
+		const float score = max_score - _relaxed(
 			len_s, len_t,
 			vocabulary_size,
-			p_options);
+			p_options,
+			flow);
+
+		return RelaxedWMDSolution<Index>{score, flow};
 	}
 };
