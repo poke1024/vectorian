@@ -183,7 +183,7 @@ class Document:
 
 
 class Token:
-	_css = 'background:	#DCDCDC; border-radius:0.25em;'
+	_css = 'background:	#F5F5F5; border-radius:0.25em;'
 	_html_template = '<span style="{style}">{text}</span>'
 
 	def __init__(self, doc, table, index):
@@ -211,9 +211,14 @@ class Span:
 		self._start = start
 		self._end = end
 
+	def __iter__(self):
+		for i in range(self._end - self._start):
+			yield self[i]
+
 	def __getitem__(self, i):
-		if i < 0 or i >= self._end - self._start:
-			raise ValueError(i)
+		n = self._end - self._start
+		if i < 0 or i >= n:
+			raise IndexError(f'{i} not in [0, {n}[')
 		return Token(self._doc, self._table, self._start + i)
 
 	def __len__(self):

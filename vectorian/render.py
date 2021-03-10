@@ -4,7 +4,7 @@ import time
 import string
 import collections
 import roman
-import json
+import importlib
 
 from yattag import Doc
 
@@ -23,12 +23,15 @@ def trim_regions(regions):
 
 
 class Renderer:
-	def __init__(self, annotate=None):
+	def __init__(self, location_formatter, annotate=None):
 		doc, tag, text = Doc().tagtext()
-		doc.asis('<!DOCTYPE html>')
+
 		self._html = (doc, tag, text)
-		self._flows = dict()
 		self._annotate = annotate or {}
+		self._location_formatter = location_formatter
+
+		self._flows = dict()
+
 		self._id_base = f"vectorian-{time.time_ns()}-{id(self)}"
 		self._id_index = 0
 
@@ -111,8 +114,8 @@ class Renderer:
 		with tag('span', klass='has-text-weight-bold'):
 			text("%.1f%%" % (100 * match['score']))
 
-	def add_match(self, match_obj, location_formatter):
-		match = match_obj.to_json(location_formatter)
+	def add_match(self, match_obj):
+		match = match_obj.to_json(self._location_formatter)
 
 		doc, tag, text = self._html
 		with tag('article', klass="media"):
@@ -181,79 +184,43 @@ class Renderer:
 						with tag('div', id=flow_div_id):
 							self._flows[flow_div_id] = match_obj
 
-	def _flow_js(self, div_id, match, cutoff=0.1):
-		flow = match.flow
-		if flow is None:
-			return ''
-
-		'''
-		sankey = hv.Sankey([
-    ['A', 'X', 5],
-    ['A', 'Y', 7],
-    ['A', 'Z', 6],
-    ['B', 'X', 2],
-    ['B', 'Y', 9],
-    ['B', 'Z', 4]]
-)
-sankey.opts(width=600, height=400)
-		'''
-
-		template = string.Template('''
-anychart.onDocumentReady(function(){
-	var data = $data;
-	var sankey_chart = anychart.sankey(data);
-	sankey_chart.nodeWidth("20%");
-	sankey_chart.title("");
-	sankey_chart.nodePadding(20);
-	sankey_chart.container("$div_id");
-	sankey_chart.draw();
-});
-''')
-
-		if flow['type'] == 'sparse':
-			s_span = match.doc_span
-			t_span = match.query
-
-			data = []
-			for t, s, w in zip(flow['source'], flow['target'], flow['weight']):
-				if w > cutoff:
-					data.append({
-						'from': t_span[t].text,
-						'to': s_span[s].text,
-						'weight': w})
-
-		return template.safe_substitute(div_id=div_id, data=json.dumps(data))
-
-	def to_html(self):
+	def to_html(self, matches):
 		doc, tag, text = self._html
-
-		prolog = '''<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>Vectorian</title>
-		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
-		<script src="https://cdn.anychart.com/releases/v8/js/anychart-core.min.js"></script>
-		<script src="https://cdn.anychart.com/releases/v8/js/anychart-sankey.min.js"></script>
-	</head>
-	<body>
-		<div class="container" height="100%">
-			<div class="section">
-'''
-		epilog = string.Template('''
-			</div>
-		</div>
-		<script>
-			$script_code
-		</script>
-	</body>
-</html>''')
-
-		# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
-
 		iframe_id = self._next_unique_id()
 
+		if self._annotate.get('flow'):
+			sankey = importlib.import_module('vectorian.sankey')
+		else:
+			sankey = None
+
+		doc.asis('<!DOCTYPE html>')
+		with tag('html'):
+			with tag('head'):
+				doc.asis('<meta charset="utf-8">')
+				doc.asis('<meta name="viewport" content="width=device-width, initial-scale=1">')
+
+				doc.stag(
+					'link', rel='stylesheet',
+					href='https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css')
+
+				with tag('script', src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'):
+					pass
+
+				if self._annotate.get('flow'):
+					sankey.write_head(tag)
+
+			with tag('body'):
+				with tag('div', klass='container', height='100%'):
+					with tag('div', klass='section'):
+						for match_obj in matches:
+							self.add_match(match_obj)
+
+				if self._annotate.get('flow'):
+					with tag('script'):
+						for div_id, match_obj in self._flows.items():
+							text(sankey.script_code(iframe_id, div_id, match_obj))
+
+		# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
 		iframe = string.Template('''
 <iframe
 	id="$id"
@@ -264,29 +231,16 @@ anychart.onDocumentReady(function(){
 	allowfullscreen
 ></iframe>
 <script>
-	$script_code
+	document.getElementById("$id").onload = function() {
+		var f = document.getElementById("$id");
+		f.height = f.contentWindow.document.body.scrollHeight + "px";
+	}
 </script>
 ''')
 
-		resize_script_code = string.Template('''
-var f = document.getElementById("$id");
-f.onload = function() {
-	f.height = f.contentWindow.document.body.scrollHeight + "px";
-};
-''')
-
-		scripts = []
-		for div_id, match_obj in self._flows.items():
-			scripts.append(self._flow_js(div_id, match_obj))
-		s = ''.join([
-			prolog,
-			doc.getvalue(),
-			epilog.safe_substitute(script_code="".join(scripts))])
-
 		return iframe.safe_substitute(
 			id=iframe_id, width="100%", height="100%",
-			srcdoc=html.escape(s),
-			script_code=resize_script_code.safe_substitute(id=iframe_id))
+			srcdoc=html.escape(doc.getvalue()))
 
 
 Location = collections.namedtuple("Location", ["speaker", "location"])

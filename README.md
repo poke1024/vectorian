@@ -25,3 +25,5 @@ https://pypi.org/project/wmd/
 https://github.com/mkusner/wmd
 https://www.ibm.com/blogs/research/2018/11/word-movers-embedding/
 * die standard test sets aus dem WRT paper rechnen / Infrastruktur dafür
+
+vectorian as standarized framework for evaluation (preprocessing etc.)

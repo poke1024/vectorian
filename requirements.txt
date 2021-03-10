@@ -16,3 +16,4 @@ matplotlib>=3.3.4
 faiss>=1.7.0
 pyyaml>=5.4.1
 holoviews>=1.14.2
+bokeh>=2.3.0
