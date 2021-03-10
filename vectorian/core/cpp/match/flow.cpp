@@ -228,6 +228,30 @@ py::list SparseFlow<Index>::py_omitted(const Match *p_match) const {
 	return Flow<Index>::py_omitted(p_match, to_injective());
 }
 
+template<typename Index>
+std::vector<typename DenseFlow<Index>::HalfEdge> DenseFlow<Index>::to_injective() const {
+	std::vector<HalfEdge> max_flow;
+	max_flow.resize(m_matrix.shape(1), HalfEdge{-1, 0.0f});
+
+	/*for (const auto &e : m_edges) {
+		if (e.weight > max_flow[e.source].weight) {
+			max_flow[e.source] = HalfEdge{e.target, e.weight};
+		}
+	}*/
+
+	return max_flow;
+}
+
+template<typename Index>
+py::list DenseFlow<Index>::py_regions(const Match *p_match, const int p_window_size) const {
+	return Flow<Index>::py_regions(p_match, to_injective(), p_window_size);
+}
+
+template<typename Index>
+py::list DenseFlow<Index>::py_omitted(const Match *p_match) const {
+	return Flow<Index>::py_omitted(p_match, to_injective());
+}
+
 
 template py::list Flow<int16_t>::py_regions(
 	const Match *p_match, const std::vector<HalfEdge> &p_edges, const int p_window_size) const;
@@ -243,5 +267,10 @@ template std::vector<typename SparseFlow<int16_t>::HalfEdge> SparseFlow<int16_t>
 template py::dict SparseFlow<int16_t>::to_py() const;
 template py::list SparseFlow<int16_t>::py_regions(const Match *p_match, const int p_window_size) const;
 template py::list SparseFlow<int16_t>::py_omitted(const Match *p_match) const;
+
+template std::vector<typename DenseFlow<int16_t>::HalfEdge> DenseFlow<int16_t>::to_injective() const;
+
+template py::list DenseFlow<int16_t>::py_regions(const Match *p_match, const int p_window_size) const;
+template py::list DenseFlow<int16_t>::py_omitted(const Match *p_match) const;
 
 #endif // __VECTORIAN_FLOW_IMPL_H__

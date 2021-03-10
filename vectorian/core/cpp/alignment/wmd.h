@@ -1,5 +1,6 @@
 #include "common.h"
 #include "match/match.h"
+#include "alignment/transport.h"
 
 #include <xtensor/xadapt.hpp>
 
@@ -15,12 +16,6 @@ struct WMDSolution {
 	float score;
 	FlowRef flow;
 };
-
-/*template<typename Index>
-struct NonRelaxedWMDSolution {
-	float score;
-	DenseFlowRef<Index> flow;
-};*/
 
 template<typename Index>
 class AbstractWMD {
@@ -73,6 +68,8 @@ public:
 
 		size_t m_max_size; // i.e. pre-allocation
 
+		OptimalTransport m_ot;
+
 		// the following values contain the size of
 		// the problem currently operated on.
 
@@ -98,6 +95,8 @@ public:
 
 			m_distance_matrix.resize({size, size});
 			m_candidates.reserve(size);
+
+			m_ot.resize(max_len_s, max_len_t);
 		}
 
 		inline void reset(const int k) {
@@ -148,33 +147,6 @@ public:
 		float sum;
 		const std::vector<Index> *v;
 	};*/
-
-	/*float _full(
-		const WMDOptions &p_options) {
-		if (p_options.injective) {
-			throw std::runtime_error(
-				"non-relaxed WMD with injective mapping is not supported");
-		}
-
-		if (p_options.symmetric) {
-			throw std::runtime_error(
-				"non-relaxed WMD with symmetric computation is not supported");
-		}
-
-		auto distance_matrix = xt::view(
-			m_distance_matrix, xt::range(0, p_size), xt::range(0, p_size));
-
-		for (int c = 0; c < 2; c++) {
-
-			auto &w1 = docs[c]->bow;
-			auto &w2 = docs[1 - c]->bow;
-
-			auto xw1 = xt::adapt(w1.data(), {w1.size()});
-			auto xw2 = xt::adapt(w2.data(), {w2.size()});
-
-			const auto r = m_ot.emd2(xw1, xw2, distance_matrix);
-		}
-	}*/
 
 	template<typename Slice>
 	inline void print_debug(
@@ -235,6 +207,54 @@ public:
 		FlowRef flow;
 	};
 
+	class FullSolver {
+		const FlowFactoryRef<Index> m_flow_factory;
+
+	public:
+		typedef DenseFlowRef<Index> FlowRef;
+
+		inline FullSolver(const FlowFactoryRef<Index> &p_flow_factory) :
+			m_flow_factory(p_flow_factory) {
+		}
+
+		OptimalCost<FlowRef> operator()(
+			Problem &p_problem,
+			const WMDOptions &p_options) const {
+
+			PPK_ASSERT(!p_options.relaxed);
+
+			if (p_options.injective) {
+				throw std::runtime_error(
+					"non-relaxed WMD with injective mapping is not supported");
+			}
+
+			if (p_options.symmetric) {
+				throw std::runtime_error(
+					"non-relaxed WMD with symmetric computation is not supported");
+			}
+
+			const Index size = p_problem.m_vocabulary_size;
+			const auto distance_matrix = xt::view(
+				p_problem.m_distance_matrix,
+				xt::range(0, size), xt::range(0, size));
+
+			auto &w1 = p_problem.m_doc[0].bow;
+			auto &w2 = p_problem.m_doc[1].bow;
+
+			auto xw1 = xt::adapt(w1.data(), {w1.size()});
+			auto xw2 = xt::adapt(w2.data(), {w2.size()});
+
+			const auto r = p_problem.m_ot.emd2(xw1, xw2, distance_matrix);
+
+			if (r.success()) {
+				const auto flow = m_flow_factory->create_dense(r.G);
+				return OptimalCost<FlowRef>{r.opt_cost, flow};
+			} else {
+				return OptimalCost<FlowRef>{0.0f, FlowRef()};
+			}
+		}
+	};
+
 	class RelaxedSolver {
 		const FlowFactoryRef<Index> m_flow_factory;
 
@@ -250,6 +270,8 @@ public:
 			const WMDOptions &p_options) const {
 
 			// inspired by https://github.com/src-d/wmd-relax
+
+			PPK_ASSERT(p_options.relaxed);
 
 			Document &doc_s = p_problem.m_doc[0];
 			Document &doc_t = p_problem.m_doc[1];

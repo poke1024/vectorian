@@ -167,6 +167,28 @@ using SparseFlowRef = std::shared_ptr<SparseFlow<Index>>;
 template<typename Index>
 class DenseFlow : public Flow<Index> {
 	xt::xtensor<float, 2> m_matrix;
+
+public:
+	template<typename Matrix>
+	inline DenseFlow(const Matrix &p_matrix) : m_matrix(p_matrix) {
+	}
+
+	template<typename Slice>
+	inline MaximumScore max_score(
+		const Slice &p_slice) const {
+
+		float matched_score = 0.0f;
+		const size_t n = p_slice.len_t();
+		for (size_t i = 0; i < n; i++) {
+			matched_score += p_slice.max_similarity_for_t(i);
+		}
+
+		return MaximumScore{0.0f, matched_score};
+	}
+
+	virtual py::dict to_py() const;
+	virtual py::list py_regions(const Match *p_match, const int p_window_size) const;
+	virtual py::list py_omitted(const Match *p_match) const;
 };
 
 template<typename Index>
@@ -189,6 +211,11 @@ public:
 
 	SparseFlowRef<Index> create_sparse() {
 		return std::make_shared<SparseFlow<Index>>();
+	}
+
+	template<typename Matrix>
+	DenseFlowRef<Index> create_dense(const Matrix &m_matrix) {
+		return std::make_shared<DenseFlow<Index>>(m_matrix);
 	}
 };
 

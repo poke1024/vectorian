@@ -186,6 +186,7 @@ struct TaggedTokenId {
 template<typename Index>
 class WordMoversDistance {
 	const WMDOptions m_options;
+
 	WMD<Index, token_t> m_wmd;
 	WMD<Index, TaggedTokenId> m_wmd_tagged;
 
@@ -227,6 +228,36 @@ class WordMoversDistance {
 		}
 	}
 
+	template<typename Slice, typename Solver>
+	inline MatchRef make_match(
+		const MatcherRef &p_matcher,
+		const Slice &p_slice,
+		const ResultSetRef &p_result_set,
+		const Solver &p_solver) {
+
+		const auto r = compute(
+			p_matcher->query(),
+			p_slice,
+			p_solver);
+
+		if (!r.flow) {
+			return MatchRef();
+		}
+
+		const float score = r.score / reference_score(
+			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
+
+		if (score > p_result_set->worst_score()) {
+			return p_result_set->add_match(
+				p_matcher,
+				p_slice.id(),
+				r.flow,
+				score);
+		} else {
+			return MatchRef();
+		}
+	}
+
 public:
 	WordMoversDistance(
 		const bool p_relaxed,
@@ -259,26 +290,18 @@ public:
 		const FlowFactoryRef<Index> flow_factory =
 			p_result_set->flow_factory();
 
-		const auto r = compute(
-			p_matcher->query(),
-			p_slice,
-			typename AbstractWMD<Index>::RelaxedSolver(flow_factory));
-
-		if (!r.flow) {
-			return MatchRef();
-		}
-
-		const float score = r.score / reference_score(
-			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
-
-		if (score > p_result_set->worst_score()) {
-			return p_result_set->add_match(
+		if (m_options.relaxed) {
+			return make_match(
 				p_matcher,
-				p_slice.id(),
-				r.flow,
-				score);
+				p_slice,
+				p_result_set,
+				typename AbstractWMD<Index>::RelaxedSolver(flow_factory));
 		} else {
-			return MatchRef();
+			return make_match(
+				p_matcher,
+				p_slice,
+				p_result_set,
+				typename AbstractWMD<Index>::FullSolver(flow_factory));
 		}
 	}
 };
