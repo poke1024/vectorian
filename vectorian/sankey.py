@@ -57,7 +57,7 @@ def flow_to_sankey(match, flow, cutoff=0.1):
 
 	nodes = hv.Dataset(enumerate(nodes), 'index', 'label')
 	return hv.Sankey((edges, nodes)).opts(
-		width=900,
+		width=800,
 		height=n * 60,
 		labels='label',
 		label_position='inner',

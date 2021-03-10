@@ -30,8 +30,8 @@ class Result:
 	def __getitem__(self, i):
 		return self._matches[i]
 
-	def to_json(self, location_formatter=None):
-		return [m.to_json(location_formatter) for m in self._matches]
+	def to_json(self, context_size=10, location_formatter=None):
+		return [m.to_json(context_size, location_formatter) for m in self._matches]
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])
@@ -193,26 +193,31 @@ class Session:
 
 
 class LabResult(Result):
-	def __init__(self, index, matches, duration, location_formatter, annotate=None):
+	def __init__(self, index, matches, duration, location_formatter, context_size=10, annotate=None):
 		super().__init__(index, matches, duration)
 		self._annotate = annotate
 		self._location_formatter = location_formatter
+		self._context_size = context_size
 
 	def _render(self, r):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
 		return r.to_html(self._matches)
 
-	def annotate(self, *args):
+	def annotate(self, *args, context_size=None):
 		# e.g. tags, metric, penalties, metadata, flow
 		return LabResult(
 			self.index,
 			self._matches,
 			self._duration,
 			self._location_formatter,
+			context_size=context_size or self._context_size,
 			annotate=dict((k, True) for k in args))
 
 	def _repr_html_(self):
-		return self._render(Renderer(self._location_formatter, annotate=self._annotate))
+		return self._render(Renderer(
+			self._context_size,
+			self._location_formatter,
+			annotate=self._annotate))
 
 
 class LabSession(Session):

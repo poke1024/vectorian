@@ -23,12 +23,17 @@ def trim_regions(regions):
 
 
 class Renderer:
-	def __init__(self, location_formatter, annotate=None):
+	def __init__(self, context_size, location_formatter, annotate=None):
 		doc, tag, text = Doc().tagtext()
 
 		self._html = (doc, tag, text)
 		self._annotate = annotate or {}
+
+		self._context_size = context_size
 		self._location_formatter = location_formatter
+
+		if self._annotate.get('flow'):
+			self._annotate['index'] = True
 
 		self._flows = dict()
 
@@ -115,7 +120,9 @@ class Renderer:
 			text("%.1f%%" % (100 * match['score']))
 
 	def add_match(self, match_obj):
-		match = match_obj.to_json(self._location_formatter)
+		match = match_obj.to_json(
+			self._context_size,
+			self._location_formatter)
 
 		doc, tag, text = self._html
 		with tag('article', klass="media"):

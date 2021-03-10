@@ -160,41 +160,40 @@ public:
 	}
 };
 
+struct TaggedTokenId {
+	token_t token;
+	int8_t tag;
+
+	inline bool operator==(const TaggedTokenId &t) const {
+		return token == t.token && tag == t.tag;
+	}
+
+	inline bool operator!=(const TaggedTokenId &t) const {
+		return !(*this == t);
+	}
+
+	inline bool operator<(const TaggedTokenId &t) const {
+		if (token < t.token) {
+			return true;
+		} else if (token == t.token) {
+			return tag < t.tag;
+		} else {
+			return false;
+		}
+	}
+};
+
 template<typename Index>
-class RelaxedWordMoversDistance {
-
-	struct TaggedTokenId {
-		token_t token;
-		int8_t tag;
-
-		inline bool operator==(const TaggedTokenId &t) const {
-			return token == t.token && tag == t.tag;
-		}
-
-		inline bool operator!=(const TaggedTokenId &t) const {
-			return !(*this == t);
-		}
-
-		inline bool operator<(const TaggedTokenId &t) const {
-			if (token < t.token) {
-				return true;
-			} else if (token == t.token) {
-				return tag < t.tag;
-			} else {
-				return false;
-			}
-		}
-	};
-
+class WordMoversDistance {
 	const WMDOptions m_options;
 	WMD<Index, token_t> m_wmd;
 	WMD<Index, TaggedTokenId> m_wmd_tagged;
 
-	template<typename Slice>
-	inline RelaxedWMDSolution<Index> compute(
+	template<typename Slice, typename Solver>
+	inline WMDSolution<typename Solver::FlowRef> compute(
 		const QueryRef &p_query,
 		const Slice &p_slice,
-		const FlowFactoryRef<Index> &p_flow_factory) {
+		const Solver &p_solver) {
 
 		const bool pos_tag_aware = p_slice.similarity_depends_on_pos();
 		const auto &enc = p_slice.encoder();
@@ -203,7 +202,7 @@ class RelaxedWordMoversDistance {
 			// perform WMD on a vocabulary
 			// built from (token id, pos tag).
 
-			return m_wmd_tagged.relaxed(
+			return m_wmd_tagged(
 				p_slice,
 				[&enc] (const auto &t) {
 					return TaggedTokenId{
@@ -212,37 +211,39 @@ class RelaxedWordMoversDistance {
 					};
 				},
 				m_options,
-				p_flow_factory);
+				p_solver);
 
 		} else {
 			// perform WMD on a vocabulary
 			// built from token ids.
 
-			return m_wmd.relaxed(
+			return m_wmd(
 				p_slice,
 				[&enc] (const auto &t) {
 					return enc.to_embedding(t);
 				},
 				m_options,
-				p_flow_factory);
+				p_solver);
 		}
 	}
 
 public:
-	RelaxedWordMoversDistance(
+	WordMoversDistance(
+		const bool p_relaxed,
 		const bool p_normalize_bow,
 		const bool p_symmetric,
-		const bool p_one_target) :
+		const bool p_injective) :
 
 		m_options(WMDOptions{
+			p_relaxed,
 			p_normalize_bow,
 			p_symmetric,
-			p_one_target
+			p_injective
 		}) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
-		m_wmd.resize(max_len_s, max_len_t);
+		m_wmd.allocate(max_len_s, max_len_t);
 	}
 
 	inline float gap_cost(size_t len) const {
@@ -255,10 +256,13 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) {
 
+		const FlowFactoryRef<Index> flow_factory =
+			p_result_set->flow_factory();
+
 		const auto r = compute(
 			p_matcher->query(),
 			p_slice,
-			p_result_set->flow_factory());
+			typename AbstractWMD<Index>::RelaxedSolver(flow_factory));
 
 		if (!r.flow) {
 			return MatchRef();
@@ -373,26 +377,30 @@ MatcherRef create_alignment_matcher(
 			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)),
 			WatermanSmithBeyer<Index>::create_score_computer(p_factory));
 
-	} else if (algorithm == "rwmd") {
+	} else if (algorithm == "wmd") {
 
+		bool relaxed = true;
 		bool normalize_bow = true;
 		bool symmetric = true;
-		bool one_target = true;
+		bool injective = true;
 
+		if (p_alignment_def.contains("relaxed")) {
+			relaxed = p_alignment_def["relaxed"].cast<bool>();
+		}
 		if (p_alignment_def.contains("normalize_bow")) {
 			normalize_bow = p_alignment_def["normalize_bow"].cast<bool>();
 		}
 		if (p_alignment_def.contains("symmetric")) {
 			symmetric = p_alignment_def["symmetric"].cast<bool>();
 		}
-		if (p_alignment_def.contains("one_target")) {
-			one_target = p_alignment_def["one_target"].cast<bool>();
+		if (p_alignment_def.contains("injective")) {
+			injective = p_alignment_def["injective"].cast<bool>();
 		}
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			std::move(RelaxedWordMoversDistance<Index>(
-				normalize_bow, symmetric, one_target)),
+			std::move(WordMoversDistance<Index>(
+				relaxed, normalize_bow, symmetric, injective)),
 			NoScoreComputer());
 
 	} else if (algorithm == "wrd") {

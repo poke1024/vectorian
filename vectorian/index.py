@@ -155,7 +155,7 @@ class Match:
 	def flow(self):
 		return None
 
-	def to_json(self, location_formatter=None):
+	def to_json(self, context_size=10, location_formatter=None):
 		regions = []
 
 		doc = self.document
@@ -164,7 +164,7 @@ class Match:
 		span_info = doc.span_info(
 			PartitionData(**partition), self.slice_id)
 
-		for r in self.regions:
+		for r in self.regions(context_size):
 			s = r.s
 			rm = r.match
 			if rm:
@@ -244,13 +244,12 @@ class CoreMatch(Match):
 		omitted = [t_text[slice(*s)] for s in self._c_match.omitted]
 		return omitted
 
-	@property
-	def regions(self):
+	def regions(self, context_size=10):
 		s_text = self.document.text
 		t_text = self.query.text
 
 		regions = []
-		for r in self._c_match.regions(10):
+		for r in self._c_match.regions(context_size):
 			if r.matched:
 				regions.append(Region(
 					s=s_text[slice(*r.s)],
