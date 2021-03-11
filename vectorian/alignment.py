@@ -119,7 +119,7 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 
 class WordMoversDistance(AlignmentAlgorithm):
 	@staticmethod
-	def wmd(variant):
+	def wmd(variant='kusner'):
 		if variant == 'kusner':
 			return WordMoversDistance(False, False, False, True)
 		elif variant == 'vectorian':
@@ -138,7 +138,7 @@ class WordMoversDistance(AlignmentAlgorithm):
 		else:
 			raise ValueError(variant)
 
-	def __init__(self, relaxed=True, injective=False, symmetric=False, normalize_bow=False):
+	def __init__(self, relaxed=True, injective=True, symmetric=False, normalize_bow=False):
 		self._options = {
 			'relaxed': relaxed,
 			'injective': injective,

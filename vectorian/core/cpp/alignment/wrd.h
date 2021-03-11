@@ -18,30 +18,7 @@ class WRD {
 
 		py::gil_scoped_acquire acquire;
 
-		const QueryVocabularyRef vocab = p_query->vocabulary();
-
-		const auto token_vector = [&] (const auto &get_id, const int n) {
-			py::list id;
-			py::list text;
-			for (int i = 0; i < n; i++) {
-				id.append(get_id(i));
-				text.append(vocab->id_to_token(get_id(i)));
-			}
-			py::dict tokens;
-			tokens[py::str("id")] = id;
-			tokens[py::str("text")] = text;
-			return tokens;
-		};
-
-		py::dict data;
-
-		data[py::str("s")] = token_vector([&] (int i) {
-			return slice.s(i).id;
-		}, len_s);
-
-		data[py::str("t")] = token_vector([&] (int i) {
-			return slice.t(i).id;
-		}, len_t);
+		py::dict data = p_query->make_py_debug_slice(slice);
 
 		data[py::str("mag_s")] = xt::pyarray<float>(mag_s);
 		data[py::str("mag_t")] = xt::pyarray<float>(mag_t);
@@ -75,12 +52,8 @@ class WRD {
 		py_solution[py::str("type")] = p_type_str;
 		data[py::str("solution")] = py_solution;
 
-		py::dict args;
-		args[py::str("hook")] = "alignment_wrd";
-		args[py::str("data")] = data;
-
 		const auto callback = *p_query->debug_hook();
-		callback(args);
+		callback("alignment_wrd", data);
 
 		/*const auto fmt_matrix = [&] (const MappedMatrixXf &data) {
 			fort::char_table table;

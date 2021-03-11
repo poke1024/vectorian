@@ -69,7 +69,7 @@ PYBIND11_MODULE(core, m) {
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
 
 	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> fast_embedding(m, "StaticEmbedding");
-	fast_embedding.def(py::init<const std::string &, py::object>());
+	fast_embedding.def(py::init<const std::string &, py::object, py::object>());
 	fast_embedding.def("token_to_id", &StaticEmbedding::token_to_id);
 	fast_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
 	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);

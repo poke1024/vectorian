@@ -120,7 +120,8 @@ class StaticEmbedding:
 			else:
 				path = None
 			if path and path.exists():
-				table = pq.read_table(path)
+				with tqdm(desc="Opening " + self._name):
+					table = pq.read_table(path, memory_map=True)
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
@@ -153,11 +154,27 @@ class StaticEmbeddingFromFile(StaticEmbedding):
 		raise NotImplementedError()
 
 
+class EmbeddingLoadingProgress:
+	def __init__(self, pbar):
+		self._pbar = pbar
+		self._last = 0
+
+	def update(self, ratio):
+		d = ratio - self._last
+		self._last = ratio
+		self._pbar.update(d)
+
+
 class StaticEmbeddingInstance:
 	def __init__(self, name, table):
 		self._name = name
 		self._table = table
-		self._core = core.StaticEmbedding(self._name, table)
+
+		with tqdm(desc="Loading " + name, total=1, bar_format='{l_bar}{bar}') as pbar:
+			progress = EmbeddingLoadingProgress(pbar)
+			self._core = core.StaticEmbedding(
+				self._name, table, progress.update)
+
 		self._vec = self._core.vectors
 
 	@property

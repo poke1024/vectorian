@@ -38,11 +38,6 @@ public:
 	virtual ~Flow() {
 	}
 
-	//virtual xt::xtensor<float, 2> to_matrix() const = 0;
-
-	/*virtual py::list py_sparse() const = 0;
-	virtual xt::pyarray<float, 2> py_dense() const = 0;*/
-
 	virtual py::dict to_py() const = 0;
 	virtual py::list py_regions(const Match *p_match, const int p_window_size) const = 0;
 	virtual py::list py_omitted(const Match *p_match) const = 0;
@@ -166,7 +161,14 @@ using SparseFlowRef = std::shared_ptr<SparseFlow<Index>>;
 
 template<typename Index>
 class DenseFlow : public Flow<Index> {
-	xt::xtensor<float, 2> m_matrix;
+public:
+	typedef typename Flow<Index>::HalfEdge HalfEdge;
+	typedef typename Flow<Index>::Edge Edge;
+
+private:
+	xt::xtensor<float, 2> m_matrix; // t x s
+
+	std::vector<HalfEdge> to_injective() const;
 
 public:
 	template<typename Matrix>

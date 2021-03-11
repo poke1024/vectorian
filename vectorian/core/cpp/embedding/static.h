@@ -81,7 +81,8 @@ class StaticEmbedding : public Embedding {
 public:
 	StaticEmbedding(
 		const std::string &p_name,
-		py::object p_table) : Embedding(p_name) {
+		py::object p_table,
+		py::object p_progress) : Embedding(p_name) {
 
 		const std::shared_ptr<arrow::Table> table = unwrap_table(p_table);
 
@@ -91,11 +92,28 @@ public:
 			m_tokens.push_back(s);
 		});*/
 
-		iterate_strings(table, "token", [this] (size_t i, const std::string &s) {
-			m_tokens[s] = static_cast<long>(i);
-		});
+		const ssize_t stage_size[2] = {
+			table->num_rows(),
+			table->num_columns()
+		};
 
-		std::cout << p_name << ": " << "loaded " << m_tokens.size() << " tokens." << std::endl;
+		const size_t update_freq[2] = {
+			1LL << 16,
+			10
+		};
+
+		const auto progress = [&stage_size, &update_freq, &p_progress] (int stage, size_t i) {
+			constexpr size_t num_stages = 2;
+			if ((i % update_freq[stage]) == 0) {
+				const float p = static_cast<float>(i) / stage_size[stage];
+				p_progress((stage + p) / num_stages);
+			}
+		};
+
+		iterate_strings(table, "token", [this, &progress] (size_t i, const std::string &s) {
+			m_tokens[s] = static_cast<long>(i);
+			progress(0, i);
+		});
 
 		/*{
 			auto tokens = string_column(table, "token");
@@ -125,9 +143,10 @@ public:
 			/*printf("loading embedding vectors parquet table.\n");
 			fflush(stdout);*/
 
-			for_each_column<arrow::FloatType, float>(table, [this] (size_t i, auto v, size_t offset) {
+			for_each_column<arrow::FloatType, float>(table, [this, &progress] (size_t i, auto v, size_t offset) {
 				PPK_ASSERT(i > 0 && offset + v.size() <= m_tokens.size());
 				xt::view(m_embeddings.unmodified, xt::range(offset, offset + v.size()), i - 1) = v;
+				progress(1, i);
 			}, 1);
 		} catch(...) {
 			printf("failed to load embedding vectors parquet table.\n");
@@ -135,6 +154,8 @@ public:
 		}
 
 		m_embeddings.update_normalized();
+
+		std::cout << p_name << ": " << "loaded " << m_tokens.size() << " tokens." << std::endl;
 
 		/*std::ofstream outfile;
 		outfile.open("/Users/arbeit/Desktop/embeddings.txt", std::ios_base::app);

@@ -249,6 +249,36 @@ public:
 	inline const std::optional<py::object>& debug_hook() const {
 		return m_debug_hook;
 	}
+
+	template<typename Slice>
+	py::dict make_py_debug_slice(const Slice &p_slice) const {
+		const QueryVocabularyRef vocab = this->vocabulary();
+
+		const auto token_vector = [&] (const auto &get_id, const int n) {
+			py::list id;
+			py::list text;
+			for (int i = 0; i < n; i++) {
+				id.append(get_id(i));
+				text.append(vocab->id_to_token(get_id(i)));
+			}
+			py::dict tokens;
+			tokens["id"] = id;
+			tokens["text"] = text;
+			return tokens;
+		};
+
+		py::dict data;
+
+		data["s"] = token_vector([&] (int i) {
+			return p_slice.s(i).id;
+		}, p_slice.len_s());
+
+		data["t"] = token_vector([&] (int i) {
+			return p_slice.t(i).id;
+		}, p_slice.len_t());
+
+		return data;
+	}
 };
 
 typedef std::shared_ptr<Query> QueryRef;

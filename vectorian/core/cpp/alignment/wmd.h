@@ -65,6 +65,7 @@ public:
 		xt::xtensor<float, 2> m_distance_matrix;
 		std::vector<DistanceRef> m_candidates;
 		std::vector<Edge> m_results[2];
+		xt::xtensor<float, 2> m_full_wmd_result;
 
 		size_t m_max_size; // i.e. pre-allocation
 
@@ -76,6 +77,24 @@ public:
 		Index m_vocabulary_size;
 		Index m_len_s;
 		Index m_len_t;
+
+		auto mutable_distance_matrix() {
+			return xt::view(
+				m_distance_matrix,
+				xt::range(0, m_vocabulary_size),
+				xt::range(0, m_vocabulary_size));
+		}
+
+		auto distance_matrix() const {
+			return xt::view(
+				m_distance_matrix,
+				xt::range(0, m_vocabulary_size),
+				xt::range(0, m_vocabulary_size));
+		}
+
+		auto bow(int i) const {
+			return xt::adapt(m_doc[i].bow.data(), {m_vocabulary_size});
+		}
 
 		void allocate(
 			const size_t max_len_s,
@@ -96,7 +115,8 @@ public:
 			m_distance_matrix.resize({size, size});
 			m_candidates.reserve(size);
 
-			m_ot.resize(max_len_s, max_len_t);
+			m_ot.resize(size, size);
+			m_full_wmd_result.resize({max_len_t, max_len_s});
 		}
 
 		inline void reset(const int k) {
@@ -110,24 +130,17 @@ public:
 
 		template<typename Similarity>
 		inline void compute_distance_matrix(
-			const Similarity &sim) {
+			const Similarity &sim,
+			const bool make_sparse) {
 
 			Document &doc_s = m_doc[0];
 			Document &doc_t = m_doc[1];
 
-			const int size = m_vocabulary_size;
+			auto dist = mutable_distance_matrix();
 
-			auto dist = xt::view(
-				m_distance_matrix, xt::range(0, size), xt::range(0, size));
-
-#if 0
-			// since wmd_relaxed will only access dist entries
-			// that are sourced from vocab_s and vocab_t, we do
-			// not need to initialize the full matrix, which saves
-			// us from quadratic time here.
-
-			dist.fill(MAX_SIMILARITY);
-#endif
+			if (!make_sparse) {
+				dist.fill(MAX_SIMILARITY);
+			}
 
 			for (const auto &u : doc_s.vocab) {
 				const Index i = doc_s.vocab_to_pos[u].front();
@@ -142,73 +155,44 @@ public:
 	};
 
 public:
-	/*struct Weights {
-		const float *w;
-		float sum;
-		const std::vector<Index> *v;
-	};*/
-
-	template<typename Slice>
-	inline void print_debug(
-		const QueryRef &p_query, const Slice &slice,
-		const int len_s, const int len_t, const int vocabulary_size,
-		std::ostream &os) {
-
-		/*const QueryVocabularyRef vocab = p_query->vocabulary();
-
-		os << "s: ";
-		for (int i = 0; i < len_s; i++) {
-			os << vocab->id_to_token(slice.s(i).id) << " [" << slice.s(i).id << "]" <<  " ";
-		}
-		os << "\n";
-
-		os << "t: ";
-		for (int i = 0; i < len_t; i++) {
-			os << vocab->id_to_token(slice.t(i).id) << " [" << slice.t(i).id << "]" <<  " ";
-		}
-		os << "\n";
-
-		os << "vocab s: ";
-		for (const auto &u : m_doc[0].vocab) {
-			os << vocab->id_to_token(slice.s(u.i).id) << " [" << u.vocab << "]" << " ";
-		}
-		os << "\n";
-
-		os << "vocab t: ";
-		for (const auto &u : m_doc[1].vocab) {
-			os << vocab->id_to_token(slice.t(u.i).id) << " [" << u.vocab << "]" << " ";
-		}
-		os << "\n";
-
-		os << "w1: ";
-		for (int i = 0; i < vocabulary_size; i++) {
-			os << m_doc[0].bow[i] << " ";
-		}
-		os << "\n";
-
-		os << "w2: ";
-		for (int i = 0; i < vocabulary_size; i++) {
-			os << m_doc[1].bow[i] << " ";
-		}
-		os << "\n";
-
-		os << "dist: \n";
-		for (int i = 0; i < vocabulary_size; i++) {
-			for (int j = 0; j < vocabulary_size; j++) {
-				os << m_dist[i * vocabulary_size + j] << " ";
-			}
-			os << "\n";
-		}*/
-	}
-
 	template<typename FlowRef>
 	struct OptimalCost {
 		float cost;
 		FlowRef flow;
 	};
 
+	static inline float cost_to_score(const float p_cost, const float p_max_cost) {
+		return (p_max_cost - p_cost) / p_max_cost;
+	}
+
 	class FullSolver {
 		const FlowFactoryRef<Index> m_flow_factory;
+
+		template<typename Slice, typename Result>
+		void call_debug_hook(
+			const QueryRef &p_query,
+			const Slice &p_slice,
+			const Problem &p_problem,
+			const Result &r) const {
+
+			py::gil_scoped_acquire acquire;
+
+			py::dict data = p_query->make_py_debug_slice(p_slice);
+
+			data["pos_to_vocab_s"] = xt::pyarray<Index>(
+				xt::adapt(p_problem.m_doc[0].pos_to_vocab.data(), {p_problem.m_len_s}));
+			data["pos_to_vocab_t"] = xt::pyarray<Index>(
+				xt::adapt(p_problem.m_doc[1].pos_to_vocab.data(), {p_problem.m_len_t}));
+
+			data["bow_s"] = xt::pyarray<float>(p_problem.bow(0));
+			data["bow_t"] = xt::pyarray<float>(p_problem.bow(1));
+
+			data["D"] = xt::pyarray<float>(p_problem.distance_matrix());
+			data["G"] = xt::pyarray<float>(r.G);
+
+			const auto callback = *p_query->debug_hook();
+			callback("alignment_wmd_full_internal", data);
+		}
 
 	public:
 		typedef DenseFlowRef<Index> FlowRef;
@@ -217,7 +201,14 @@ public:
 			m_flow_factory(p_flow_factory) {
 		}
 
+		inline bool allow_sparse_distance_matrix() const {
+			return false;
+		}
+
+		template<typename Slice>
 		OptimalCost<FlowRef> operator()(
+			const QueryRef &p_query,
+			const Slice &p_slice,
 			Problem &p_problem,
 			const WMDOptions &p_options) const {
 
@@ -233,21 +224,52 @@ public:
 					"non-relaxed WMD with symmetric computation is not supported");
 			}
 
-			const Index size = p_problem.m_vocabulary_size;
-			const auto distance_matrix = xt::view(
-				p_problem.m_distance_matrix,
-				xt::range(0, size), xt::range(0, size));
+			const size_t size = p_problem.m_vocabulary_size;
+			const auto distance_matrix = p_problem.distance_matrix();
 
-			auto &w1 = p_problem.m_doc[0].bow;
-			auto &w2 = p_problem.m_doc[1].bow;
+			const Document &doc_s = p_problem.m_doc[0];
+			const Document &doc_t = p_problem.m_doc[1];
 
-			auto xw1 = xt::adapt(w1.data(), {w1.size()});
-			auto xw2 = xt::adapt(w2.data(), {w2.size()});
+			auto xw1 = p_problem.bow(0);
+			auto xw2 = p_problem.bow(1);
 
 			const auto r = p_problem.m_ot.emd2(xw1, xw2, distance_matrix);
 
 			if (r.success()) {
-				const auto flow = m_flow_factory->create_dense(r.G);
+				// now map (and transpose) from vocabulary to pos.
+
+				if (p_query->debug_hook().has_value()) {
+					call_debug_hook(p_query, p_slice, p_problem, r);
+				}
+
+				auto flow_by_pos = xt::view(
+					p_problem.m_full_wmd_result,
+					xt::range(0, p_problem.m_len_t),
+					xt::range(0, p_problem.m_len_s));
+
+				PPK_ASSERT(r.G.shape(0) == size);
+				PPK_ASSERT(r.G.shape(1) == size);
+
+				for (const Index i : doc_s.vocab) {
+					const auto &spos = doc_s.vocab_to_pos[i];
+
+					for (const Index j : doc_t.vocab) {
+						const auto &tpos = doc_t.vocab_to_pos[j];
+
+						const float score = cost_to_score(
+							r.G(i, j), p_options.normalize_bow ?
+								1.0f :
+								std::max(doc_s.bow[i], doc_t.bow[j]));
+
+						for (Index t : tpos) {
+							for (Index s : spos) {
+								flow_by_pos(t, s) = score;
+							}
+						}
+					}
+				}
+
+				const auto flow = m_flow_factory->create_dense(flow_by_pos);
 				return OptimalCost<FlowRef>{r.opt_cost, flow};
 			} else {
 				return OptimalCost<FlowRef>{0.0f, FlowRef()};
@@ -265,7 +287,14 @@ public:
 			m_flow_factory(p_flow_factory) {
 		}
 
+		inline bool allow_sparse_distance_matrix() const {
+			return true;
+		}
+
+		template<typename Slice>
 		OptimalCost<FlowRef> operator()(
+			const QueryRef &p_query,
+			const Slice &,
 			Problem &p_problem,
 			const WMDOptions &p_options) const {
 
@@ -275,12 +304,11 @@ public:
 
 			Document &doc_s = p_problem.m_doc[0];
 			Document &doc_t = p_problem.m_doc[1];
+
+			// flipped docs, so we first compute t -> s!
 			const Document * const docs[2] = {&doc_t, &doc_s};
 
-			const Index size = p_problem.m_vocabulary_size;
-			const auto distance_matrix = xt::view(
-				p_problem.m_distance_matrix,
-				xt::range(0, size), xt::range(0, size));
+			const auto distance_matrix = p_problem.distance_matrix();
 
 			float cost = 0;
 			int tighter = 0;
@@ -380,9 +408,8 @@ public:
 				const auto &spos = doc_s.vocab_to_pos[tighter == 0 ? edge.target : edge.source];
 				const auto &tpos = doc_t.vocab_to_pos[tighter == 0 ? edge.source : edge.target];
 
-				const float max_cost = (p_options.normalize_bow ?
+				const float score = cost_to_score(edge.cost, p_options.normalize_bow ?
 					1.0f : docs[tighter]->bow[edge.source]);
-				const float score = (max_cost - edge.cost) / max_cost;
 
 				for (Index t : tpos) {
 					for (Index s : spos) {
@@ -510,6 +537,7 @@ public:
 
 	template<typename Slice, typename MakeToken, typename Solver>
 	WMDSolution<typename Solver::FlowRef> operator()(
+		const QueryRef &p_query,
 		const Slice &p_slice,
 		const MakeToken &p_make_token,
 		const WMDOptions &p_options,
@@ -537,9 +565,12 @@ public:
 		m_problem.compute_distance_matrix(
 			[&p_slice] (int i, int j) -> float {
 				return p_slice.similarity(i, j);
-			});
+			},
+			p_solver.allow_sparse_distance_matrix());
 
 		const auto r = p_solver(
+			p_query,
+			p_slice,
 			m_problem,
 			p_options);
 

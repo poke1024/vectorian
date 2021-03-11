@@ -5,6 +5,7 @@ import vectorian.utils as utils
 import vectorian
 
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
+from vectorian.alignment import WordMoversDistance
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
@@ -18,7 +19,7 @@ import json
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    embedding = FastText("en")
+    fasttext = FastText("en")
 
     nlp = spacy.load("en_core_web_sm")
 
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
         session = Session(
             [doc],
-            [embedding])
+            [fasttext])
 
     # use case 2.
     im = NovelImporter(nlp)
@@ -50,7 +51,7 @@ if __name__ == '__main__':
 
     session = Session(
         corpus,
-        [embedding],
+        [fasttext],
         token_mappings)
 
     #doc.save("/Users/arbeit/temp.json")
@@ -61,13 +62,39 @@ if __name__ == '__main__':
 
     formatter = LocationFormatter()
 
-    metric = AlignmentSentenceMetric(
-        TokenSimilarityMetric(
-            embedding, CosineMetric()))
+    if False:
+        metric = AlignmentSentenceMetric(
+            TokenSimilarityMetric(
+                fasttext, CosineMetric()))
 
-    #p = Partition("sentence")
-    index = session.partition("token", 25, 1).index(metric, nlp)
-    matches = index.find("write female", n=3)
+        index = session.partition("token", 25, 1).index(metric, nlp)
+        matches = index.find("write female", n=3)
+    else:
+        import numpy as np
+        import json
+
+        with open("/Users/arbeit/debug.txt", "w") as f:
+            def debug(hook, args):
+                if hook != 'alignment_wmd_full_internal':
+                    return
+
+                for k, v in args.items():
+                    f.write(f"{k}:\n")
+                    if isinstance(v, np.ndarray):
+                        f.write(np.array2string(v))
+                    else:
+                        f.write(json.dumps(v, indent=4))
+                    f.write("\n")
+                    f.write("\n")
+
+                f.write("-" * 80)
+                f.write("\n")
+                f.write("\n")
+
+            index = session.partition("sentence").index(AlignmentSentenceMetric(
+                token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
+                alignment=WordMoversDistance.wmd('vectorian')), nlp=nlp)
+            matches = index.find("write female", n=3, debug=debug)
 
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")

@@ -204,6 +204,7 @@ class WordMoversDistance {
 			// built from (token id, pos tag).
 
 			return m_wmd_tagged(
+				p_query,
 				p_slice,
 				[&enc] (const auto &t) {
 					return TaggedTokenId{
@@ -219,6 +220,7 @@ class WordMoversDistance {
 			// built from token ids.
 
 			return m_wmd(
+				p_query,
 				p_slice,
 				[&enc] (const auto &t) {
 					return enc.to_embedding(t);

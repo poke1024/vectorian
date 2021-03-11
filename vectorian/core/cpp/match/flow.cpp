@@ -3,6 +3,7 @@
 
 #include "match/match.h"
 #include "document.h"
+#include <xtensor/xsort.hpp>
 
 template<typename Index>
 py::list Flow<Index>::py_regions(
@@ -231,15 +232,30 @@ py::list SparseFlow<Index>::py_omitted(const Match *p_match) const {
 template<typename Index>
 std::vector<typename DenseFlow<Index>::HalfEdge> DenseFlow<Index>::to_injective() const {
 	std::vector<HalfEdge> max_flow;
-	max_flow.resize(m_matrix.shape(1), HalfEdge{-1, 0.0f});
+	max_flow.resize(m_matrix.shape(0), HalfEdge{-1, 0.0f});
 
-	/*for (const auto &e : m_edges) {
-		if (e.weight > max_flow[e.source].weight) {
-			max_flow[e.source] = HalfEdge{e.target, e.weight};
+	const auto indices = xt::argmax(m_matrix, 1);
+	PPK_ASSERT(indices.shape(0) == m_matrix.shape(0));
+
+	for (size_t i = 0; i < indices.size(); i++) {
+		const auto j = indices[i];
+		const auto w = m_matrix(i, j);
+		if (w > 0.0f) {
+			max_flow[i] = HalfEdge{static_cast<Index>(j), w};
 		}
-	}*/
+	}
 
 	return max_flow;
+}
+
+template<typename Index>
+py::dict DenseFlow<Index>::to_py() const {
+	py::dict d;
+
+	d["type"] = py::str("dense");
+	d["matrix"] = xt::pyarray<float>(m_matrix);
+
+	return d;
 }
 
 template<typename Index>
@@ -263,13 +279,12 @@ template py::list InjectiveFlow<int16_t>::py_regions(const Match *p_match, const
 template py::list InjectiveFlow<int16_t>::py_omitted(const Match *p_match) const;
 
 template std::vector<typename SparseFlow<int16_t>::HalfEdge> SparseFlow<int16_t>::to_injective() const;
-
 template py::dict SparseFlow<int16_t>::to_py() const;
 template py::list SparseFlow<int16_t>::py_regions(const Match *p_match, const int p_window_size) const;
 template py::list SparseFlow<int16_t>::py_omitted(const Match *p_match) const;
 
 template std::vector<typename DenseFlow<int16_t>::HalfEdge> DenseFlow<int16_t>::to_injective() const;
-
+template py::dict DenseFlow<int16_t>::to_py() const;
 template py::list DenseFlow<int16_t>::py_regions(const Match *p_match, const int p_window_size) const;
 template py::list DenseFlow<int16_t>::py_omitted(const Match *p_match) const;
 
