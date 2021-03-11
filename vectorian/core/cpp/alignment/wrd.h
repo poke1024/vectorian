@@ -20,37 +20,18 @@ class WRD {
 
 		py::dict data = p_query->make_py_debug_slice(slice);
 
-		data[py::str("mag_s")] = xt::pyarray<float>(mag_s);
-		data[py::str("mag_t")] = xt::pyarray<float>(mag_t);
+		data["mag_s"] = xt::pyarray<float>(mag_s);
+		data["mag_t"] = xt::pyarray<float>(mag_t);
 
-		data[py::str("D")] = xt::pyarray<float>(D);
+		data["D"] = xt::pyarray<float>(D);
 
 		py::dict py_solution;
 
-		py_solution[py::str("G")] = xt::pyarray<float>(solution.G);
-		py_solution[py::str("opt_cost")] = solution.opt_cost;
+		py_solution["G"] = xt::pyarray<float>(solution.G);
+		py_solution["cost"] = solution.cost;
 
-		const char *p_type_str;
-		switch (solution.type) {
-			case OptimalTransport::ProblemType::OPTIMAL: {
-				p_type_str = "optimal";
-			} break;
-			case OptimalTransport::ProblemType::MAX_ITER_REACHED: {
-				p_type_str = "max_iter_reached";
-			} break;
-			case OptimalTransport::ProblemType::INFEASIBLE: {
-				p_type_str = "infeasible";
-			} break;
-			case OptimalTransport::ProblemType::UNBOUNDED: {
-				p_type_str = "unbounded";
-			} break;
-			default: {
-				p_type_str = "illegal";
-			} break;
-		}
-
-		py_solution[py::str("type")] = p_type_str;
-		data[py::str("solution")] = py_solution;
+		py_solution["type"] = solution.type_str();
+		data["solution"] = py_solution;
 
 		const auto callback = *p_query->debug_hook();
 		callback("alignment_wrd", data);
@@ -135,7 +116,7 @@ public:
 
 		if (r.success()) {
 			//outfile << "--- success.\n";
-			return 1.0f - r.opt_cost * 0.5f;
+			return 1.0f - r.cost * 0.5f;
 		} else {
 			return 0.0f;
 		}

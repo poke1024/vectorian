@@ -64,7 +64,7 @@ public:
 
 		xt::xtensor<float, 2> m_distance_matrix;
 		std::vector<DistanceRef> m_candidates;
-		std::vector<Edge> m_results[2];
+		std::vector<Edge> m_tmp_costs[2];
 		xt::xtensor<float, 2> m_full_wmd_result;
 
 		size_t m_max_size; // i.e. pre-allocation
@@ -92,8 +92,24 @@ public:
 				xt::range(0, m_vocabulary_size));
 		}
 
-		auto bow(int i) const {
-			return xt::adapt(m_doc[i].bow.data(), {m_vocabulary_size});
+		auto bow(const int p_doc) const {
+			return xt::adapt(m_doc[p_doc].bow.data(), {m_vocabulary_size});
+		}
+
+		py::dict py_vocab_to_pos(const int p_doc) const {
+			py::dict result;
+			const auto &doc = m_doc[p_doc];
+			for (Index i = 0; i < m_vocabulary_size; i++) {
+				const auto &mapping = doc.vocab_to_pos[i];
+				if (!mapping.empty()) {
+					py::list positions;
+					for (auto p : mapping) {
+						positions.append(p);
+					}
+					result[py::int_(i)] = positions;
+				}
+			}
+			return result;
 		}
 
 		void allocate(
@@ -109,7 +125,7 @@ public:
 
 			for (int i = 0; i < 2; i++) {
 				m_doc[i].allocate(size);
-				m_results[i].reserve(size * size);
+				m_tmp_costs[i].reserve(size * size);
 			}
 
 			m_distance_matrix.resize({size, size});
@@ -168,12 +184,13 @@ public:
 	class FullSolver {
 		const FlowFactoryRef<Index> m_flow_factory;
 
-		template<typename Slice, typename Result>
+		template<typename Slice, typename ResultEMD, typename ScoreByPos>
 		void call_debug_hook(
 			const QueryRef &p_query,
 			const Slice &p_slice,
 			const Problem &p_problem,
-			const Result &r) const {
+			const ResultEMD &r,
+			const ScoreByPos &score_by_pos) const {
 
 			py::gil_scoped_acquire acquire;
 
@@ -184,11 +201,18 @@ public:
 			data["pos_to_vocab_t"] = xt::pyarray<Index>(
 				xt::adapt(p_problem.m_doc[1].pos_to_vocab.data(), {p_problem.m_len_t}));
 
+			data["vocab_to_pos_s"] = p_problem.py_vocab_to_pos(0);
+			data["vocab_to_pos_t"] = p_problem.py_vocab_to_pos(1);
+
 			data["bow_s"] = xt::pyarray<float>(p_problem.bow(0));
 			data["bow_t"] = xt::pyarray<float>(p_problem.bow(1));
 
 			data["D"] = xt::pyarray<float>(p_problem.distance_matrix());
 			data["G"] = xt::pyarray<float>(r.G);
+			data["P"] = xt::pyarray<float>(score_by_pos);
+
+			data["cost"] = r.cost;
+			data["type"] = r.type_str();
 
 			const auto callback = *p_query->debug_hook();
 			callback("alignment_wmd_full_internal", data);
@@ -238,11 +262,7 @@ public:
 			if (r.success()) {
 				// now map (and transpose) from vocabulary to pos.
 
-				if (p_query->debug_hook().has_value()) {
-					call_debug_hook(p_query, p_slice, p_problem, r);
-				}
-
-				auto flow_by_pos = xt::view(
+				auto score_by_pos = xt::view(
 					p_problem.m_full_wmd_result,
 					xt::range(0, p_problem.m_len_t),
 					xt::range(0, p_problem.m_len_s));
@@ -263,15 +283,23 @@ public:
 
 						for (Index t : tpos) {
 							for (Index s : spos) {
-								flow_by_pos(t, s) = score;
+								score_by_pos(t, s) = score;
 							}
 						}
 					}
 				}
 
-				const auto flow = m_flow_factory->create_dense(flow_by_pos);
-				return OptimalCost<FlowRef>{r.opt_cost, flow};
+				if (p_query->debug_hook().has_value()) {
+					call_debug_hook(p_query, p_slice, p_problem, r, score_by_pos);
+				}
+
+				const auto flow = m_flow_factory->create_dense(score_by_pos);
+				return OptimalCost<FlowRef>{r.cost, flow};
 			} else {
+				if (p_query->debug_hook().has_value()) {
+					call_debug_hook(p_query, p_slice, p_problem, r, xt::xtensor<float, 2>());
+				}
+
 				return OptimalCost<FlowRef>{0.0f, FlowRef()};
 			}
 		}
@@ -313,7 +341,7 @@ public:
 			float cost = 0;
 			int tighter = 0;
 			for (int c = 0; c < 2; c++) {
-				p_problem.m_results[c].clear();
+				p_problem.m_tmp_costs[c].clear();
 
 				const float *w1 = docs[c]->bow.data();
 				const float *w2 = docs[1 - c]->bow.data();
@@ -342,7 +370,7 @@ public:
 						const float d = (best_j >= 0 ? best_dist : MAX_SIMILARITY);
 						const float d_acc = w1[i] * d;
 						acc += d_acc;
-						p_problem.m_results[c].emplace_back(Edge{i, best_j, d_acc});
+						p_problem.m_tmp_costs[c].emplace_back(Edge{i, best_j, d_acc});
 
 					} else {
 						// 1:n case
@@ -368,13 +396,13 @@ public:
 							if (remaining <= w2[target]) {
 								const float d_acc = remaining * r.d;
 								acc += d_acc;
-								p_problem.m_results[c].emplace_back(Edge{i, target, d_acc});
+								p_problem.m_tmp_costs[c].emplace_back(Edge{i, target, d_acc});
 								break;
 							} else {
 								remaining -= w2[target];
 								const float d_acc = w2[target] * r.d;
 								acc += d_acc;
-								p_problem.m_results[c].emplace_back(Edge{i, target, d_acc});
+								p_problem.m_tmp_costs[c].emplace_back(Edge{i, target, d_acc});
 							}
 
 							candidates.pop_back();
@@ -404,7 +432,7 @@ public:
 			flow->initialize(p_problem.m_len_t);
 
 			// best == 0 -> w1 is t, best == 1 -> w1 is s
-			for (const auto &edge : p_problem.m_results[tighter]) {
+			for (const auto &edge : p_problem.m_tmp_costs[tighter]) {
 				const auto &spos = doc_s.vocab_to_pos[tighter == 0 ? edge.target : edge.source];
 				const auto &tpos = doc_t.vocab_to_pos[tighter == 0 ? edge.source : edge.target];
 

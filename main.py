@@ -94,7 +94,8 @@ if __name__ == '__main__':
             index = session.partition("sentence").index(AlignmentSentenceMetric(
                 token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
                 alignment=WordMoversDistance.wmd('vectorian')), nlp=nlp)
-            matches = index.find("write female", n=3, debug=debug)
+            #matches = index.find("write female", n=3, debug=debug)
+            matches = index.find("the great star", n=3, min_score=0.1, debug=debug)
 
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")

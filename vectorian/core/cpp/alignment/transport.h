@@ -16,10 +16,10 @@ class OptimalTransport {
 	xt::xtensor<float, 1> m_alpha_storage;
 	xt::xtensor<float, 1> m_beta_storage;
 
-	typedef unsigned int node_id_type;
+	typedef uint32_t node_id_type;
     typedef lemon::FullBipartiteDigraph Digraph;
     DIGRAPH_TYPEDEFS(lemon::FullBipartiteDigraph);
-    typedef lemon::NetworkSimplexSimple<Digraph,float,float,node_id_type> Simplex;
+    typedef lemon::NetworkSimplexSimple<Digraph, float, float, node_id_type> Simplex;
 
 public:
     typedef Simplex::ProblemType ProblemType;
@@ -129,11 +129,33 @@ public:
 	template<typename Matrix>
 	struct Solution {
 		ProblemType type;
-		float opt_cost;
+		float cost;
 		Matrix G;
 
 		inline bool success() const {
 			return type == ProblemType::OPTIMAL || type == ProblemType::MAX_ITER_REACHED;
+		}
+
+		inline const char *type_str() const {
+			const char *type_str;
+			switch (type) {
+				case OptimalTransport::ProblemType::OPTIMAL: {
+					type_str = "optimal";
+				} break;
+				case OptimalTransport::ProblemType::MAX_ITER_REACHED: {
+					type_str = "max_iter_reached";
+				} break;
+				case OptimalTransport::ProblemType::INFEASIBLE: {
+					type_str = "infeasible";
+				} break;
+				case OptimalTransport::ProblemType::UNBOUNDED: {
+					type_str = "unbounded";
+				} break;
+				default: {
+					type_str = "illegal";
+				} break;
+			}
+			return type_str;
 		}
 	};
 
