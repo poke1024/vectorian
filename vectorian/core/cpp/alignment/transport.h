@@ -35,9 +35,11 @@ public:
 	};
 
 	template<typename Vector, typename Matrix>
-	inline auto emd2(const Vector &a, const Vector &b, const Matrix &M) {
-		constexpr scalar_t DEFAULT_EXTRA_MASS_PENALTY = -1.0;
-		const scalar_t extra_mass_penalty = DEFAULT_EXTRA_MASS_PENALTY;
+	inline auto emd(
+		const Vector &a,
+		const Vector &b,
+		const Matrix &M,
+		const float extra_mass_penalty=-1.0f) {
 
 		std::vector<std::vector<scalar_t>> C;
 		C.reserve(M.shape(0));

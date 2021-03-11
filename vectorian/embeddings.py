@@ -120,8 +120,9 @@ class StaticEmbedding:
 			else:
 				path = None
 			if path and path.exists():
-				with tqdm(desc="Opening " + self._name):
+				with tqdm(desc="Opening " + self._name, total=1,  bar_format='{l_bar}{bar}') as pbar:
 					table = pq.read_table(path, memory_map=True)
+					pbar.update(1)
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(

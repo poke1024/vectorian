@@ -4,6 +4,7 @@ import holoviews as hv
 import json
 import string
 import collections
+import logging
 
 hv.extension('bokeh')
 
@@ -48,8 +49,21 @@ def flow_to_sankey(match, flow, cutoff=0.1):
 			if w > cutoff:
 				edges.append((token('t', t), token('s', s), w))
 
+	elif flow['type'] == 'dense':
+
+		m = flow['matrix']
+		for t in range(m.shape[0]):
+			for s in range(m.shape[1]):
+				if t <= s:
+					w = m[t, s]
+					if w > cutoff:
+						edges.append((token('t', t), token('s', s), w))
+
 	else:
 		raise ValueError(flow['type'])
+
+	if len(edges) < 1:
+		logging.warning("no edges found")
 
 	n = max(
 		len(set(x[0] for x in edges)),
@@ -57,7 +71,7 @@ def flow_to_sankey(match, flow, cutoff=0.1):
 
 	nodes = hv.Dataset(enumerate(nodes), 'index', 'label')
 	return hv.Sankey((edges, nodes)).opts(
-		width=800,
+		width=400,
 		height=n * 60,
 		labels='label',
 		label_position='inner',

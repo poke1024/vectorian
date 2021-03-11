@@ -101,7 +101,7 @@ public:
 			}
 		}
 
-		const auto r = m_ot.emd2(mag_s, mag_t, cost);
+		const auto r = m_ot.emd(mag_s, mag_t, cost);
 
 		if (p_query->debug_hook().has_value()) {
 			call_debug_hook(p_query, slice, len_s, len_t, mag_s, mag_t, cost, r);

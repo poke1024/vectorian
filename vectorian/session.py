@@ -24,6 +24,9 @@ class Result:
 	def matches(self):
 		return self._matches
 
+	def __len__(self):
+		return len(self._matches)
+
 	def __iter__(self):
 		return self._matches
 

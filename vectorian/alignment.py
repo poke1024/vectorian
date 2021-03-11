@@ -138,12 +138,13 @@ class WordMoversDistance(AlignmentAlgorithm):
 		else:
 			raise ValueError(variant)
 
-	def __init__(self, relaxed=True, injective=True, symmetric=False, normalize_bow=False):
+	def __init__(self, relaxed=True, injective=True, symmetric=False, normalize_bow=False, extra_mass_penalty=-1):
 		self._options = {
 			'relaxed': relaxed,
 			'injective': injective,
 			'normalize_bow': normalize_bow,
-			'symmetric': symmetric
+			'symmetric': symmetric,
+			'extra_mass_penalty': extra_mass_penalty
 		}
 
 	def to_description(self, partition):

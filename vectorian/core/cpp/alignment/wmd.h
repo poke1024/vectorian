@@ -9,6 +9,7 @@ struct WMDOptions {
 	bool normalize_bow;
 	bool symmetric;
 	bool injective;
+	float extra_mass_penalty;
 };
 
 template<typename FlowRef>
@@ -251,7 +252,8 @@ public:
 			auto xw1 = p_problem.bow(0);
 			auto xw2 = p_problem.bow(1);
 
-			const auto r = p_problem.m_ot.emd2(xw1, xw2, distance_matrix);
+			const auto r = p_problem.m_ot.emd(
+				xw1, xw2, distance_matrix, p_options.extra_mass_penalty);
 
 			if (r.success()) {
 				// now map (and transpose) from vocabulary to pos.

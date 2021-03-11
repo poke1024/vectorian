@@ -262,17 +262,9 @@ class WordMoversDistance {
 
 public:
 	WordMoversDistance(
-		const bool p_relaxed,
-		const bool p_normalize_bow,
-		const bool p_symmetric,
-		const bool p_injective) :
+		const WMDOptions &p_options) :
 
-		m_options(WMDOptions{
-			p_relaxed,
-			p_normalize_bow,
-			p_symmetric,
-			p_injective
-		}) {
+		m_options(p_options) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
@@ -408,6 +400,7 @@ MatcherRef create_alignment_matcher(
 		bool normalize_bow = true;
 		bool symmetric = true;
 		bool injective = true;
+		float extra_mass_penalty = -1.0f;
 
 		if (p_alignment_def.contains("relaxed")) {
 			relaxed = p_alignment_def["relaxed"].cast<bool>();
@@ -421,11 +414,14 @@ MatcherRef create_alignment_matcher(
 		if (p_alignment_def.contains("injective")) {
 			injective = p_alignment_def["injective"].cast<bool>();
 		}
+		if (p_alignment_def.contains("extra_mass_penalty")) {
+			extra_mass_penalty = p_alignment_def["extra_mass_penalty"].cast<float>();
+		}
 
 		return make_matcher(
 			p_query, p_document, p_metric, p_factory,
-			std::move(WordMoversDistance<Index>(
-				relaxed, normalize_bow, symmetric, injective)),
+			std::move(WordMoversDistance<Index>(WMDOptions{
+				relaxed, normalize_bow, symmetric, injective, extra_mass_penalty})),
 			NoScoreComputer());
 
 	} else if (algorithm == "wrd") {
