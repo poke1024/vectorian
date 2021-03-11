@@ -171,12 +171,6 @@ public:
 	};
 
 public:
-	template<typename FlowRef>
-	struct OptimalCost {
-		float cost;
-		FlowRef flow;
-	};
-
 	static inline float cost_to_score(const float p_cost, const float p_max_cost) {
 		return (p_max_cost - p_cost) / p_max_cost;
 	}
@@ -230,7 +224,7 @@ public:
 		}
 
 		template<typename Slice>
-		OptimalCost<FlowRef> operator()(
+		WMDSolution<FlowRef> operator()(
 			const QueryRef &p_query,
 			const Slice &p_slice,
 			Problem &p_problem,
@@ -276,8 +270,8 @@ public:
 					for (const Index j : doc_t.vocab) {
 						const auto &tpos = doc_t.vocab_to_pos[j];
 
-						const float score = cost_to_score(
-							r.G(i, j), p_options.normalize_bow ?
+						const float score =
+							r.G(i, j) / (p_options.normalize_bow ?
 								1.0f :
 								std::max(doc_s.bow[i], doc_t.bow[j]));
 
@@ -293,14 +287,23 @@ public:
 					call_debug_hook(p_query, p_slice, p_problem, r, score_by_pos);
 				}
 
+				float max_cost;
+				if (p_options.normalize_bow) {
+					max_cost = 1.0f;
+				} else {
+					// reach 100% when all t words can be transported. with some s we might
+					// obtain > 100%.
+					max_cost = doc_t.w_sum;
+				}
+
 				const auto flow = m_flow_factory->create_dense(score_by_pos);
-				return OptimalCost<FlowRef>{r.cost, flow};
+				return WMDSolution<FlowRef>{cost_to_score(r.cost, max_cost), flow};
 			} else {
 				if (p_query->debug_hook().has_value()) {
 					call_debug_hook(p_query, p_slice, p_problem, r, xt::xtensor<float, 2>());
 				}
 
-				return OptimalCost<FlowRef>{0.0f, FlowRef()};
+				return WMDSolution<FlowRef>{0.0f, FlowRef()};
 			}
 		}
 	};
@@ -320,9 +323,9 @@ public:
 		}
 
 		template<typename Slice>
-		OptimalCost<FlowRef> operator()(
+		WMDSolution<FlowRef> operator()(
 			const QueryRef &p_query,
-			const Slice &,
+			const Slice &p_slice,
 			Problem &p_problem,
 			const WMDOptions &p_options) const {
 
@@ -446,7 +449,11 @@ public:
 				}
 			}
 
-			return OptimalCost<FlowRef>{cost, flow};
+			const float max_cost = p_options.normalize_bow ?
+				1.0f : p_slice.max_sum_of_similarities();
+
+			return WMDSolution<FlowRef>{
+				cost_to_score(cost, max_cost), flow};
 		}
 	};
 };
@@ -596,17 +603,11 @@ public:
 			},
 			p_solver.allow_sparse_distance_matrix());
 
-		const auto r = p_solver(
+		return p_solver(
 			p_query,
 			p_slice,
 			m_problem,
 			p_options);
-
-		const float max_cost = p_options.normalize_bow ?
-			1.0f : p_slice.max_sum_of_similarities();
-
-		return WMDSolution<typename Solver::FlowRef>{
-			max_cost - r.cost, r.flow};
 	}
 };
 

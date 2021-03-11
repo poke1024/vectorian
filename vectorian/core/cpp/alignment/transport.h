@@ -1,6 +1,83 @@
 #ifndef __VECTORIAN_TRANSPORT_H__
 #define __VECTORIAN_TRANSPORT_H__
 
+#if 1
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-compare"
+#include "emd_hat.hpp"
+#pragma clang diagnostic pop
+
+class OptimalTransport {
+	typedef double scalar_t;
+
+	xt::xtensor<float, 2> m_G_storage;
+
+	emd_hat_gd_metric<scalar_t, WITHOUT_EXTRA_MASS_FLOW> m_emd;
+
+public:
+	void resize(const size_t max_n1, const size_t max_n2) {
+		m_G_storage.resize({max_n1, max_n2});
+	}
+
+	template<typename Matrix>
+	struct Solution {
+		float cost;
+		Matrix G;
+
+		inline bool success() const {
+			return true;
+		}
+
+		inline const char *type_str() const {
+			return "";
+		}
+	};
+
+	template<typename Vector, typename Matrix>
+	inline auto emd2(const Vector &a, const Vector &b, const Matrix &M) {
+		constexpr scalar_t DEFAULT_EXTRA_MASS_PENALTY = -1.0;
+		const scalar_t extra_mass_penalty = DEFAULT_EXTRA_MASS_PENALTY;
+
+		std::vector<std::vector<scalar_t>> C;
+		C.reserve(M.shape(0));
+		for (size_t i = 0; i < M.shape(0); i++) {
+			C.emplace_back(std::vector<scalar_t>());
+			C.back().resize(M.shape(1));
+			auto &row = C.back();
+			for (size_t j = 0; j < M.shape(1); j++) {
+				row[j] = M(i, j);
+			}
+		}
+
+		const std::vector<scalar_t> P(a.begin(), a.end());
+		const std::vector<scalar_t> Q(b.begin(), b.end());
+		std::vector<std::vector<scalar_t>> flow_tmp(
+			P.size(), std::vector<scalar_t>(P.size()));
+		const scalar_t emd = m_emd(
+			P, Q, C, extra_mass_penalty, &flow_tmp);
+
+		PPK_ASSERT(P.size() <= m_G_storage.shape(0));
+		PPK_ASSERT(Q.size() <= m_G_storage.shape(1));
+		auto flow = xt::view(
+			m_G_storage, xt::range(0, P.size()), xt::range(0, Q.size()));
+		size_t i = 0;
+		for (const auto &row : flow_tmp) {
+			size_t j = 0;
+			for (const auto &col : row) {
+				flow(i, j) = col;
+				j++;
+			}
+			i++;
+		}
+
+		return Solution<decltype(flow)>{
+			static_cast<float>(emd), flow};
+	}
+};
+
+#else // lemon
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreorder"
 #include "lemon/network_simplex_simple.h"
@@ -193,5 +270,7 @@ public:
 		return emd_c(a, b, M, max_iter);
 	}
 };
+
+#endif
 
 #endif // __VECTORIAN_TRANSPORT_H__

@@ -26,10 +26,9 @@ if platform.system() == 'Linux':
 	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
 cfg['include_dirs'].append('../../../lib')
-#cfg['include_dirs'].append('../../../lib/memory/include')
-#cfg['include_dirs'].append('../../../lib/memory/src')
+cfg['include_dirs'].append('../../../lib/pyemd/pyemd/lib')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
-
+x
 old_pyarrow = 1 if compare_versions(
 	pyarrow.__version__, '0.12.1', operator.le) else 0
 
@@ -64,6 +63,7 @@ cfg['compiler_args'].append('-fvisibility=hidden')
 
 cfg['dependencies'] = [
 	'alignment/aligner.h',
+	'alignment/transport.h',
 	'alignment/wmd.h',
 	'alignment/wrd.h',
 	'embedding/contextual.h',
