@@ -1,3 +1,9 @@
 [submodule "lib/ppk_assert"]
 	path = lib/ppk_assert
 	url = https://github.com/gpakosz/PPK_ASSERT
+[submodule "lib/memory"]
+	path = lib/memory
+	url = https://github.com/foonathan/memory
+[submodule "lib/pyemd"]
+	path = lib/pyemd
+	url = https://github.com/wmayner/pyemd
