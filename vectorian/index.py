@@ -348,7 +348,7 @@ class Index:
 
 	def find(
 		self, text,
-		n=10, min_score=0.2, debug=None,
+		n=10, min_score=0.0, debug=None,
 		options: dict = dict()):
 
 		options = options.copy()

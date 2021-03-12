@@ -33,7 +33,7 @@ StaticEmbeddingMetric::StaticEmbeddingMetric(
 
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
 	if (p_query->debug_hook().has_value()) {
-		(*p_query->debug_hook())("sim_matrix", xt::pyarray<float>(m_similarity));
+		(*p_query->debug_hook())("similarity_matrix", xt::pyarray<float>(m_similarity));
 	}
 
 	if (std::any_of(

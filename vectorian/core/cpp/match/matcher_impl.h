@@ -122,6 +122,15 @@ public:
 				slice_id, slice_strategy.window_step);
 		}
 
+		if (this->m_query->debug_hook().has_value()) {
+			py::gil_scoped_acquire acquire;
+			py::dict data;
+			data["doc_id"] = this->m_document->id();
+			data["num_results"] = p_matches->size();
+			const auto callback = *this->m_query->debug_hook();
+			callback("document/done", data);
+		}
+
 		p_matches->modify([this] (const auto &match) {
 			this->m_finalizer(match);
 		});

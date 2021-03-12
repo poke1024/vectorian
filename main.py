@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
         with open("/Users/arbeit/debug.txt", "w") as f:
             def debug(hook, args):
-                if hook != 'alignment_wmd_full_internal':
+                if hook != 'alignment/wmd':
                     return
 
                 for k, v in args.items():

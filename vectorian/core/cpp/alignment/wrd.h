@@ -34,7 +34,7 @@ class WRD {
 		data["solution"] = py_solution;
 
 		const auto callback = *p_query->debug_hook();
-		callback("alignment_wrd", data);
+		callback("alignment/wrd/solver", data);
 
 		/*const auto fmt_matrix = [&] (const MappedMatrixXf &data) {
 			fort::char_table table;

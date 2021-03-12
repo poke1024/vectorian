@@ -247,6 +247,15 @@ class WordMoversDistance {
 		const float score = r.score / reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
 
+		if (p_matcher->query()->debug_hook().has_value()) {
+			py::gil_scoped_acquire acquire;
+			const auto callback = *p_matcher->query()->debug_hook();
+			py::dict data;
+			data["score"] = score;
+			data["worst_score"] = p_result_set->worst_score();
+			callback("alignment/wmd/make", data);
+		}
+
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,

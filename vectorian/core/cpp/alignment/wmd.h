@@ -221,7 +221,7 @@ public:
 			data["score"] = score;
 
 			const auto callback = *p_query->debug_hook();
-			callback("alignment_wmd_full_internal", data);
+			callback("alignment/wmd/solver", data);
 		}
 
 	public:
