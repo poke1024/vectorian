@@ -39,25 +39,25 @@ def flow_to_sankey(match, flow, cutoff=0.1):
 
 	if flow['type'] == 'injective':
 
-		for t, (s, w) in enumerate(zip(flow['target'], flow['weight'])):
-			if s >= 0 and w > cutoff:
-				edges.append((token('t', t), token('s', s), w))
+		for t, (s, f) in enumerate(zip(flow['target'], flow['flow'])):
+			if s >= 0 and f > cutoff:
+				edges.append((token('t', t), token('s', s), f))
 
 	elif flow['type'] == 'sparse':
 
-		for t, s, w in zip(flow['source'], flow['target'], flow['weight']):
-			if w > cutoff:
-				edges.append((token('t', t), token('s', s), w))
+		for t, s, f in zip(flow['source'], flow['target'], flow['flow']):
+			if f > cutoff:
+				edges.append((token('t', t), token('s', s), f))
 
 	elif flow['type'] == 'dense':
 
-		m = flow['matrix']
+		m = flow['flow']
 		for t in range(m.shape[0]):
 			for s in range(m.shape[1]):
 				if t <= s:
-					w = m[t, s]
-					if w > cutoff:
-						edges.append((token('t', t), token('s', s), w))
+					f = m[t, s]
+					if f > cutoff:
+						edges.append((token('t', t), token('s', s), f))
 
 	else:
 		raise ValueError(flow['type'])

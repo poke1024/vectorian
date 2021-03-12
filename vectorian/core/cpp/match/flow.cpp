@@ -107,7 +107,7 @@ py::list Flow<Index>::py_regions(
 		}
 
 		regions.append(std::make_shared<MatchedRegion>(
-			TokenScore{match[i].weight, 1.0f},
+			TokenScore{1.0f - match[i].weight.distance, 1.0f},
 			Slice{s.idx, s.len},
 			Slice{t.idx, t.len},
 			p_match->query()->vocabulary(),
@@ -163,7 +163,8 @@ py::dict InjectiveFlow<Index>::to_py() const {
 
 	d["type"] = py::str("injective");
 	d["target"] = PY_ARRAY_MEMBER(HalfEdge, target);
-	d["weight"] = PY_ARRAY_MEMBER(HalfEdge, weight);
+	d["flow"] = PY_ARRAY_MEMBER(HalfEdge, weight.flow);
+	d["dist"] = PY_ARRAY_MEMBER(HalfEdge, weight.distance);
 #else
 	d["type"] = py::str("sparse");
 	const size_t n = m_mapping.size();
@@ -191,10 +192,10 @@ py::list InjectiveFlow<Index>::py_omitted(const Match *p_match) const {
 template<typename Index>
 std::vector<typename SparseFlow<Index>::HalfEdge> SparseFlow<Index>::to_injective() const {
 	std::vector<HalfEdge> max_flow;
-	max_flow.resize(m_source_nodes, HalfEdge{-1, 0.0f});
+	max_flow.resize(m_source_nodes, HalfEdge{-1, Weight{0.0f, 0.0f}});
 
 	for (const auto &e : m_edges) {
-		if (e.weight > max_flow[e.source].weight) {
+		if (e.weight.flow > max_flow[e.source].weight.flow) {
 			max_flow[e.source] = HalfEdge{e.target, e.weight};
 		}
 	}
@@ -214,7 +215,8 @@ py::dict SparseFlow<Index>::to_py() const {
 	d["type"] = py::str("sparse");
 	d["source"] = PY_ARRAY_MEMBER(Edge, source);
 	d["target"] = PY_ARRAY_MEMBER(Edge, target);
-	d["weight"] = PY_ARRAY_MEMBER(Edge, weight);
+	d["flow"] = PY_ARRAY_MEMBER(Edge, weight.flow);
+	d["dist"] = PY_ARRAY_MEMBER(Edge, weight.distance);
 
 	return d;
 }
@@ -232,16 +234,17 @@ py::list SparseFlow<Index>::py_omitted(const Match *p_match) const {
 template<typename Index>
 std::vector<typename DenseFlow<Index>::HalfEdge> DenseFlow<Index>::to_injective() const {
 	std::vector<HalfEdge> max_flow;
-	max_flow.resize(m_matrix.shape(0), HalfEdge{-1, 0.0f});
+	max_flow.resize(m_flow.shape(0), HalfEdge{-1, Weight{0.0f, 0.0f}});
 
-	const auto indices = xt::argmax(m_matrix, 1);
-	PPK_ASSERT(indices.shape(0) == m_matrix.shape(0));
+	const auto indices = xt::argmax(m_flow, 1);
+	PPK_ASSERT(indices.shape(0) == m_flow.shape(0));
 
 	for (size_t i = 0; i < indices.size(); i++) {
 		const auto j = indices[i];
-		const auto w = m_matrix(i, j);
-		if (w > 0.0f) {
-			max_flow[i] = HalfEdge{static_cast<Index>(j), w};
+		const auto f = m_flow(i, j);
+		if (f > 0.0f) {
+			const auto d = m_distance(i, j);
+			max_flow[i] = HalfEdge{static_cast<Index>(j), Weight{f, d}};
 		}
 	}
 
@@ -253,7 +256,8 @@ py::dict DenseFlow<Index>::to_py() const {
 	py::dict d;
 
 	d["type"] = py::str("dense");
-	d["matrix"] = xt::pyarray<float>(m_matrix);
+	d["flow"] = xt::pyarray<float>(m_flow);
+	d["dist"] = xt::pyarray<float>(m_distance);
 
 	return d;
 }

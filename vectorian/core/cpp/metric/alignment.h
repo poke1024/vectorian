@@ -136,11 +136,9 @@ public:
 	        Index i = 0;
 	        for (auto &m : mapping) {
 	            if (m.target >= 0) {
-	                m.weight = slice.unmodified_similarity(m.target, i);
-	                //m.weight = 1.0f; // FIXME; was: slice.weight(m, i)
+	                m.weight.distance = 1.0f - slice.unmodified_similarity(m.target, i);
 	            } else {
-	                m.weight = 0.0f;
-	                //m.weight = 0.0f;
+	                m.weight.distance = 1.0f;
 	            }
 	            i++;
 	        }
