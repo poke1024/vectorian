@@ -3,11 +3,7 @@
 
 #include "common.h"
 #include "vocabulary.h"
-
-struct TokenScore {
-	float similarity;
-	float weight;
-};
+#include "match.h"
 
 class Region {
 	const Slice m_s;
@@ -51,63 +47,93 @@ struct TokenRef {
 };
 
 class MatchedRegion : public Region {
-	const TokenScore m_score; // score between s and t
-	const Slice m_t;
+public:
+	struct HalfEdge {
+		const Weight m_weight;
+		const Slice m_slice;
+		const TokenRef m_token;
+		const std::string m_metric;
 
+	public:
+		inline HalfEdge(
+			const Weight &p_weight,
+			const Slice &p_slice,
+			const TokenRef &p_token,
+			const std::string &p_metric) :
+
+			m_weight(p_weight),
+			m_slice(p_slice),
+			m_token(p_token),
+			m_metric(p_metric)
+		{
+		}
+
+		inline const Weight &weight() const {
+			return m_weight;
+		}
+
+		inline const Slice &slice() const {
+			return m_slice;
+		}
+
+		inline const TokenRef &token() const {
+			return m_token;
+		}
+
+		inline const std::string &metric() const {
+			return m_metric;
+		}
+	};
+
+private:
 	const QueryVocabularyRef m_vocab;
 	const TokenRef m_s_token;
-	const TokenRef m_t_token;
-
-	const std::string m_metric;
+	std::vector<HalfEdge> m_edges;
 
 public:
 	MatchedRegion(
-		const TokenScore &p_score,
-		const Slice &p_s,
-		const Slice &p_t,
 		const QueryVocabularyRef &p_vocab,
+		const Slice &p_s,
 		const TokenRef &p_s_token,
-		const TokenRef &p_t_token,
-		const std::string &p_metric) :
+		std::vector<HalfEdge> &&p_edges) :
 
 		Region(p_s),
-		m_score(p_score),
-		m_t(p_t),
-
 		m_vocab(p_vocab),
 		m_s_token(p_s_token),
-		m_t_token(p_t_token),
+		m_edges(p_edges) {
+	}
 
-		m_metric(p_metric) {
-		}
+	virtual bool is_matched() const {
+		return true;
+	}
 
-		virtual bool is_matched() const {
-			return true;
-		}
+	size_t num_edges() const {
+		return m_edges.size();
+	}
 
-		float similarity() const {
-			return m_score.similarity;
-		}
+	float flow(const size_t p_index) const {
+		return m_edges.at(p_index).weight().flow;
+	}
 
-		float weight() const {
-			return m_score.weight;
-		}
+	float distance(const size_t p_index) const {
+		return m_edges.at(p_index).weight().distance;
+	}
 
-		py::tuple t() const {
-			return m_t.to_py();
-		}
+	py::tuple t(const size_t p_index) const {
+		return m_edges.at(p_index).slice().to_py();
+	}
 
-		py::bytes pos_s() const {
-			return m_vocab->pos_str(m_s_token->pos);
-		}
+	const std::string &pos_s() const {
+		return m_vocab->pos_str(m_s_token->pos);
+	}
 
-		py::bytes pos_t() const {
-			return m_vocab->pos_str(m_t_token->pos);
-		}
+	const std::string &pos_t(const size_t p_index) const {
+		return m_vocab->pos_str(m_edges.at(p_index).token()->pos);
+	}
 
-		py::bytes metric() const {
-			return m_metric;
-		}
+	const std::string &metric(const size_t p_index) const {
+		return m_edges.at(p_index).metric();
+	}
 };
 
 typedef std::shared_ptr<MatchedRegion> MatchedRegionRef;

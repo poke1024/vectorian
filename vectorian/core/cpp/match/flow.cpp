@@ -8,7 +8,7 @@
 template<typename Index>
 py::list Flow<Index>::py_regions(
 	const Match *p_match,
-	const std::vector<HalfEdge> &p_edges,
+	const std::vector<Edge> &p_edges,
 	const int p_window_size) const {
 
 	const auto &s_tokens_ref = p_match->document()->tokens();
@@ -18,10 +18,9 @@ py::list Flow<Index>::py_regions(
 
 	const auto token_at = p_match->slice().idx;
 
-	const auto &match = p_edges;
 	py::list regions;
 
-	if (match.size() < 1) {
+	if (p_edges.size() < 1) {
 		const auto &s0 = s_tokens.at(token_at);
 		const auto &s1 = s_tokens.at(std::min(
 			static_cast<size_t>(token_at + p_match->slice().len), s_tokens.size() - 1));
@@ -30,26 +29,30 @@ py::list Flow<Index>::py_regions(
 		return regions;
 	}
 
-	Index match_0 = 0;
-	for (auto m : match) {
-		if (m.target >= 0) {
-			match_0 = m.target;
-			break;
+	std::vector<Edge> edges(p_edges);
+	std::sort(edges.begin(), edges.end(), [] (const Edge &a, const Edge &b) {
+		if (a.target < b.target) {
+			return true;
+		} else if (a.target > b.target) {
+			return false;
+		} else {
+			return a.weight.flow > b.weight.flow; // biggest flow first.
 		}
-	}
+	});
 
-	int32_t last_anchor = std::max(0, token_at + match_0 - p_window_size);
+	const Index match_0 = edges[0].target;
+	auto last_anchor = std::max(0, token_at + match_0 - p_window_size);
 	bool last_matched = false;
 
-	const int32_t n = static_cast<int32_t>(match.size());
+	//const int32_t n = static_cast<int32_t>(match.size());
 
 	const TokenFilter &token_filter = p_match->query()->token_filter();
-	std::vector<int16_t> index_map;
+	std::vector<Index> index_map;
 	if (!token_filter.all()) {
-		int16_t k = 0;
+		size_t k = 0;
 		const auto len = p_match->slice().len;
 		index_map.resize(len);
-		for (int32_t i = 0; i < len; i++) {
+		for (ssize_t i = 0; i < len; i++) {
 			index_map[k] = i;
 			if (token_filter(s_tokens.at(token_at + i))) {
 				k++;
@@ -57,7 +60,7 @@ py::list Flow<Index>::py_regions(
 		}
 	}
 
-	struct MatchLoc {
+	/*struct MatchLoc {
 		int32_t i;
 		int32_t match_at_i;
 	};
@@ -80,24 +83,28 @@ py::list Flow<Index>::py_regions(
 
 	std::sort(locs.begin(), locs.end(), [] (const MatchLoc &a, const MatchLoc &b) {
 		return a.match_at_i < b.match_at_i;
-	});
+	});*/
 
-	for (const auto &loc : locs) {
-		const auto i = loc.i;
-		const auto match_at_i = loc.match_at_i;
+	size_t edge_index = 0;
 
-		const auto &s = s_tokens.at(token_at + match_at_i);
-		const auto &t = t_tokens.at(i);
+	while (edge_index < edges.size()) {
+		const auto &edge = edges[edge_index];
+
+		auto target = edge.target;
+		PPK_ASSERT(target >= 0);
+		if (!index_map.empty()) {
+			target = index_map[target];
+		}
+
+		const auto &s = s_tokens.at(token_at + target);
 
 		const int32_t idx0 = s_tokens.at(last_anchor).idx;
 		if (s.idx > idx0) {
-
-			// this is for displaying the relative (!) penalty in the UI.
-
 			float p;
 
 			if (last_matched) {
-				p = p_match->matcher()->gap_cost(token_at + match_at_i - last_anchor);
+				p = p_match->matcher()->gap_cost(
+					token_at + target - last_anchor);
 			} else {
 				p = 0.0f;
 			}
@@ -106,23 +113,36 @@ py::list Flow<Index>::py_regions(
 				Slice{idx0, s.idx - idx0}, p));
 		}
 
+		std::vector<MatchedRegion::HalfEdge> region_edges;
+
+		do {
+			const auto source = edges[edge_index].source;
+			const auto &t = t_tokens.at(source);
+			region_edges.emplace_back(MatchedRegion::HalfEdge(
+				edges[edge_index].weight,
+				Slice{t.idx, t.len},
+				TokenRef{t_tokens_ref, source},
+				p_match->metric()->origin(s.id, source)
+			));
+
+			edge_index += 1;
+		} while (edge_index < edges.size() && edges[edge_index].target == target);
+
 		regions.append(std::make_shared<MatchedRegion>(
-			TokenScore{1.0f - match[i].weight.distance, 1.0f},
-			Slice{s.idx, s.len},
-			Slice{t.idx, t.len},
 			p_match->query()->vocabulary(),
-			TokenRef{s_tokens_ref, token_at + match_at_i},
-			TokenRef{t_tokens_ref, i},
-			p_match->metric()->origin(s.id, i)
+			Slice{s.idx, s.len},
+			TokenRef{s_tokens_ref, token_at + target},
+			std::move(region_edges)
 		));
 
-		last_anchor = token_at + match_at_i + 1;
+		last_anchor = token_at + target + 1;
 		last_matched = true;
 	}
 
-	const int32_t up_to = std::min(last_anchor + p_window_size, int32_t(s_tokens.size() - 1));
+	const auto up_to = std::min(
+		last_anchor + p_window_size, int32_t(s_tokens.size() - 1));
 	if (up_to > last_anchor) {
-		const int32_t idx0 = s_tokens.at(last_anchor).idx;
+		const auto idx0 = s_tokens.at(last_anchor).idx;
 		regions.append(std::make_shared<Region>(
 			Slice{idx0, s_tokens.at(up_to).idx - idx0}));
 	}
@@ -181,7 +201,7 @@ py::dict InjectiveFlow<Index>::to_py() const {
 
 template<typename Index>
 py::list InjectiveFlow<Index>::py_regions(const Match *p_match, const int p_window_size) const {
-	return Flow<Index>::py_regions(p_match, m_mapping, p_window_size);
+	return Flow<Index>::py_regions(p_match, to_edges(), p_window_size);
 }
 
 template<typename Index>
@@ -223,7 +243,7 @@ py::dict SparseFlow<Index>::to_py() const {
 
 template<typename Index>
 py::list SparseFlow<Index>::py_regions(const Match *p_match, const int p_window_size) const {
-	return Flow<Index>::py_regions(p_match, to_injective(), p_window_size);
+	return Flow<Index>::py_regions(p_match, to_edges(), p_window_size);
 }
 
 template<typename Index>
@@ -234,16 +254,16 @@ py::list SparseFlow<Index>::py_omitted(const Match *p_match) const {
 template<typename Index>
 std::vector<typename DenseFlow<Index>::HalfEdge> DenseFlow<Index>::to_injective() const {
 	std::vector<HalfEdge> max_flow;
-	max_flow.resize(m_flow.shape(0), HalfEdge{-1, Weight{0.0f, 0.0f}});
+	max_flow.resize(m_data.shape(0), HalfEdge{-1, Weight{0.0f, 0.0f}});
 
-	const auto indices = xt::argmax(m_flow, 1);
-	PPK_ASSERT(indices.shape(0) == m_flow.shape(0));
+	const auto indices = xt::argmax(xt::view(m_data, xt::all(), xt::all(), 0), 1);
+	PPK_ASSERT(indices.shape(0) == m_data.shape(0));
 
 	for (size_t i = 0; i < indices.size(); i++) {
 		const auto j = indices[i];
-		const auto f = m_flow(i, j);
+		const auto f = m_data(i, j, 0);
 		if (f > 0.0f) {
-			const auto d = m_distance(i, j);
+			const auto d = m_data(i, j, 1);
 			max_flow[i] = HalfEdge{static_cast<Index>(j), Weight{f, d}};
 		}
 	}
@@ -256,15 +276,15 @@ py::dict DenseFlow<Index>::to_py() const {
 	py::dict d;
 
 	d["type"] = py::str("dense");
-	d["flow"] = xt::pyarray<float>(m_flow);
-	d["dist"] = xt::pyarray<float>(m_distance);
+	d["flow"] = xt::pyarray<float>(xt::view(m_data, xt::all(), xt::all(), 0));
+	d["dist"] = xt::pyarray<float>(xt::view(m_data, xt::all(), xt::all(), 1));
 
 	return d;
 }
 
 template<typename Index>
 py::list DenseFlow<Index>::py_regions(const Match *p_match, const int p_window_size) const {
-	return Flow<Index>::py_regions(p_match, to_injective(), p_window_size);
+	return Flow<Index>::py_regions(p_match, to_edges(), p_window_size);
 }
 
 template<typename Index>
@@ -274,7 +294,7 @@ py::list DenseFlow<Index>::py_omitted(const Match *p_match) const {
 
 
 template py::list Flow<int16_t>::py_regions(
-	const Match *p_match, const std::vector<HalfEdge> &p_edges, const int p_window_size) const;
+	const Match *p_match, const std::vector<Edge> &p_edges, const int p_window_size) const;
 template py::list Flow<int16_t>::py_omitted(
 	const Match *p_match, const std::vector<HalfEdge> &p_edges) const;
 

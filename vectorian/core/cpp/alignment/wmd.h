@@ -71,9 +71,7 @@ public:
 		xt::xtensor<float, 2> m_distance_matrix;
 		std::vector<DistanceRef> m_candidates;
 		std::vector<Edge> m_tmp_costs[2];
-
-		xt::xtensor<float, 2> m_flow_result;
-		xt::xtensor<float, 2> m_dist_result;
+		xt::xtensor<float, 3> m_flow_dist_result;
 
 		size_t m_max_size; // i.e. pre-allocation
 
@@ -140,8 +138,7 @@ public:
 			m_candidates.reserve(size);
 
 			m_ot.resize(size, size);
-			m_flow_result.resize({max_len_t, max_len_s});
-			m_dist_result.resize({max_len_t, max_len_s});
+			m_flow_dist_result.resize({max_len_t, max_len_s, 2});
 		}
 
 		inline void reset(const int k) {
@@ -269,13 +266,8 @@ public:
 			if (r.success()) {
 				// now map from vocabulary to pos.
 
-				auto flow_by_pos = xt::view(
-					p_problem.m_flow_result,
-					xt::range(0, p_problem.m_len_t),
-					xt::range(0, p_problem.m_len_s));
-
-				auto dist_by_pos = xt::view(
-					p_problem.m_dist_result,
+				auto flow_dist_by_pos = xt::view(
+					p_problem.m_flow_dist_result,
 					xt::range(0, p_problem.m_len_t),
 					xt::range(0, p_problem.m_len_s));
 
@@ -291,8 +283,8 @@ public:
 
 						for (Index t : tpos) {
 							for (Index s : spos) {
-								flow_by_pos(t, s) = r.G(i, j) / max_flow; // normalize
-								dist_by_pos(t, s) = distance_matrix(i, j);
+								flow_dist_by_pos(t, s, 0) = r.G(i, j) / max_flow; // normalize
+								flow_dist_by_pos(t, s, 1) = distance_matrix(i, j);
 							}
 						}
 					}
@@ -301,10 +293,12 @@ public:
 				const float score = (xt::sum((1.0f - distance_matrix) * r.G) / xt::sum(r.G))();
 
 				if (p_query->debug_hook().has_value()) {
-					call_debug_hook(p_query, p_slice, p_problem, r.G, score, flow_by_pos, dist_by_pos);
+					call_debug_hook(p_query, p_slice, p_problem, r.G, score,
+					xt::view(flow_dist_by_pos, xt::all(), xt::all(), 0),
+					xt::view(flow_dist_by_pos, xt::all(), xt::all(), 1));
 				}
 
-				const auto flow = m_flow_factory->create_dense(flow_by_pos, dist_by_pos);
+				const auto flow = m_flow_factory->create_dense(flow_dist_by_pos);
 				return WMDSolution<FlowRef>{score, flow};
 			} else {
 				if (p_query->debug_hook().has_value()) {

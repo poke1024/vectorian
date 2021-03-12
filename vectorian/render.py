@@ -66,6 +66,7 @@ class Renderer:
 
 	def add_match_region(self, region):
 		doc, tag, text = self._html
+		edge = region['edges'][0]  # FIXME
 		with tag('span'):
 			with tag('span', style='display:inline-table;'):
 				with tag('span', style='display:table-row;'):
@@ -73,11 +74,12 @@ class Renderer:
 						self.add_bold_text(region['s'])
 					text(" ")
 					with tag('span', style='display:table-cell;'):
-						self.add_light_tag(region['t'])
+						self.add_light_tag(edge['t'])
 					text(" ")
-					with tag('span', style=f'display:table-cell; opacity:{region["weight"]};'):
-						with tag('span', klass=score_color_class(region['similarity'])):
-							text("%d%%" % int(math.floor(100 * region['similarity'])))
+					with tag('span', style=f'display:table-cell; opacity:{edge["flow"]};'):
+						similarity = 1 - edge["distance"]
+						with tag('span', klass=score_color_class(similarity)):
+							text("%d%%" % int(math.floor(100 * similarity)))
 
 				if self._annotate.get('tags') or self._annotate.get('metric'):
 					cell_style = 'display:table-cell; padding-left: 0.2em; padding-right: 0.2em;'
@@ -93,13 +95,13 @@ class Renderer:
 								text(region['pos_s'])
 						with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered'):
 							if self._annotate.get('tags'):
-								text(region['pos_t'])
+								text(edge['pos_t'])
 						with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered has-text-grey-light'):
 							if self._annotate.get('metric'):
-								text(region['metric'])
+								text(edge['metric'])
 
 	def add_region(self, region):
-		if len(region.get('t', '')) > 0 and region['similarity'] * region['weight'] > 0:
+		if len(region.get('edges', [])) > 0:
 			self.add_match_region(region)
 		elif self._annotate.get('penalties'):
 			doc, tag, text = self._html

@@ -19,10 +19,7 @@ class InjectiveFlow;
 template<typename Index>
 class Flow {
 public:
-	struct Weight {
-		float flow;
-		float distance;
-	};
+	typedef ::Weight Weight;
 
 	struct Edge {
 		Index source;
@@ -36,7 +33,7 @@ public:
 	};
 
 protected:
-	py::list py_regions(const Match *p_match, const std::vector<HalfEdge> &p_edges, const int p_window_size) const;
+	py::list py_regions(const Match *p_match, const std::vector<Edge> &p_edges, const int p_window_size) const;
 	py::list py_omitted(const Match *p_match, const std::vector<HalfEdge> &p_edges) const;
 
 public:
@@ -56,9 +53,24 @@ class InjectiveFlow : public Flow<Index> {
 public:
 	typedef typename Flow<Index>::Weight Weight;
 	typedef typename Flow<Index>::HalfEdge HalfEdge;
+	typedef typename Flow<Index>::Edge Edge;
 
 private:
 	std::vector<HalfEdge> m_mapping;
+
+	std::vector<Edge> to_edges() const {
+		std::vector<Edge> edges;
+		edges.reserve(m_mapping.size());
+		Index i = 0;
+		for (const auto &edge : m_mapping) {
+			if (edge.target >= 0) {
+				edges.emplace_back(
+					Edge{i, edge.target, edge.weight});
+			}
+			i += 1;
+		}
+		return edges;
+	}
 
 public:
 	inline InjectiveFlow() {
@@ -131,6 +143,10 @@ private:
 
 	std::vector<HalfEdge> to_injective() const;
 
+	const std::vector<Edge> &to_edges() const {
+		return m_edges;
+	}
+
 public:
 	inline SparseFlow() : m_source_nodes(0) {
 	}
@@ -174,16 +190,32 @@ public:
 	typedef typename Flow<Index>::Edge Edge;
 
 private:
-	xt::xtensor<float, 2> m_flow; // t x s
-	xt::xtensor<float, 2> m_distance; // t x s
+	xt::xtensor<float, 3> m_data; // t x s x (flow, distance)
 
 	std::vector<HalfEdge> to_injective() const;
 
+	std::vector<Edge> to_edges() const {
+		std::vector<Edge> edges;
+		edges.reserve(m_data.shape(0) * m_data.shape(1));
+		for (size_t i = 0; i < m_data.shape(0); i++) {
+			for (size_t j = 0; j < m_data.shape(1); j++) {
+				const auto f = m_data(i, j, 0);
+				if (f > 0.0f) {
+					edges.emplace_back(
+						Edge{
+							static_cast<Index>(i),
+							static_cast<Index>(j),
+							Weight{f, m_data(i, j, 1)}});
+				}
+			}
+		}
+		return edges;
+	}
+
 public:
 	template<typename Matrix>
-	inline DenseFlow(const Matrix &p_flow, const Matrix &p_distance) :
-		m_flow(p_flow),
-		m_distance(p_distance) {
+	inline DenseFlow(const Matrix &p_flow_and_distance) :
+		m_data(p_flow_and_distance) {
 	}
 
 	template<typename Slice>
@@ -227,8 +259,8 @@ public:
 	}
 
 	template<typename Matrix>
-	DenseFlowRef<Index> create_dense(const Matrix &p_matrix, const Matrix &p_distance) {
-		return std::make_shared<DenseFlow<Index>>(p_matrix, p_distance);
+	DenseFlowRef<Index> create_dense(const Matrix &p_flow_and_distance) {
+		return std::make_shared<DenseFlow<Index>>(p_flow_and_distance);
 	}
 };
 

@@ -39,12 +39,13 @@ PYBIND11_MODULE(core, m) {
 	region.def_property_readonly("matched", &Region::is_matched);
 
 	py::class_<MatchedRegion, Region, MatchedRegionRef> matched_region(m, "MatchedRegion");
-	matched_region.def_property_readonly("t", &MatchedRegion::t);
-	matched_region.def_property_readonly("similarity", &MatchedRegion::similarity);
-	matched_region.def_property_readonly("weight", &MatchedRegion::weight);
+	matched_region.def_property_readonly("num_edges", &MatchedRegion::num_edges);
+	matched_region.def("flow", &MatchedRegion::flow);
+	matched_region.def("distance", &MatchedRegion::distance);
+	matched_region.def("t", &MatchedRegion::t);
 	matched_region.def_property_readonly("pos_s", &MatchedRegion::pos_s);
-	matched_region.def_property_readonly("pos_t", &MatchedRegion::pos_t);
-	matched_region.def_property_readonly("metric", &MatchedRegion::metric);
+	matched_region.def("pos_t", &MatchedRegion::pos_t);
+	matched_region.def("metric", &MatchedRegion::metric);
 
 	py::class_<ExternalMatcher, ExternalMatcherRef> matcher(m, "ExternalMatcher");
 	matcher.def(py::init<const QueryRef&,

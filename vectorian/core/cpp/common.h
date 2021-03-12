@@ -66,6 +66,11 @@ struct MetricModifiers {
 	std::vector<float> t_pos_weights; // by index in t
 };
 
+struct Weight {
+	float flow;
+	float distance;
+};
+
 class Query;
 typedef std::shared_ptr<Query> QueryRef;
 class Document;

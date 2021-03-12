@@ -107,7 +107,11 @@ Region = namedtuple('Region', [
 
 
 TokenMatch = namedtuple('TokenMatch', [
-	't', 'pos_s', 'pos_t', 'similarity', 'weight', 'metric'])
+	'pos_s', 'edges'])
+
+
+TokenMatchEdge = namedtuple('TokenMatchEdge', [
+	't', 'pos_t', 'flow', 'distance', 'metric'])
 
 
 PartitionData = namedtuple('PartitionData', [
@@ -168,17 +172,22 @@ class Match:
 			s = r.s
 			rm = r.match
 			if rm:
-				t = rm.t
+				edges = []
+				for e in rm.edges:
+					edges.append({
+						't': e.t,
+						'pos_t': e.pos_t,
+						'flow': e.flow,
+						'distance': e.distance,
+						'metric': e.metric
+					})
+
 				regions.append(dict(
 					s=s,
-					t=t,
-					similarity=rm.similarity,
-					weight=rm.weight,
-					pos_s=rm.pos_s,
-					pos_t=rm.pos_t,
-					metric=rm.metric))
+					edges=edges))
 			else:
-				regions.append(dict(s=s, gap_penalty=r.gap_penalty))
+				regions.append(dict(
+					s=s, gap_penalty=r.gap_penalty))
 
 		metadata = doc.metadata
 		if location_formatter is not None:
@@ -251,15 +260,20 @@ class CoreMatch(Match):
 		regions = []
 		for r in self._c_match.regions(context_size):
 			if r.matched:
+				edges = []
+				for i in range(r.num_edges):
+					edges.append(TokenMatchEdge(
+						t=t_text[slice(*r.t(i))],
+						pos_t=r.pos_t(i),
+						flow=r.flow(i),
+						distance=r.distance(i),
+						metric=r.metric(i)))
+
 				regions.append(Region(
 					s=s_text[slice(*r.s)],
 					match=TokenMatch(
-						t=t_text[slice(*r.t)],
-						pos_s=r.pos_s.decode('utf-8'),
-						pos_t=r.pos_t.decode('utf-8'),
-						similarity=r.similarity,
-						weight=r.weight,
-						metric=r.metric.decode('utf-8')),
+						pos_s=r.pos_s,
+						edges=edges),
 					gap_penalty=r.mismatch_penalty))
 			else:
 				regions.append(Region(

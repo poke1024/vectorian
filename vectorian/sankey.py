@@ -54,10 +54,9 @@ def flow_to_sankey(match, flow, cutoff=0.1):
 		m = flow['flow']
 		for t in range(m.shape[0]):
 			for s in range(m.shape[1]):
-				if t <= s:
-					f = m[t, s]
-					if f > cutoff:
-						edges.append((token('t', t), token('s', s), f))
+				f = m[t, s]
+				if f > cutoff:
+					edges.append((token('t', t), token('s', s), f))
 
 	else:
 		raise ValueError(flow['type'])
