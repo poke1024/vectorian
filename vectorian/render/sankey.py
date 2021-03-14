@@ -9,90 +9,92 @@ import logging
 hv.extension('bokeh')
 
 
-def flow_to_sankey(match, flow, cutoff=0.1):
-	nodes = []
-	node_mapping = collections.defaultdict(dict)
-	spans = {'s': match.doc_span, 't': match.query}
+class FlowRenderer:
+	def __init__(self, width=400, height_per_node=60, node_padding=80, cmap='Pastel1'):
+		self._flows = {}
+		self._width = width
+		self._height_per_node = height_per_node
+		self._node_padding = node_padding
+		self._cmap = cmap
 
-	def token(name, i):
-		idx = node_mapping[name]
-		k = idx.get(i)
-		if k is not None:
-			return k
-		idx[i] = len(nodes)
-		nodes.append(' %s [%d] ' % (spans[name][i].text, i))
-		return idx[i]
+	def _flow_to_sankey(self, match, flow, cutoff=0.1):
+		nodes = []
+		node_mapping = collections.defaultdict(dict)
+		spans = {'s': match.doc_span, 't': match.query}
 
-	edges = []
+		def token(name, i):
+			idx = node_mapping[name]
+			k = idx.get(i)
+			if k is not None:
+				return k
+			idx[i] = len(nodes)
+			nodes.append(' %s [%d] ' % (spans[name][i].text, i))
+			return idx[i]
 
-	if flow['type'] == 'injective':
+		edges = []
 
-		for t, (s, f) in enumerate(zip(flow['target'], flow['flow'])):
-			if s >= 0 and f > cutoff:
-				edges.append((token('t', t), token('s', s), f))
+		if flow['type'] == 'injective':
 
-	elif flow['type'] == 'sparse':
+			for t, (s, f) in enumerate(zip(flow['target'], flow['flow'])):
+				if s >= 0 and f > cutoff:
+					edges.append((token('t', t), token('s', s), f))
 
-		for t, s, f in zip(flow['source'], flow['target'], flow['flow']):
-			if f > cutoff:
-				edges.append((token('t', t), token('s', s), f))
+		elif flow['type'] == 'sparse':
 
-	elif flow['type'] == 'dense':
-
-		m = flow['flow']
-		for t in range(m.shape[0]):
-			for s in range(m.shape[1]):
-				f = m[t, s]
+			for t, s, f in zip(flow['source'], flow['target'], flow['flow']):
 				if f > cutoff:
 					edges.append((token('t', t), token('s', s), f))
 
-	else:
-		raise ValueError(flow['type'])
+		elif flow['type'] == 'dense':
 
-	if len(edges) < 1:
-		logging.warning("no edges found")
+			m = flow['flow']
+			for t in range(m.shape[0]):
+				for s in range(m.shape[1]):
+					f = m[t, s]
+					if f > cutoff:
+						edges.append((token('t', t), token('s', s), f))
 
-	n = max(
-		len(set(x[0] for x in edges)),
-		len(set(x[1] for x in edges)))
+		else:
+			raise ValueError(flow['type'])
 
-	nodes = hv.Dataset(enumerate(nodes), 'index', 'label')
-	return hv.Sankey((edges, nodes)).opts(
-		width=400,
-		height=n * 60,
-		labels='label',
-		label_position='inner',
-		cmap='Pastel1',
-		node_padding=80,
-		show_values=False)
+		if len(edges) < 1:
+			logging.warning("no edges found")
 
+		n = max(
+			len(set(x[0] for x in edges)),
+			len(set(x[1] for x in edges)))
 
-def script_code(iframe_id, div_id, match):
-	flow = match.flow
+		nodes = hv.Dataset(enumerate(nodes), 'index', 'label')
+		return hv.Sankey((edges, nodes)).opts(
+			width=self._width,
+			height=n * self._height_per_node,
+			labels='label',
+			label_position='inner',
+			cmap=self._cmap,
+			node_padding=self._node_padding,
+			show_values=False)
 
-	if flow is None:
-		return
+	def _script_code(self, iframe_id, div_id, match):
+		flow = match.flow
 
-	sankey = flow_to_sankey(match, flow)
-	fig = hv.render(sankey, backend='bokeh')
-	fig.toolbar.logo = None
-	fig.toolbar_location = None
-	fig_json = json.dumps(bokeh.embed.json_item(fig, div_id))
+		if flow is None:
+			return
 
-	code = string.Template('''
-	$('#${div_id}').ready(function () {
-		Bokeh.embed.embed_item(${fig_json}).then(function() {
-			parent.document.getElementById("${iframe_id}").onload();
+		sankey = self._flow_to_sankey(match, flow)
+		fig = hv.render(sankey, backend='bokeh')
+		fig.toolbar.logo = None
+		fig.toolbar_location = None
+		fig_json = json.dumps(bokeh.embed.json_item(fig, div_id))
+
+		code = string.Template('''
+		$('#${div_id}').ready(function () {
+			Bokeh.embed.embed_item(${fig_json}).then(function() {
+				parent.document.getElementById("${iframe_id}").onload();
+			});
 		});
-	});
-	''')
+		''')
 
-	return code.safe_substitute(iframe_id=iframe_id, div_id=div_id, fig_json=fig_json)
-
-
-class FlowRenderer:
-	def __init__(self):
-		self._flows = {}
+		return code.safe_substitute(iframe_id=iframe_id, div_id=div_id, fig_json=fig_json)
 
 	def write_match(self, doc, match, fetch_id):
 		div_id = fetch_id()
@@ -120,4 +122,4 @@ class FlowRenderer:
 		doc, tag, text = doc.tagtext()
 		with tag('script'):
 			for div_id, match in self._flows.items():
-				text(script_code(iframe_id, div_id, match))
+				text(self._script_code(iframe_id, div_id, match))
