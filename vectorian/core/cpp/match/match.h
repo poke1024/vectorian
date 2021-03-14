@@ -76,10 +76,11 @@ public:
 	inline InjectiveFlow() {
 	}
 
-	inline InjectiveFlow(const std::vector<Index> &p_map) {
-		m_mapping.reserve(p_map.size());
-		for (Index i : p_map) {
-			m_mapping.emplace_back(HalfEdge{i, Weight{i < 0 ? 0.0f : 1.0f, 0.0f}});
+	inline InjectiveFlow(const std::vector<Index> &p_mapping) {
+		m_mapping.reserve(p_mapping.size());
+		for (Index i : p_mapping) {
+			m_mapping.emplace_back(HalfEdge{
+				i, Weight{i < 0 ? 0.0f : 1.0f, 0.0f}});
 		}
 	}
 

@@ -19,7 +19,7 @@ from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
 from vectorian.corpus import Corpus
-from vectorian.render import LocationFormatter
+from vectorian.render.render import LocationFormatter
 
 fasttext = FastText("en")
 

@@ -11,6 +11,25 @@
 class OptimalTransport {
 	typedef double scalar_t;
 
+	template<typename T>
+	class Matrix {
+		std::vector<std::vector<T>> m_cached_rows;
+		std::vector<std::vector<T>> m_matrix;
+
+	public:
+		void allocate(const size_t max_rows, const size_t max_cols) {
+			m_matrix.reserve(max_rows);
+			for (size_t i = 0; i < max_rows; i++) {
+				m_cached_rows.emplace_back(std::vector<T>(max_cols));
+			}
+		}
+
+		std::vector<std::vector<T>> &configure(
+			const size_t num_rows, const size_t num_cols) {
+
+		}
+	};
+
 	xt::xtensor<float, 2> m_G_storage;
 
 	emd_hat_gd_metric<scalar_t, WITHOUT_EXTRA_MASS_FLOW> m_emd;

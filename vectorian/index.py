@@ -159,7 +159,7 @@ class Match:
 	def flow(self):
 		return None
 
-	def to_json(self, context_size=10, location_formatter=None):
+	def to_json(self, context_size=10):
 		regions = []
 
 		doc = self.document
@@ -168,12 +168,11 @@ class Match:
 		span_info = doc.span_info(
 			PartitionData(**partition), self.slice_id)
 
-		for r in self.regions(context_size):
-			s = r.s
-			rm = r.match
-			if rm:
+		for region in self.regions(context_size):
+			s = region.s
+			if region.match:
 				edges = []
-				for e in rm.edges:
+				for e in region.match.edges:
 					edges.append({
 						't': e.t,
 						'pos_t': e.pos_t,
@@ -184,29 +183,14 @@ class Match:
 
 				regions.append(dict(
 					s=s,
+					pos_s=region.match.pos_s,
 					edges=edges))
 			else:
 				regions.append(dict(
-					s=s, gap_penalty=r.gap_penalty))
-
-		metadata = doc.metadata
-		if location_formatter is not None:
-			loc = location_formatter(doc, span_info)
-			if loc:
-				speaker, loc_desc = loc
-			else:
-				speaker = ""
-				loc_desc = ""
-			r_location = dict(
-				speaker=speaker,
-				author=metadata["author"],
-				title=metadata["title"],
-				location=loc_desc)
-		else:
-			r_location = None
+					s=s,
+					gap_penalty=region.gap_penalty))
 
 		data = dict(
-			document=metadata,
 			slice=self.slice_id,
 			location=span_info,
 			score=self.score,
@@ -215,8 +199,6 @@ class Match:
 			omitted=self.omitted,
 			level=self.level)
 
-		if r_location is not None:
-			data['r_location'] = r_location
 		return data
 
 

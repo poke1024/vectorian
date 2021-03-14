@@ -4,8 +4,9 @@ import logging
 
 from cached_property import cached_property
 from functools import lru_cache
-from pathlib import Path
-from vectorian.render import Renderer, LocationFormatter
+from vectorian.render.render import Renderer
+from vectorian.render.excerpt import ExcerptRenderer
+from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
 
@@ -33,8 +34,8 @@ class Result:
 	def __getitem__(self, i):
 		return self._matches[i]
 
-	def to_json(self, context_size=10, location_formatter=None):
-		return [m.to_json(context_size, location_formatter) for m in self._matches]
+	def to_json(self, context_size=10):
+		return [m.to_json(context_size) for m in self._matches]
 
 	def limit_to(self, n):
 		return type(self)(self._matches[:n])
@@ -196,29 +197,61 @@ class Session:
 
 
 class LabResult(Result):
-	def __init__(self, index, matches, duration, location_formatter, context_size=10, annotate=None):
+	def __init__(self, index, matches, duration, renderers, location_formatter):
 		super().__init__(index, matches, duration)
-		self._annotate = annotate
+		self._renderers = renderers
 		self._location_formatter = location_formatter
-		self._context_size = context_size
+		self._annotate = {}
 
 	def _render(self, r):
 		# see https://ipython.readthedocs.io/en/stable/api/generated/IPython.display.html#IPython.display.display
 		return r.to_html(self._matches)
 
-	def annotate(self, *args, context_size=None):
-		# e.g. tags, metric, penalties, metadata, flow
+	def format(self, render_spec):
+		renderers = []
+		if isinstance(render_spec, (list, tuple)):
+			renderers = render_spec
+		else:
+			from vectorian.render.excerpt import ExcerptRenderer
+			from vectorian.render.sankey import FlowRenderer
+
+			lookup = {
+				'excerpt': ExcerptRenderer,
+				'flow': FlowRenderer
+			}
+
+			klass = None
+			args = []
+			for render_desc in render_spec.split(","):
+				for i, part in enumerate(render_desc.split()):
+					part = part.strip()
+					if i == 0:
+						klass = lookup[part]
+						args = []
+					else:
+						if part.startswith("+"):
+							args.append(part[1:].strip())
+						else:
+							raise ValueError(part)
+
+				if klass is not None:
+					renderers.append(klass(*args))
+					klass = None
+
+			if klass is not None:
+				renderers.append(klass(*args))
+				klass = None
+
 		return LabResult(
 			self.index,
 			self._matches,
 			self._duration,
-			self._location_formatter,
-			context_size=context_size or self._context_size,
-			annotate=dict((k, True) for k in args))
+			renderers,
+			self._location_formatter)
 
 	def _repr_html_(self):
 		return self._render(Renderer(
-			self._context_size,
+			self._renderers,
 			self._location_formatter,
 			annotate=self._annotate))
 
@@ -249,6 +282,9 @@ class LabSession(Session):
 			progress.close()
 
 		def make_result(*args, **kwargs):
-			return LabResult(*args, **kwargs, location_formatter=self._location_formatter)
+			return LabResult(
+				*args, **kwargs,
+				renderers=[ExcerptRenderer()],
+				location_formatter=self._location_formatter)
 
 		return make_result, result

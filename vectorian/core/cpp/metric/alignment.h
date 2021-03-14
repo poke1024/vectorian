@@ -136,8 +136,10 @@ public:
 	        Index i = 0;
 	        for (auto &m : mapping) {
 	            if (m.target >= 0) {
+	                m.weight.flow = 1.0f;
 	                m.weight.distance = 1.0f - slice.unmodified_similarity(m.target, i);
 	            } else {
+	                m.weight.flow = 0.0f;
 	                m.weight.distance = 1.0f;
 	            }
 	            i++;

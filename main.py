@@ -1,8 +1,6 @@
 # This is a sample Python script.
 
-import vectorian.core as core
 import vectorian.utils as utils
-import vectorian
 
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
 from vectorian.alignment import WordMoversDistance
@@ -10,11 +8,9 @@ from vectorian.importers import NovelImporter
 from vectorian.embeddings import FastText
 from vectorian.session import Session
 from vectorian.corpus import Corpus
-from vectorian.render import LocationFormatter
+from vectorian.render.location import LocationFormatter
 
 import spacy
-import json
-
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
@@ -100,7 +96,7 @@ if __name__ == '__main__':
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
-        f.write(json.dumps(matches.to_json(10, formatter), indent=4))
+        f.write(json.dumps(matches.to_json(10), indent=4))
 
 
 
