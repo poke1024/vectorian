@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import os
 import download
 import logging
+import compress_fasttext
 
 
 def _make_table(tokens, embeddings, normalizer, sampling='nearest'):
@@ -242,7 +243,29 @@ class Glove(StaticEmbedding):
 			txt_data_path / f"glove.{name}.300d.txt")
 
 
-class FastTextVectors(StaticEmbedding):
+class InstalledStaticEmbedding(StaticEmbedding):
+	def __init__(self, path, unique_name=None):
+		super().__init__()
+
+		if unique_name is None:
+			unique_name = Path(path).stem
+
+		self._path = path
+		self._unique_name = unique_name
+
+	@property
+	def unique_name(self):
+		return self._unique_name
+
+
+class GensimKeyedVectors(InstalledStaticEmbedding):
+	def _load(self):
+		from gensim.models import KeyedVectors
+		wv = KeyedVectors.load(self._path)
+		return wv.index2word, wv.vectors_vocab
+
+
+class FastTextVectors(InstalledStaticEmbedding):
 	def _load(self):
 		from gensim.models.fasttext import load_facebook_vectors
 		wv = load_facebook_vectors(self._path)
@@ -257,10 +280,10 @@ class FastTextVectors(StaticEmbedding):
 		small_model.save(path)
 
 
-class CompressedFastTextVectors(StaticEmbedding):
+class CompressedFastTextVectors(InstalledStaticEmbedding):
 	def _load(self):
-		import compress_fasttext
-		small_model = compress_fasttext.models.CompressedFastTextKeyedVectors.load(self._path)
+		wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(self._path)
+		return wv.index2word, np.array([wv.word_vec(word) for word in wv.index2word])
 
 
 class FacebookFastTextVectors(StaticEmbedding):
@@ -296,39 +319,6 @@ class FacebookFastTextVectors(StaticEmbedding):
 	@property
 	def unique_name(self):
 		return f"fasttext-{self._lang}"
-
-
-'''
-class FastText(StaticEmbedding):
-	def __init__(self, loader):
-		self._custom_model_path = None
-
-		if lang:
-			unique_name = f"fasttext-{self._lang}"
-		else:
-			self._custom_model_path = Path(path)
-			if unique_name is None:
-				unique_name = self._custom_model_path.stem
-
-		self._cache_path = Path.home() / ".vectorian" / "embeddings"
-		self._cache_path.mkdir(exist_ok=True, parents=True)
-
-		unique_name = loader.name()
-		pq_path = self._cache_path / f"{unique_name}.parquet"
-
-		super().__init__(path=pq_path, name=unique_name)
-
-	def _model_path(self):
-		if self._custom_model_path is None:
-			import fasttext.util
-			os.chdir(self._cache_path)
-			filename = fasttext.util.download_model(
-				self._lang, if_exists='ignore')
-			return self._cache_path / filename
-		else:
-			return self._custom_model_path
-
-'''
 
 
 class ContextualEmbedding:

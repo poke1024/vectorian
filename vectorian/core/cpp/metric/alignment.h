@@ -26,32 +26,14 @@ inline float reference_score(
 	return reference_score;
 }
 
-template<typename Index>
-class WatermanSmithBeyer {
+template<typename Index, typename Compute>
+class InjectiveAlignment {
+protected:
+	const char *m_callback_name;
+	const Compute m_compute;
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
 	size_t m_max_len_t;
-	const std::vector<float> m_gap_cost;
-	const float m_smith_waterman_zero;
 	mutable InjectiveFlowRef<Index> m_cached_flow;
-
-	template<typename Slice>
-	inline void compute(
-		const QueryRef &,
-		const Slice &p_slice,
-		const InjectiveFlowRef<Index> &p_flow) const {
-
-		m_aligner->waterman_smith_beyer(
-			*p_flow.get(),
-			[&p_slice] (int i, int j) -> float {
-				return p_slice.similarity(i, j);
-			},
-			[this] (size_t len) -> float {
-				return this->gap_cost(len);
-			},
-			p_slice.len_s(),
-			p_slice.len_t(),
-			m_smith_waterman_zero);
-	}
 
 	template<typename Slice>
 	void call_debug_hook(
@@ -71,30 +53,23 @@ class WatermanSmithBeyer {
 		data["score"] = p_score;
 
 		const auto callback = *p_query->debug_hook();
-		callback("alignment/wsb", data);
+		callback(m_callback_name, data);
 	}
 
 public:
-	WatermanSmithBeyer(
-		const std::vector<float> &p_gap_cost,
-		float p_zero=0.5) :
+	InjectiveAlignment(
+		const char *p_callback_name,
+		const Compute &p_compute) :
 
-		m_max_len_t(0),
-		m_gap_cost(p_gap_cost),
-		m_smith_waterman_zero(p_zero) {
-
-		PPK_ASSERT(m_gap_cost.size() >= 1);
+		m_callback_name(p_callback_name),
+		m_compute(p_compute),
+		m_max_len_t(0) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
 		m_aligner = std::make_shared<Aligner<Index, float>>(
 			max_len_s, max_len_t);
 		m_max_len_t = max_len_t;
-	}
-
-	inline float gap_cost(size_t len) const {
-		return m_gap_cost[
-			std::min(len, m_gap_cost.size() - 1)];
 	}
 
 	template<typename Slice>
@@ -108,7 +83,7 @@ public:
 			m_cached_flow->reserve(m_max_len_t);
 		}
 
-		compute(p_matcher->query(), p_slice, m_cached_flow);
+		m_compute(*m_aligner.get(), p_matcher->query(), p_slice, *m_cached_flow.get());
 
 		const float score = m_aligner->score() / reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
@@ -176,6 +151,99 @@ public:
 	template<typename SliceFactory>
 	static ScoreComputer<SliceFactory> create_score_computer(const SliceFactory &p_factory) {
 		return ScoreComputer<SliceFactory>(p_factory);
+	}
+};
+
+struct SmithWatermanCompute {
+	const float m_gap_cost;
+	const float m_zero;
+
+	template<typename Aligner, typename Slice, typename Flow>
+	inline void operator()(
+		Aligner &p_aligner,
+		const QueryRef &,
+		const Slice &p_slice,
+		Flow &p_flow) const {
+
+		p_aligner.smith_waterman(
+			p_flow,
+			[&p_slice] (auto i, auto j) -> float {
+				return p_slice.similarity(i, j);
+			},
+			m_gap_cost,
+			p_slice.len_s(),
+			p_slice.len_t(),
+			m_zero);
+	}
+
+	inline float gap_cost(size_t len) const {
+		return m_gap_cost * len;
+	}
+};
+
+template<typename Index>
+class SmithWaterman : public InjectiveAlignment<Index, SmithWatermanCompute> {
+public:
+	SmithWaterman(
+		const float p_gap_cost,
+		const float p_zero=0.5) :
+
+		InjectiveAlignment<Index, SmithWatermanCompute>(
+			"alignment/smith-waterman",
+			SmithWatermanCompute{p_gap_cost, p_zero}) {
+	}
+
+	inline float gap_cost(size_t len) const {
+		return this->m_compute.gap_cost(len);
+	}
+};
+
+struct WatermanSmithBeyerCompute {
+	const std::vector<float> m_gap_cost;
+	const float m_zero;
+
+	template<typename Aligner, typename Slice, typename Flow>
+	inline void operator()(
+		Aligner &p_aligner,
+		const QueryRef &,
+		const Slice &p_slice,
+		Flow &p_flow) const {
+
+		p_aligner.waterman_smith_beyer(
+			p_flow,
+			[&p_slice] (auto i, auto j) -> float {
+				return p_slice.similarity(i, j);
+			},
+			[this] (auto len) -> float {
+				return this->gap_cost(len);
+			},
+			p_slice.len_s(),
+			p_slice.len_t(),
+			m_zero);
+		}
+
+	inline float gap_cost(size_t len) const {
+		return m_gap_cost[
+			std::min(len, m_gap_cost.size() - 1)];
+	}
+};
+
+template<typename Index>
+class WatermanSmithBeyer : public InjectiveAlignment<Index, WatermanSmithBeyerCompute> {
+public:
+	WatermanSmithBeyer(
+		const std::vector<float> &p_gap_cost,
+		const float p_zero=0.5) :
+
+		InjectiveAlignment<Index, WatermanSmithBeyerCompute>(
+			"alignment/waterman-smith-beyer",
+			WatermanSmithBeyerCompute{p_gap_cost, p_zero}) {
+
+		PPK_ASSERT(p_gap_cost.size() >= 1);
+	}
+
+	inline float gap_cost(size_t len) const {
+		return this->m_compute.gap_cost(len);
 	}
 };
 
@@ -428,6 +496,23 @@ MatcherRef create_alignment_matcher(
 			p_query, p_document, p_metric, p_factory,
 			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)),
 			WatermanSmithBeyer<Index>::create_score_computer(p_factory));
+
+	} else if (algorithm == "sw") {
+
+		float gap_cost = 0.0f;
+		if (p_alignment_def.contains("gap_cost")) {
+			gap_cost = p_alignment_def["gap_cost"].cast<float>();
+		}
+
+		float zero = 0.5f;
+		if (p_alignment_def.contains("zero")) {
+			zero = p_alignment_def["zero"].cast<float>();
+		}
+
+		return make_matcher(
+			p_query, p_document, p_metric, p_factory,
+			std::move(SmithWaterman<Index>(gap_cost, zero)),
+			SmithWaterman<Index>::create_score_computer(p_factory));
 
 	} else if (algorithm == "wmd") {
 

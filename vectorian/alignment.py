@@ -94,6 +94,27 @@ class AlignmentAlgorithm:
 		raise NotImplementedError()
 
 
+class SmithWaterman(AlignmentAlgorithm):
+	def __init__(self, gap: float = 0, zero: float = 0.5):
+		self._gap = gap
+		self._zero = zero
+
+	def to_description(self, partition):
+		return {
+			'WatermanSmithBeyer': {
+				'gap': self._gap,
+				'zero': self._zero
+			}
+		}
+
+	def to_args(self, partition):
+		return {
+			'algorithm': 'sw',
+			'gap': self._gap,
+			'zero': self._zero
+		}
+
+
 class WatermanSmithBeyer(AlignmentAlgorithm):
 	def __init__(self, gap: GapCost = None, zero: float = 0.5):
 		if gap is None:
