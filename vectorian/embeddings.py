@@ -11,12 +11,11 @@ import download
 import logging
 
 
-def _make_table(tokens, embeddings, normalizer, strategy='select'):
-	embeddings = embeddings.astype(np.float32)
+def _make_table(tokens, embeddings, normalizer, selection='nearest'):
+	if selection not in ('nearest', 'average'):
+		raise ValueError(selection)
 
-	with open("/Users/arbeit/debug.txt", "a") as f:
-		f.write("stage1\n")
-		f.write(str(embeddings[tokens.index("speak")]) + "\n")
+	embeddings = embeddings.astype(np.float32)
 
 	f_mask = np.zeros((embeddings.shape[0],), dtype=np.bool)
 	f_tokens = []
@@ -26,7 +25,7 @@ def _make_table(tokens, embeddings, normalizer, strategy='select'):
 		nt = normalizer(t)
 		if nt is None:
 			continue
-		if strategy != 'merge' and nt != t:
+		if selection != 'average' and nt != t:
 			continue
 		indices = token_to_ids.get(nt)
 		if indices is None:
@@ -36,7 +35,7 @@ def _make_table(tokens, embeddings, normalizer, strategy='select'):
 		else:
 			indices.append(i)
 
-	if strategy == 'merge':
+	if selection == 'average':
 		for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
 			if len(indices) > 1:
 				i = indices[0]
@@ -46,14 +45,6 @@ def _make_table(tokens, embeddings, normalizer, strategy='select'):
 	embeddings = None
 
 	assert f_embeddings.shape[0] == len(f_tokens)
-
-	with open("/Users/arbeit/debug.txt", "a") as f:
-		f.write("stagex\n")
-		f.write(str(token_to_ids["speak"]) + "\n")
-		for x in token_to_ids["speak"]:
-			f.write(tokens[x] + "\n")
-		f.write("stage2\n")
-		f.write(str(f_embeddings[f_tokens.index("speak")]) + "\n")
 
 	vecs = [pa.array(f_embeddings[:, i]) for i in range(f_embeddings.shape[1])]
 	vecs_name = [('v%d' % i) for i in range(f_embeddings.shape[1])]
@@ -128,14 +119,14 @@ class StaticEmbedding:
 	def unique_name(self):
 		raise NotImplementedError()
 
-	def create_instance(self, normalizer, strategy):
+	def create_instance(self, normalizer, embedding_selection):
 		loaded = self._loaded.get(normalizer.name)
 		if loaded is None:
 			name = self.unique_name
 
-			normalized_cache_path = self._cache_path / 'pa
+			normalized_cache_path = self._cache_path / 'parquet'
 			normalized_cache_path.mkdir(exist_ok=True, parents=True)
-			pq_path = normalized_cache_path / f"{name}-{normalizer.name}-{strategy}.parquet"
+			pq_path = normalized_cache_path / f"{name}-{normalizer.name}-{selector}.parquet"
 
 			if pq_path.exists():
 				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
@@ -144,7 +135,7 @@ class StaticEmbedding:
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
-					tokens, vectors, normalizer.unpack(), strategy)
+					tokens, vectors, normalizer.unpack(), embedding_selection)
 
 			loaded = StaticEmbeddingInstance(name, table)
 			self._loaded[normalizer.name] = loaded

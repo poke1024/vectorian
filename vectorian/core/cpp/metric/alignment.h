@@ -53,6 +53,27 @@ class WatermanSmithBeyer {
 			m_smith_waterman_zero);
 	}
 
+	template<typename Slice>
+	void call_debug_hook(
+		const QueryRef &p_query,
+		const Slice &p_slice,
+		const InjectiveFlowRef<Index> &p_flow,
+		const float p_score) const {
+
+		py::gil_scoped_acquire acquire;
+
+		py::dict data;
+		data["values"] = xt::pyarray<float>(m_aligner->value_matrix(
+			p_slice.len_s(), p_slice.len_t()));
+		data["traceback"] = xt::pyarray<float>(m_aligner->traceback_matrix(
+			p_slice.len_s(), p_slice.len_t()));
+		data["flow"] = p_flow->to_py();
+		data["score"] = p_score;
+
+		const auto callback = *p_query->debug_hook();
+		callback("alignment/wsb", data);
+	}
+
 public:
 	WatermanSmithBeyer(
 		const std::vector<float> &p_gap_cost,
@@ -95,6 +116,11 @@ public:
 		if (score > p_result_set->worst_score()) {
 			const auto flow = m_cached_flow;
 			m_cached_flow.reset();
+
+			if (p_matcher->query()->debug_hook().has_value()) {
+				call_debug_hook(p_matcher->query(), p_slice, flow, m_aligner->score());
+			}
+
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),

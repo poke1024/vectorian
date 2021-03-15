@@ -33,7 +33,32 @@ StaticEmbeddingMetric::StaticEmbeddingMetric(
 
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
 	if (p_query->debug_hook().has_value()) {
-		(*p_query->debug_hook())("similarity_matrix", xt::pyarray<float>(m_similarity));
+		auto gen_labels = py::cpp_function([&] () {
+			const auto &vocab = p_query->vocabulary();
+
+			py::list row_tokens;
+			p_vocabulary_to_embedding.iterate([&] (
+				const auto &ids, const size_t offset) {
+				for (size_t i = 0; i < ids.size(); i++) {
+					row_tokens.append(vocab->id_to_token(ids[i]));
+				}
+			});
+			py::list col_tokens;
+			for (const auto &t : *p_query->tokens()) {
+				col_tokens.append(vocab->id_to_token(t.id));
+			}
+
+			py::dict labels;
+			labels["rows"] = row_tokens;
+			labels["columns"] = col_tokens;
+			return labels;
+		});
+
+		py::dict data;
+		data["matrix"] = xt::pyarray<float>(m_similarity);
+		data["labels"] = gen_labels;
+
+		(*p_query->debug_hook())("similarity_matrix", data);
 	}
 
 	if (std::any_of(

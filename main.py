@@ -5,7 +5,7 @@ import vectorian.utils as utils
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
 from vectorian.alignment import WordMoversDistance
 from vectorian.importers import NovelImporter
-from vectorian.embeddings import FastText
+from vectorian.embeddings import FacebookFastTextVectors
 from vectorian.session import Session
 from vectorian.corpus import Corpus
 from vectorian.render.location import LocationFormatter
@@ -15,7 +15,7 @@ import spacy
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    fasttext = FastText("en")
+    fasttext = FacebookFastTextVectors("en")
 
     nlp = spacy.load("en_core_web_sm")
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
         "tagger": []
     }
 
-    token_mappings["tokenizer"].append(utils.lowercase())
+    #token_mappings["tokenizer"].append(utils.lowercase())
     token_mappings["tokenizer"].append(utils.erase("W"))
     token_mappings["tokenizer"].append(utils.alpha())
 
