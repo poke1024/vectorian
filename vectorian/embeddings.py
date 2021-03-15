@@ -91,58 +91,51 @@ def _load_glove_txt(csv_path):
 	return tokens, embeddings
 
 
-def cache_path(path, name):
-	if name:
-		return path.parent / (path.stem + "." + name + path.suffix)
-	else:
-		return path
-
-
 class StaticEmbedding:
-	def __init__(self, path, name):
-		self._path = path
-		self._name = name
-
+	def __init__(self):
 		self._loaded = {}
+		cache_path = Path.home() / ".vectorian" / "embeddings"
+		cache_path.mkdir(exist_ok=True, parents=True)
+		self._cache_path = cache_path
 
 	def _load(self):
 		raise NotImplementedError()
 
 	@property
-	def name(self):
-		return self._name
+	def name(self):  # i.e. display name
+		return self.unique_name
+
+	@property
+	def unique_name(self):
+		raise NotImplementedError()
 
 	def create_instance(self, normalizer):
 		loaded = self._loaded.get(normalizer.name)
 		if loaded is None:
-			if self._path:
-				path = cache_path(self._path, normalizer.name)
-			else:
-				path = None
-			if path and path.exists():
-				with tqdm(desc="Opening " + self._name, total=1,  bar_format='{l_bar}{bar}') as pbar:
-					table = pq.read_table(path, memory_map=True)
+			name = self.unique_name
+
+			normalized_cache_path = self._cache_path / 'parquet'
+			normalized_cache_path.mkdir(exist_ok=True, parents=True)
+			pq_path = normalized_cache_path / f"{name}-{normalizer.name}.parquet"
+
+			if pq_path.exists():
+				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
+					table = pq.read_table(pq_path, memory_map=True)
 					pbar.update(1)
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
 					tokens, vectors, normalizer.unpack())
 
-			loaded = StaticEmbeddingInstance(self._name, table)
+			loaded = StaticEmbeddingInstance(name, table)
 			self._loaded[normalizer.name] = loaded
 
-			if path and not path.exists():
-				loaded.save(path)
+			if pq_path and not pq_path.exists():
+				loaded.save(pq_path)
 
 			loaded.free_table()
 
 		return loaded
-
-
-# https://github.com/avidale/compress-fasttext
-#class CompressedStaticEmbedding:
-#	def create_instance(self, normalizer):
-#		compress_fasttext.models.CompressedFastTextKeyedVectors.load
 
 
 class StaticEmbeddingFromFile(StaticEmbedding):
@@ -196,7 +189,7 @@ class StaticEmbeddingInstance:
 		pq.write_table(
 			self._table,
 			path,
-			compression='snappy',
+			compression='none',
 			version='2.0')
 		logging.info("done.")
 
@@ -221,15 +214,15 @@ class Glove(StaticEmbedding):
 
 		self._glove_name = name
 
-		self._base_path = Path.home() / ".vectorian" / "embeddings" / "glove"
-		self._base_path.mkdir(exist_ok=True, parents=True)
-		pq_path = self._base_path / f"{name}.parquet"
+		self._cache_path = Path.home() / ".vectorian" / "embeddings" / "glove"
+		self._cache_path.mkdir(exist_ok=True, parents=True)
+		pq_path = self._cache_path / f"{name}.parquet"
 
 		super().__init__(path=pq_path, name=f"glove-{name}")
 
 	def _load(self):
 		name = self._glove_name
-		txt_data_path = self._base_path / name
+		txt_data_path = self._cache_path / name
 
 		if not txt_data_path.exists():
 			url = f"http://nlp.stanford.edu/data/glove.{name}.zip"
@@ -239,34 +232,90 @@ class Glove(StaticEmbedding):
 			txt_data_path / f"glove.{name}.300d.txt")
 
 
-class FastText(StaticEmbedding):
+class FastTextVectors(StaticEmbedding):
+	def _load(self):
+		from gensim.models.fasttext import load_facebook_vectors
+		load_facebook_vectors(self._path)
+
+
+class CompressedFastTextVectors(StaticEmbedding):
+	def _load(self):
+		import compress_fasttext
+		small_model = compress_fasttext.models.CompressedFastTextKeyedVectors.load(self._path)
+
+
+class FacebookFastTextVectors(StaticEmbedding):
 	def __init__(self, lang):
 		"""
-		:param lang: language code of fasttext encodings, see
+		:param lang: language code of precomputed fasttext encodings, see
 		https://fasttext.cc/docs/en/crawl-vectors.html
 		"""
 
+		super().__init__()
 		self._lang = lang
-		self._base_path = Path.home() / ".vectorian" / "embeddings" / "fasttext"
-		self._base_path.mkdir(exist_ok=True, parents=True)
-		pq_path = self._base_path / f"{lang}.parquet"
-
-		super().__init__(path=pq_path, name=f"fasttext-{self._lang}")
 
 	def _load(self):
+		import fasttext
 		import fasttext.util
-		lang = self._lang
-
-		os.chdir(self._base_path)
-		filename = fasttext.util.download_model(lang, if_exists='ignore')
-		ft = fasttext.load_model(filename)
-
+		download_path = self._cache_path / 'models'
+		download_path.mkdir(exist_ok=True, parents=True)
+		os.chdir(download_path)
+		with tqdm(desc="Downloading " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
+			filename = fasttext.util.download_model(
+				self._lang, if_exists='ignore')
+			pbar.update(1)
+		with tqdm(desc="Opening " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
+			ft = fasttext.load_model(str(download_path / filename))
+			pbar.update(1)
 		words = ft.get_words()
 		ndims = ft.get_dimension()
 		embeddings = np.empty((len(words), ndims), dtype=np.float32)
-		for i, w in enumerate(tqdm(words, desc=f"Importing fasttext ({lang})")):
+		for i, w in enumerate(tqdm(words, desc=f"Importing {self.unique_name}")):
 			embeddings[i] = ft.get_word_vector(w)
 		return words, embeddings
+
+	@property
+	def unique_name(self):
+		return f"fasttext-{self._lang}"
+
+
+'''
+class FastText(StaticEmbedding):
+	def __init__(self, loader):
+		self._custom_model_path = None
+
+		if lang:
+			unique_name = f"fasttext-{self._lang}"
+		else:
+			self._custom_model_path = Path(path)
+			if unique_name is None:
+				unique_name = self._custom_model_path.stem
+
+		self._cache_path = Path.home() / ".vectorian" / "embeddings"
+		self._cache_path.mkdir(exist_ok=True, parents=True)
+
+		unique_name = loader.name()
+		pq_path = self._cache_path / f"{unique_name}.parquet"
+
+		super().__init__(path=pq_path, name=unique_name)
+
+	def _model_path(self):
+		if self._custom_model_path is None:
+			import fasttext.util
+			os.chdir(self._cache_path)
+			filename = fasttext.util.download_model(
+				self._lang, if_exists='ignore')
+			return self._cache_path / filename
+		else:
+			return self._custom_model_path
+
+	def save_compressed(self, path):
+		from gensim.models.fasttext import load_facebook_model
+		import compress_fasttext
+		big_model = load_facebook_model(self._model_path()).wv
+		small_model = compress_fasttext.prune_ft_freq(big_model, pq=True)
+		small_model.save(path)
+'''
 
 
 class ContextualEmbedding:
