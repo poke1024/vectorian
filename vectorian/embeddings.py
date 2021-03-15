@@ -139,6 +139,12 @@ class StaticEmbedding:
 		return loaded
 
 
+# https://github.com/avidale/compress-fasttext
+#class CompressedStaticEmbedding:
+#	def create_instance(self, normalizer):
+#		compress_fasttext.models.CompressedFastTextKeyedVectors.load
+
+
 class StaticEmbeddingFromFile(StaticEmbedding):
 	def __init__(self, embeddings=None, tokens=None, vectors=None, name=None):
 		if embeddings:

@@ -7,6 +7,24 @@ from vectorian.index import PartitionData
 
 
 class Renderer:
+	# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
+	iframe_template = string.Template('''
+	<iframe
+		id="$id"
+		width="$width"
+		height="$height"
+		srcdoc="$srcdoc"
+		frameborder="0"
+		allowfullscreen
+	></iframe>
+	<script>
+		document.getElementById("$id").onload = function() {
+			var f = document.getElementById("$id");
+			f.height = f.contentWindow.document.body.scrollHeight + "px";
+		}
+	</script>
+	''')
+
 	def __init__(self, renderers, location_formatter, annotate=None):
 		self._annotate = annotate or {}
 
@@ -124,24 +142,6 @@ class Renderer:
 				for renderer in self._renderers:
 					renderer.write_script(doc, iframe_id)
 
-		# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
-		iframe = string.Template('''
-<iframe
-	id="$id"
-	width="$width"
-	height="$height"
-	srcdoc="$srcdoc"
-	frameborder="0"
-	allowfullscreen
-></iframe>
-<script>
-	document.getElementById("$id").onload = function() {
-		var f = document.getElementById("$id");
-		f.height = f.contentWindow.document.body.scrollHeight + "px";
-	}
-</script>
-''')
-
-		return iframe.safe_substitute(
+		return Renderer.iframe_template.safe_substitute(
 			id=iframe_id, width="100%", height="100%",
 			srcdoc=html.escape(doc.getvalue()))

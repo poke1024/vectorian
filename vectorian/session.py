@@ -212,12 +212,22 @@ class LabResult(Result):
 		if isinstance(render_spec, (list, tuple)):
 			renderers = render_spec
 		else:
-			from vectorian.render.excerpt import ExcerptRenderer
-			from vectorian.render.sankey import FlowRenderer
+			def load_excerpt_renderer():
+				from vectorian.render.excerpt import ExcerptRenderer
+				return ExcerptRenderer
+
+			def load_flow_renderer():
+				from vectorian.render.sankey import FlowRenderer
+				return FlowRenderer
+
+			def load_matrix_renderer():
+				from vectorian.render.matrix import MatrixRenderer
+				return MatrixRenderer
 
 			lookup = {
-				'excerpt': ExcerptRenderer,
-				'flow': FlowRenderer
+				'excerpt': load_excerpt_renderer,
+				'flow': load_flow_renderer,
+				'matrix': load_matrix_renderer
 			}
 
 			klass = None
@@ -226,7 +236,7 @@ class LabResult(Result):
 				for i, part in enumerate(render_desc.split()):
 					part = part.strip()
 					if i == 0:
-						klass = lookup[part]
+						klass = lookup[part]()
 						args = []
 					else:
 						if part.startswith("+"):

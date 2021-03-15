@@ -6,6 +6,8 @@ import string
 import collections
 import logging
 
+from vectorian.render.utils import flow_edges
+
 hv.extension('bokeh')
 
 
@@ -31,31 +33,7 @@ class FlowRenderer:
 			nodes.append(' %s [%d] ' % (spans[name][i].text, i))
 			return idx[i]
 
-		edges = []
-
-		if flow['type'] == 'injective':
-
-			for t, (s, f) in enumerate(zip(flow['target'], flow['flow'])):
-				if s >= 0 and f > cutoff:
-					edges.append((token('t', t), token('s', s), f))
-
-		elif flow['type'] == 'sparse':
-
-			for t, s, f in zip(flow['source'], flow['target'], flow['flow']):
-				if f > cutoff:
-					edges.append((token('t', t), token('s', s), f))
-
-		elif flow['type'] == 'dense':
-
-			m = flow['flow']
-			for t in range(m.shape[0]):
-				for s in range(m.shape[1]):
-					f = m[t, s]
-					if f > cutoff:
-						edges.append((token('t', t), token('s', s), f))
-
-		else:
-			raise ValueError(flow['type'])
+		edges = [(token('t', t), token('s', s), f) for t, s, f in flow_edges(flow, cutoff)]
 
 		if len(edges) < 1:
 			logging.warning("no edges found")
@@ -96,12 +74,6 @@ class FlowRenderer:
 
 		return code.safe_substitute(iframe_id=iframe_id, div_id=div_id, fig_json=fig_json)
 
-	def write_match(self, doc, match, fetch_id):
-		div_id = fetch_id()
-		doc, tag, text = doc.tagtext()
-		with tag('div', id=div_id):
-			self._flows[div_id] = match
-
 	def write_head(self, doc):
 		doc, tag, text = doc.tagtext()
 
@@ -117,6 +89,12 @@ class FlowRenderer:
 		for src in bokeh_src:
 			with tag('script', src=src, crossorigin='anonymous'):
 				pass
+
+	def write_match(self, doc, match, fetch_id):
+		div_id = fetch_id()
+		doc, tag, text = doc.tagtext()
+		with tag('div', id=div_id):
+			self._flows[div_id] = match
 
 	def write_script(self, doc, iframe_id):
 		doc, tag, text = doc.tagtext()
