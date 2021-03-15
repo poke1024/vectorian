@@ -126,7 +126,7 @@ class Session:
 		self._vocab = core.Vocabulary()
 
 		if static_embeddings and not token_mappings:
-			logging.warn("got static embeddings but not token mappings.")
+			logging.warning("got static embeddings but not token mappings.")
 
 		if token_mappings is None:
 			token_mappings = {}
@@ -142,7 +142,7 @@ class Session:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			instance = embedding.create_instance(
-				self.token_mapper("tokenizer"))
+				self.token_mapper("tokenizer"), "select")
 			self._embeddings[instance.name] = instance
 			self._vocab.add_embedding(instance.to_core())
 

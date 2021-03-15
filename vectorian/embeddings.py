@@ -11,8 +11,12 @@ import download
 import logging
 
 
-def _make_table(tokens, embeddings, normalizer):
+def _make_table(tokens, embeddings, normalizer, strategy='select'):
 	embeddings = embeddings.astype(np.float32)
+
+	with open("/Users/arbeit/debug.txt", "a") as f:
+		f.write("stage1\n")
+		f.write(str(embeddings[tokens.index("speak")]) + "\n")
 
 	f_mask = np.zeros((embeddings.shape[0],), dtype=np.bool)
 	f_tokens = []
@@ -20,25 +24,40 @@ def _make_table(tokens, embeddings, normalizer):
 
 	for i, t in enumerate(tqdm(tokens, desc="Normalizing Tokens")):
 		nt = normalizer(t)
-		if nt:
-			indices = token_to_ids.get(nt)
-			if indices is None:
-				token_to_ids[nt] = [i]
-				f_tokens.append(nt)
-				f_mask[i] = True
-			else:
-				indices.append(i)
+		if nt is None:
+			continue
+		if strategy != 'merge' and nt != t:
+			continue
+		indices = token_to_ids.get(nt)
+		if indices is None:
+			token_to_ids[nt] = [i]
+			f_tokens.append(nt)
+			f_mask[i] = True
+		else:
+			indices.append(i)
 
-	for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
-		if len(indices) > 1:
-			i = indices[0]
-			embeddings[i] = np.mean(embeddings[indices], axis=0)
+	if strategy == 'merge':
+		for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
+			if len(indices) > 1:
+				i = indices[0]
+				embeddings[i] = np.mean(embeddings[indices], axis=0)
 
-	embeddings = embeddings[f_mask]
-	assert embeddings.shape[0] == len(f_tokens)
+	f_embeddings = embeddings[f_mask]
+	embeddings = None
 
-	vecs = [pa.array(embeddings[:, i]) for i in range(embeddings.shape[1])]
-	vecs_name = [('v%d' % i) for i in range(embeddings.shape[1])]
+	assert f_embeddings.shape[0] == len(f_tokens)
+
+	with open("/Users/arbeit/debug.txt", "a") as f:
+		f.write("stagex\n")
+		f.write(str(token_to_ids["speak"]) + "\n")
+		for x in token_to_ids["speak"]:
+			f.write(tokens[x] + "\n")
+		f.write("stage2\n")
+		f.write(str(f_embeddings[f_tokens.index("speak")]) + "\n")
+
+	vecs = [pa.array(f_embeddings[:, i]) for i in range(f_embeddings.shape[1])]
+	vecs_name = [('v%d' % i) for i in range(f_embeddings.shape[1])]
+	f_embeddings = None
 
 	return pa.Table.from_arrays(
 		[pa.array(f_tokens, type=pa.string())] + vecs,
@@ -109,14 +128,14 @@ class StaticEmbedding:
 	def unique_name(self):
 		raise NotImplementedError()
 
-	def create_instance(self, normalizer):
+	def create_instance(self, normalizer, strategy):
 		loaded = self._loaded.get(normalizer.name)
 		if loaded is None:
 			name = self.unique_name
 
-			normalized_cache_path = self._cache_path / 'parquet'
+			normalized_cache_path = self._cache_path / 'pa
 			normalized_cache_path.mkdir(exist_ok=True, parents=True)
-			pq_path = normalized_cache_path / f"{name}-{normalizer.name}.parquet"
+			pq_path = normalized_cache_path / f"{name}-{normalizer.name}-{strategy}.parquet"
 
 			if pq_path.exists():
 				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
@@ -125,7 +144,7 @@ class StaticEmbedding:
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
-					tokens, vectors, normalizer.unpack())
+					tokens, vectors, normalizer.unpack(), strategy)
 
 			loaded = StaticEmbeddingInstance(name, table)
 			self._loaded[normalizer.name] = loaded
@@ -235,7 +254,16 @@ class Glove(StaticEmbedding):
 class FastTextVectors(StaticEmbedding):
 	def _load(self):
 		from gensim.models.fasttext import load_facebook_vectors
-		load_facebook_vectors(self._path)
+		wv = load_facebook_vectors(self._path)
+		# see https://radimrehurek.com/gensim/models/fasttext.html#gensim.models.fasttext.FastTextKeyedVectors
+		return wv.index2word, wv.vectors_vocab
+
+	def save_compressed(self, path):
+		from gensim.models.fasttext import load_facebook_vectors
+		import compress_fasttext
+		big_model = load_facebook_vectors(self._path)
+		small_model = compress_fasttext.prune_ft_freq(big_model, pq=True)
+		small_model.save(path)
 
 
 class CompressedFastTextVectors(StaticEmbedding):
@@ -309,12 +337,6 @@ class FastText(StaticEmbedding):
 		else:
 			return self._custom_model_path
 
-	def save_compressed(self, path):
-		from gensim.models.fasttext import load_facebook_model
-		import compress_fasttext
-		big_model = load_facebook_model(self._model_path()).wv
-		small_model = compress_fasttext.prune_ft_freq(big_model, pq=True)
-		small_model.save(path)
 '''
 
 
