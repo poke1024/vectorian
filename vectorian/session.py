@@ -122,7 +122,7 @@ class Partition:
 
 
 class Session:
-	def __init__(self, docs, static_embeddings=None, token_mappings=None, embedding_selection='nearest'):
+	def __init__(self, docs, static_embeddings=None, token_mappings=None, embedding_sampling='nearest'):
 		self._vocab = core.Vocabulary()
 
 		if static_embeddings and not token_mappings:
@@ -142,7 +142,7 @@ class Session:
 			if not isinstance(embedding, StaticEmbedding):
 				raise TypeError(f"expected StaticEmbedding, got {embedding}")
 			instance = embedding.create_instance(
-				self.token_mapper("tokenizer"), embedding_selection)
+				self.token_mapper("tokenizer"), embedding_sampling)
 			self._embeddings[instance.name] = instance
 			self._vocab.add_embedding(instance.to_core())
 

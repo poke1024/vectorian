@@ -11,9 +11,9 @@ import download
 import logging
 
 
-def _make_table(tokens, embeddings, normalizer, selection='nearest'):
-	if selection not in ('nearest', 'average'):
-		raise ValueError(selection)
+def _make_table(tokens, embeddings, normalizer, sampling='nearest'):
+	if sampling not in ('nearest', 'average'):
+		raise ValueError(f'Expected "nearest" or "average", got "{sampling}"')
 
 	embeddings = embeddings.astype(np.float32)
 
@@ -25,7 +25,7 @@ def _make_table(tokens, embeddings, normalizer, selection='nearest'):
 		nt = normalizer(t)
 		if nt is None:
 			continue
-		if selection != 'average' and nt != t:
+		if sampling != 'average' and nt != t:
 			continue
 		indices = token_to_ids.get(nt)
 		if indices is None:
@@ -35,7 +35,7 @@ def _make_table(tokens, embeddings, normalizer, selection='nearest'):
 		else:
 			indices.append(i)
 
-	if selection == 'average':
+	if sampling == 'average':
 		for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
 			if len(indices) > 1:
 				i = indices[0]
@@ -119,14 +119,14 @@ class StaticEmbedding:
 	def unique_name(self):
 		raise NotImplementedError()
 
-	def create_instance(self, normalizer, embedding_selection):
+	def create_instance(self, normalizer, embedding_sampling):
 		loaded = self._loaded.get(normalizer.name)
 		if loaded is None:
 			name = self.unique_name
 
 			normalized_cache_path = self._cache_path / 'parquet'
 			normalized_cache_path.mkdir(exist_ok=True, parents=True)
-			pq_path = normalized_cache_path / f"{name}-{normalizer.name}-{selector}.parquet"
+			pq_path = normalized_cache_path / f"{name}-{normalizer.name}-{embedding_sampling}.parquet"
 
 			if pq_path.exists():
 				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
@@ -135,7 +135,7 @@ class StaticEmbedding:
 			else:
 				tokens, vectors = self._load()
 				table = _make_table(
-					tokens, vectors, normalizer.unpack(), embedding_selection)
+					tokens, vectors, normalizer.unpack(), embedding_sampling)
 
 			loaded = StaticEmbeddingInstance(name, table)
 			self._loaded[normalizer.name] = loaded
