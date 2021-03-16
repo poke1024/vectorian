@@ -94,6 +94,24 @@ class AlignmentAlgorithm:
 		raise NotImplementedError()
 
 
+class NeedlemanWunsch(AlignmentAlgorithm):
+	def __init__(self, gap: float = 0):
+		self._gap = gap
+
+	def to_description(self, partition):
+		return {
+			'NeedlemanWunsch': {
+				'gap': self._gap
+			}
+		}
+
+	def to_args(self, partition):
+		return {
+			'algorithm': 'needleman-wunsch',
+			'gap': self._gap
+		}
+
+
 class SmithWaterman(AlignmentAlgorithm):
 	def __init__(self, gap: float = 0, zero: float = 0.5):
 		self._gap = gap
@@ -109,7 +127,7 @@ class SmithWaterman(AlignmentAlgorithm):
 
 	def to_args(self, partition):
 		return {
-			'algorithm': 'sw',
+			'algorithm': 'smith-waterman',
 			'gap': self._gap,
 			'zero': self._zero
 		}
@@ -132,7 +150,7 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 
 	def to_args(self, partition):
 		return {
-			'algorithm': 'wsb',
+			'algorithm': 'waterman-smith-beyer',
 			'gap': self._gap.costs(partition.max_len()),
 			'zero': self._zero
 		}
@@ -175,7 +193,7 @@ class WordMoversDistance(AlignmentAlgorithm):
 
 	def to_args(self, partition):
 		return {
-			'algorithm': 'wmd',
+			'algorithm': 'word-movers-distance',
 			'relaxed': self._options['relaxed'],
 			'injective': self._options['injective'],
 			'symmetric': self._options['symmetric'],
@@ -194,5 +212,5 @@ class WordRotatorsDistance(AlignmentAlgorithm):
 
 	def to_args(self, partition):
 		return {
-			'algorithm': 'wrd'
+			'algorithm': 'word-rotators-distance'
 		}

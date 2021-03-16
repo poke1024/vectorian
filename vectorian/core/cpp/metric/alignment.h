@@ -26,11 +26,11 @@ inline float reference_score(
 	return reference_score;
 }
 
-template<typename Index, typename Compute>
+template<typename Index, typename Kernel>
 class InjectiveAlignment {
 protected:
 	const char *m_callback_name;
-	const Compute m_compute;
+	const Kernel m_kernel;
 	std::shared_ptr<Aligner<Index, float>> m_aligner;
 	size_t m_max_len_t;
 	mutable InjectiveFlowRef<Index> m_cached_flow;
@@ -59,10 +59,10 @@ protected:
 public:
 	InjectiveAlignment(
 		const char *p_callback_name,
-		const Compute &p_compute) :
+		const Kernel &p_kernel) :
 
 		m_callback_name(p_callback_name),
-		m_compute(p_compute),
+		m_kernel(p_kernel),
 		m_max_len_t(0) {
 	}
 
@@ -83,7 +83,7 @@ public:
 			m_cached_flow->reserve(m_max_len_t);
 		}
 
-		m_compute(*m_aligner.get(), p_matcher->query(), p_slice, *m_cached_flow.get());
+		m_kernel(*m_aligner.get(), p_matcher->query(), p_slice, *m_cached_flow.get());
 
 		const float score = m_aligner->score() / reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
@@ -154,7 +154,48 @@ public:
 	}
 };
 
-struct SmithWatermanCompute {
+struct NeedlemanWunschKernel {
+	const float m_gap_cost;
+
+	template<typename Aligner, typename Slice, typename Flow>
+	inline void operator()(
+		Aligner &p_aligner,
+		const QueryRef &,
+		const Slice &p_slice,
+		Flow &p_flow) const {
+
+		p_aligner.needleman_wunsch(
+			p_flow,
+			[&p_slice] (auto i, auto j) -> float {
+				return p_slice.similarity(i, j);
+			},
+			m_gap_cost,
+			p_slice.len_s(),
+			p_slice.len_t());
+	}
+
+	inline float gap_cost(size_t len) const {
+		return m_gap_cost * len;
+	}
+};
+
+template<typename Index>
+class NeedlemanWunsch : public InjectiveAlignment<Index, NeedlemanWunschKernel> {
+public:
+	NeedlemanWunsch(
+		const float p_gap_cost) :
+
+		InjectiveAlignment<Index, NeedlemanWunschKernel>(
+			"alignment/needleman-wunsch",
+			NeedlemanWunschKernel{p_gap_cost}) {
+	}
+
+	inline float gap_cost(size_t len) const {
+		return this->m_kernel.gap_cost(len);
+	}
+};
+
+struct SmithWatermanKernel {
 	const float m_gap_cost;
 	const float m_zero;
 
@@ -182,23 +223,23 @@ struct SmithWatermanCompute {
 };
 
 template<typename Index>
-class SmithWaterman : public InjectiveAlignment<Index, SmithWatermanCompute> {
+class SmithWaterman : public InjectiveAlignment<Index, SmithWatermanKernel> {
 public:
 	SmithWaterman(
 		const float p_gap_cost,
 		const float p_zero=0.5) :
 
-		InjectiveAlignment<Index, SmithWatermanCompute>(
+		InjectiveAlignment<Index, SmithWatermanKernel>(
 			"alignment/smith-waterman",
-			SmithWatermanCompute{p_gap_cost, p_zero}) {
+			SmithWatermanKernel{p_gap_cost, p_zero}) {
 	}
 
 	inline float gap_cost(size_t len) const {
-		return this->m_compute.gap_cost(len);
+		return this->m_kernel.gap_cost(len);
 	}
 };
 
-struct WatermanSmithBeyerCompute {
+struct WatermanSmithBeyerKernel {
 	const std::vector<float> m_gap_cost;
 	const float m_zero;
 
@@ -229,21 +270,21 @@ struct WatermanSmithBeyerCompute {
 };
 
 template<typename Index>
-class WatermanSmithBeyer : public InjectiveAlignment<Index, WatermanSmithBeyerCompute> {
+class WatermanSmithBeyer : public InjectiveAlignment<Index, WatermanSmithBeyerKernel> {
 public:
 	WatermanSmithBeyer(
 		const std::vector<float> &p_gap_cost,
 		const float p_zero=0.5) :
 
-		InjectiveAlignment<Index, WatermanSmithBeyerCompute>(
+		InjectiveAlignment<Index, WatermanSmithBeyerKernel>(
 			"alignment/waterman-smith-beyer",
-			WatermanSmithBeyerCompute{p_gap_cost, p_zero}) {
+			WatermanSmithBeyerKernel{p_gap_cost, p_zero}) {
 
 		PPK_ASSERT(p_gap_cost.size() >= 1);
 	}
 
 	inline float gap_cost(size_t len) const {
-		return this->m_compute.gap_cost(len);
+		return this->m_kernel.gap_cost(len);
 	}
 };
 
@@ -472,7 +513,7 @@ MatcherRef create_alignment_matcher(
 
 	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
 
-	if (algorithm == "wsb") {
+	if (algorithm == "waterman-smith-beyer") {
 		float zero = 0.5;
 		if (p_alignment_def.contains("zero")) {
 			zero = p_alignment_def["zero"].cast<float>();
@@ -497,7 +538,7 @@ MatcherRef create_alignment_matcher(
 			std::move(WatermanSmithBeyer<Index>(gap_cost, zero)),
 			WatermanSmithBeyer<Index>::create_score_computer(p_factory));
 
-	} else if (algorithm == "sw") {
+	} else if (algorithm == "smith-waterman") {
 
 		float gap_cost = 0.0f;
 		if (p_alignment_def.contains("gap_cost")) {
@@ -514,7 +555,19 @@ MatcherRef create_alignment_matcher(
 			std::move(SmithWaterman<Index>(gap_cost, zero)),
 			SmithWaterman<Index>::create_score_computer(p_factory));
 
-	} else if (algorithm == "wmd") {
+	} else if (algorithm == "needleman-wunsch") {
+
+		float gap_cost = 0.0f;
+		if (p_alignment_def.contains("gap_cost")) {
+			gap_cost = p_alignment_def["gap_cost"].cast<float>();
+		}
+
+		return make_matcher(
+			p_query, p_document, p_metric, p_factory,
+			std::move(NeedlemanWunsch<Index>(gap_cost)),
+			NeedlemanWunsch<Index>::create_score_computer(p_factory));
+
+	} else if (algorithm == "word-movers-distance") {
 
 		bool relaxed = true;
 		bool normalize_bow = true;
@@ -544,7 +597,7 @@ MatcherRef create_alignment_matcher(
 				relaxed, normalize_bow, symmetric, injective, extra_mass_penalty})),
 			NoScoreComputer());
 
-	} else if (algorithm == "wrd") {
+	} else if (algorithm == "word-rotators-distance") {
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
 			std::move(WordRotatorsDistance<Index>()),

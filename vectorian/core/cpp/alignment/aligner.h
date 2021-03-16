@@ -172,7 +172,7 @@ private:
 		while (u >= 0 && v >= 0) {
 			flow.set(v, u);
 			//_best_match[v] = u;
-			std::tie(u, v) = m_traceback(u, v);
+			std::tie(u, v) = m_traceback(u, v).to_pair();
 		}
 	}
 
