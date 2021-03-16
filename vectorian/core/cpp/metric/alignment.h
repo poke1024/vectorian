@@ -390,7 +390,7 @@ class WordMoversDistance {
 			py::dict data;
 			data["score"] = score;
 			data["worst_score"] = p_result_set->worst_score();
-			callback("alignment/wmd/make", data);
+			callback("alignment/word-movers-distance/make", data);
 		}
 
 		if (score > p_result_set->worst_score()) {
@@ -466,23 +466,24 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) {
 
-		return MatchRef();
+		const FlowFactoryRef<Index> flow_factory =
+			p_result_set->flow_factory();
 
-		/*const float score0 = m_wrd.compute(
-			p_matcher->query(), p_slice);
+		const auto r = m_wrd.compute(
+			p_matcher->query(), p_slice, flow_factory);
 
 		const float score = r.score / reference_score(
-			p_query, p_slice, r.flow->max_score(p_slice));
+			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				p_result_set->flow_factory()->create_injective(m_wrd.match()),
+				r.flow,
 				score);
 		} else {
 			return MatchRef();
-		}*/
+		}
 	}
 };
 

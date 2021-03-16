@@ -169,6 +169,11 @@ public:
 				for (const auto &v : doc_t.vocab) {
 					const Index j = doc_t.vocab_to_pos[v].front();
 					const float d = MAX_SIMILARITY - sim(i, j);
+
+					// since distance_matrix stores vocabulary indices and
+					// not positions into s and t, index of (x, y) vs (y, x)
+					// does not matter here and is symmetric.
+
 					dist(u, v) = d;
 					dist(v, u) = d;
 				}
@@ -218,7 +223,7 @@ public:
 			data["score"] = score;
 
 			const auto callback = *p_query->debug_hook();
-			callback("alignment/wmd/solver", data);
+			callback("alignment/word-movers-distance/solver", data);
 		}
 
 	public:
