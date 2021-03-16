@@ -163,8 +163,9 @@ class Session:
 	def c_documents(self):
 		return [x.c_doc for x in self._collection.documents]
 
-	def get_embedding_instance(self, embedding):
-		return self._embeddings[embedding.name]
+	@property
+	def embeddings(self):
+		return self._embeddings.values()
 
 	@property
 	def vocab(self):

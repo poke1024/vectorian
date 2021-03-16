@@ -344,7 +344,7 @@ class Index:
 
 	def find(
 		self, text,
-		n=10, min_score=0.0, debug=None,
+		n=10, min_score=0.0, debug=None, run_query=None,
 		options: dict = dict()):
 
 		options = options.copy()
@@ -362,8 +362,11 @@ class Index:
 		start_time = time.time()
 
 		session = self._partition.session
+		if run_query is None:
+			run_query = session.run_query
+
 		query = Query(self, session.vocab, text, options)
-		result_class, matches = session.run_query(self._find, query)
+		result_class, matches = run_query(self._find, query)
 
 		return result_class(
 			self,

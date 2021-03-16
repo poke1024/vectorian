@@ -57,6 +57,10 @@ class LinearGapCost(GapCost):
 		self._step = step
 		self._start = step if start is None else start
 
+	def to_scalar(self):
+		assert self._start == self._step
+		return self._step
+
 	def to_description(self):
 		return f'LinearGapCost({self._step}, {self._start})'
 
