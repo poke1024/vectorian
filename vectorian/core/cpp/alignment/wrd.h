@@ -55,21 +55,9 @@ public:
 		const size_t len_s = slice.len_s();
 		const size_t len_t = slice.len_t();
 
-		PPK_ASSERT(len_s <= static_cast<size_t>(m_cost_storage.shape(0)));
-		PPK_ASSERT(len_t <= static_cast<size_t>(m_cost_storage.shape(1)));
-
-		/*MappedVectorXf mag_s(
-			&m_mag_s_storage(0), len_s);
-		MappedVectorXf mag_t(
-			&m_mag_t_storage(0), len_t);
-		MappedMatrixXf cost(
-			&m_cost_storage(0, 0), len_s, len_t);*/
-
-		xt::xtensor<float, 1> mag_s;
-		mag_s.resize({len_s});
-		xt::xtensor<float, 1> mag_t;
-		mag_t.resize({len_t});
-		xt::xtensor<float, 2> distance_matrix({len_t, len_s});
+		auto mag_s = xt::view(m_mag_s_storage, xt::range(0, len_s));
+		auto mag_t = xt::view(m_mag_t_storage, xt::range(0, len_t));
+		auto distance_matrix = xt::view(m_cost_storage, xt::range(0, len_t), xt::range(0, len_s));
 
 		for (size_t i = 0; i < len_s; i++) {
 			mag_s(i) = slice.magnitude_s(i);

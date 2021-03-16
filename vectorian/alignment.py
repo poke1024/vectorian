@@ -1,20 +1,37 @@
 import numpy as np
+import io
 
 
 class GapCost:
 	def costs(self, n):
 		raise NotImplementedError
 
+	def _plot(self, ax, n):
+		from matplotlib.ticker import MaxNLocator
+		c = self.costs(n)
+		ax.plot(c)
+		ax.set_xlabel('gap length')
+		ax.set_ylabel('cost')
+		ax.set_ylim(-0.1, 1)
+		ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+		ax.grid()
+
 	def plot(self, n):
 		import matplotlib.pyplot as plt
-		c = self.costs(n)
-		plt.figure(figsize=(12, 3))
-		plt.plot(c)
-		plt.xlabel('gap length')
-		plt.ylabel('cost')
-		plt.tight_layout()
-		plt.grid()
-		plt.show()
+		fig, ax = plt.subplots(1, 1, figsize=(12, 3))
+		self._plot(ax, n)
+		fig.tight_layout()
+		fig.show()
+
+	def plot_to_image(self, fig, ax, n, format='png'):
+		self._plot(ax, n)
+		buf = io.BytesIO()
+		fig.tight_layout()
+		fig.savefig(buf, format=format)
+		buf.seek(0)
+		data = buf.getvalue()
+		buf.close()
+		return data
 
 	def _ipython_display_(self):
 		# see https://ipython.readthedocs.io/en/stable/config/integrating.html
@@ -32,7 +49,6 @@ class ConstantGapCost(GapCost):
 		c = np.empty((n,), dtype=np.float32)
 		c.fill(self._cost)
 		c[0] = 0
-		c = np.clip(c, 0, 1)
 		return c
 
 
@@ -51,7 +67,6 @@ class LinearGapCost(GapCost):
 		for i in range(1, n):
 			c[i] = x
 			x += self._step
-		c = np.clip(c, 0, 1)
 		return c
 
 
@@ -64,9 +79,12 @@ class ExponentialGapCost(GapCost):
 
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
-		for i in range(n):
-			c[i] = 1 - (2 ** -(i / self._cutoff))
-		c = np.clip(c, 0, 1)
+		if self._cutoff > 0:
+			for i in range(n):
+				c[i] = 1 - (2 ** -(i / self._cutoff))
+		else:
+			c.fill(1)
+			c[0] = 0
 		return c
 
 
@@ -82,7 +100,6 @@ class CustomGapCost(GapCost):
 		c[0] = 0
 		for i in range(1, n):
 			c[i] = self._costs_fn(i)
-		c = np.clip(c, 0, 1)
 		return c
 
 
@@ -149,9 +166,11 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 		}
 
 	def to_args(self, partition):
+		costs = self._gap.costs(partition.max_len())
+
 		return {
 			'algorithm': 'waterman-smith-beyer',
-			'gap': self._gap.costs(partition.max_len()),
+			'gap': np.clip(costs, 0, 1),
 			'zero': self._zero
 		}
 
