@@ -71,6 +71,10 @@ struct Weight {
 	float distance;
 };
 
+struct MatcherOptions {
+	bool needs_magnitudes;
+};
+
 class Query;
 typedef std::shared_ptr<Query> QueryRef;
 class Document;

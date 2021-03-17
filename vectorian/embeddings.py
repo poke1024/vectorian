@@ -216,7 +216,7 @@ class FastTextVectors(InstalledStaticEmbedding):
 		small_model.save(path)
 
 
-class CompressedVectors(InstalledStaticEmbedding):
+class CompressedFastTextVectors(InstalledStaticEmbedding):
 	def _load(self):
 		wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(self._path)
 		return wv.index2word, np.array([wv.word_vec(word) for word in wv.index2word])
@@ -258,7 +258,7 @@ class PretrainedFastText(StaticEmbedding):
 
 
 class PretrainedGlove(StaticEmbedding):
-	def __init__(self, name="6B"):
+	def __init__(self, name="6B", ndims=300):
 		"""
 		:param name: one of "6B", "42B.300d", "840B.300d",
 		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
@@ -266,6 +266,7 @@ class PretrainedGlove(StaticEmbedding):
 
 		super().__init__()
 		self._glove_name = name
+		self._ndims = ndims
 
 	def _load(self):
 		download_path = self._cache_path / 'models'
@@ -274,15 +275,15 @@ class PretrainedGlove(StaticEmbedding):
 		txt_data_path = download_path / self.unique_name
 
 		if not txt_data_path.exists():
-			url = f"http://nlp.stanford.edu/data/glove.{self._glove_name}.zip"
+			url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
 			download.download(url, txt_data_path, kind="zip", progressbar=True)
 
 		return _load_glove_txt(
-			txt_data_path / f"glove.{self._glove_name}.300d.txt")
+			txt_data_path / f"glove.{self._glove_name}.{self._ndims}d.txt")
 
 	@property
 	def unique_name(self):
-		return f"glove-{self._glove_name}"
+		return f"glove-{self._glove_name}-{self._ndims}"
 
 
 class ContextualEmbedding:

@@ -60,6 +60,9 @@ public:
 		const Matrix &M,
 		const float extra_mass_penalty=-1.0f) {
 
+		PPK_ASSERT(a.size() <= m_G_storage.shape(0));
+		PPK_ASSERT(b.size() <= m_G_storage.shape(1));
+
 		std::vector<std::vector<scalar_t>> C;
 		C.reserve(M.shape(0));
 		for (size_t i = 0; i < M.shape(0); i++) {

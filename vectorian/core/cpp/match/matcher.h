@@ -49,10 +49,6 @@ typedef std::shared_ptr<MatcherFactory> MatcherFactoryRef;
 template<typename Make>
 class MatcherFactoryImpl;
 
-struct MatcherOptions {
-	bool needs_magnitudes;
-};
-
 class MatcherFactory {
 	const MatcherOptions m_options;
 
@@ -90,7 +86,7 @@ public:
 	}
 
 	virtual MatcherRef create_matcher(const DocumentRef &p_document) const {
-		return m_make(p_document);
+		return m_make(p_document, this->options());
 	}
 };
 

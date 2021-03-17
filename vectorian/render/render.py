@@ -142,6 +142,18 @@ class Renderer:
 				for renderer in self._renderers:
 					renderer.write_script(doc, iframe_id)
 
+		# we need the following script_code for widget outputs to
+		# work (correctly resize) in Jupyter Lab interactive mode.
+
+		script_code = string.Template('''
+		<script>
+		(function() {
+			var f = parent.document.getElementById("${iframe_id}");
+			f.height = f.contentWindow.document.body.scrollHeight + "px";
+		})();
+		</script>
+		''').safe_substitute(iframe_id=iframe_id)
+
 		return Renderer.iframe_template.safe_substitute(
 			id=iframe_id, width="100%", height="100%",
-			srcdoc=html.escape(doc.getvalue()))
+			srcdoc=html.escape(doc.getvalue() + script_code))

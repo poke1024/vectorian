@@ -181,22 +181,22 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 
 class WordMoversDistance(AlignmentAlgorithm):
 	@staticmethod
-	def wmd(variant='kusner'):
+	def wmd(variant='kusner', **kwargs):
 		if variant == 'kusner':
-			return WordMoversDistance(False, False, False, True)
+			return WordMoversDistance(False, False, False, True, **kwargs)
 		elif variant == 'vectorian':
-			return WordMoversDistance(False, False, False, False)
+			return WordMoversDistance(False, False, False, False, **kwargs)
 		else:
 			raise ValueError(variant)
 
 	@staticmethod
-	def rwmd(variant):
+	def rwmd(variant, **kwargs):
 		if variant == 'kusner':
-			return WordMoversDistance(True, True, True, True)
+			return WordMoversDistance(True, True, True, True, **kwargs)
 		elif variant == 'jablonsky':
-			return WordMoversDistance(True, False, True, True)
+			return WordMoversDistance(True, False, True, True, **kwargs)
 		elif variant == 'vectorian':
-			return WordMoversDistance(True, True, False, False)
+			return WordMoversDistance(True, True, False, False, **kwargs)
 		else:
 			raise ValueError(variant)
 
@@ -220,20 +220,24 @@ class WordMoversDistance(AlignmentAlgorithm):
 			'relaxed': self._options['relaxed'],
 			'injective': self._options['injective'],
 			'symmetric': self._options['symmetric'],
-			'normalize_bow': self._options['normalize_bow']
+			'normalize_bow': self._options['normalize_bow'],
+			'extra_mass_penalty': self._options['extra_mass_penalty']
 		}
 
 
 class WordRotatorsDistance(AlignmentAlgorithm):
-	def __init__(self):
-		pass
+	def __init__(self, extra_mass_penalty=-1):
+		self._extra_mass_penalty = extra_mass_penalty
 
 	def to_description(self, partition):
 		return {
-			'WordRotatorsDistance': {}
+			'WordRotatorsDistance': {
+				'extra_mass_penalty': self._extra_mass_penalty
+			}
 		}
 
 	def to_args(self, partition):
 		return {
-			'algorithm': 'word-rotators-distance'
+			'algorithm': 'word-rotators-distance',
+			'extra_mass_penalty': self._extra_mass_penalty
 		}

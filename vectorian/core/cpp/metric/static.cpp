@@ -5,19 +5,13 @@
 #include "metric/alignment.h"
 #include "metric/factory.h"
 
-StaticEmbeddingMetric::StaticEmbeddingMetric(
+void StaticEmbeddingMetric::initialize(
 	const QueryRef &p_query,
-	const StaticEmbeddingRef &p_embedding,
 	const WordMetricDef &p_metric,
-	const py::dict &p_sent_metric_def,
-	const VocabularyToEmbedding &p_vocabulary_to_embedding) :
-
-	m_embedding(p_embedding),
-	m_options(p_sent_metric_def),
-	m_alignment_def(m_options["alignment"].cast<py::dict>()) {
+	const VocabularyToEmbedding &p_vocabulary_to_embedding) {
 
 	const auto builder = p_metric.instantiate(
-		p_embedding->embeddings());
+		m_embedding->embeddings());
 
 	const Needle needle(p_query, p_vocabulary_to_embedding);
 
@@ -26,8 +20,8 @@ StaticEmbeddingMetric::StaticEmbeddingMetric(
 		p_vocabulary_to_embedding,
 		m_similarity);
 
-	if (p_sent_metric_def.contains("similarity_falloff")) {
-		const float similarity_falloff = p_sent_metric_def["similarity_falloff"].cast<float>();
+	if (m_options.contains("similarity_falloff")) {
+		const float similarity_falloff = m_options["similarity_falloff"].cast<float>();
 		m_similarity = xt::pow(m_similarity, similarity_falloff);
 	}
 
@@ -61,14 +55,11 @@ StaticEmbeddingMetric::StaticEmbeddingMetric(
 		(*p_query->debug_hook())("similarity_matrix", data);
 	}
 
-	if (std::any_of(
-		p_query->match_strategies().begin(),
-		p_query->match_strategies().end(), [] (const auto &s) {
-			return s.matcher_factory->options().needs_magnitudes;
-		})) {
+	m_matcher_factory = create_matcher_factory(p_query);
 
+	if (m_needs_magnitudes) { // set in create_matcher_factory
 		compute_magnitudes(
-			p_embedding->embeddings(),
+			m_embedding->embeddings(),
 			p_vocabulary_to_embedding,
 			needle);
 	}
@@ -117,9 +108,14 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
+		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
+		if (matcher_options.needs_magnitudes) {
+			m_needs_magnitudes = true;
+		}
+
 		return MatcherFactory::create(
-			create_alignment_matcher_options(metric->alignment_def()),
-			[p_query, metric] (const DocumentRef &p_document) {
+			matcher_options,
+			[p_query, metric] (const DocumentRef &p_document, const auto &p_matcher_options) {
 				const auto make_fast_slice = [metric] (
 					const size_t slice_id,
 					const TokenSpan &s,
@@ -132,7 +128,7 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 				const auto &token_filter = p_query->token_filter();
 
 				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, metric->alignment_def(),
+					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
 					gen.create_filtered(p_query, p_document, token_filter));
 			});
 
@@ -149,9 +145,14 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 		}
 		options.t_pos_weights_sum = sum;
 
+		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
+		if (matcher_options.needs_magnitudes) {
+			m_needs_magnitudes = true;
+		}
+
 		return MatcherFactory::create(
-			create_alignment_matcher_options(metric->alignment_def()),
-			[p_query, metric, options] (const DocumentRef &p_document) {
+			matcher_options,
+			[p_query, metric, options] (const DocumentRef &p_document, const auto &p_matcher_options) {
 
 				const auto make_tag_weighted_slice = [metric, options] (
 					const size_t slice_id,
@@ -167,7 +168,7 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 				const auto &token_filter = p_query->token_filter();
 
 				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, metric->alignment_def(),
+					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
 					gen.create_filtered(p_query, p_document, token_filter));
 			});
 

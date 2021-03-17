@@ -1,3 +1,5 @@
+python >= 3.7
+
 conda install -c conda-forge xtl
 conda install -c conda-forge xtensor
 conda install -c conda-forge xsimd
@@ -5,7 +7,12 @@ conda install -c conda-forge xtensor-blas
 conda install -c conda-forge xtensor-python
 
 
-python >= 3.7
+# Important Related Packages
+https://github.com/christianj6/binarized-word-movers-distance
+https://github.com/flairNLP/flair
+
+
+# Textdaten
 
 http://martinweisser.org/corpora_site/diy_corpora.html
 

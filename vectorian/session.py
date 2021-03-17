@@ -275,6 +275,9 @@ class LabSession(Session):
 		super().__init__(*args, **kwargs)
 		self._location_formatter = location_formatter or LocationFormatter()
 
+	def interact(self):
+		pass  # return InteractiveQuery(self)
+
 	def run_query(self, find, query):
 		import ipywidgets as widgets
 		from IPython.display import display

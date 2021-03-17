@@ -49,10 +49,14 @@ MetricRef StaticEmbedding::create_metric(
 	const py::dict &p_sent_metric_def,
 	const VocabularyToEmbedding &p_vocabulary_to_embedding) {
 
-	return std::make_shared<StaticEmbeddingMetric>(
-		p_query,
+	const auto metric = std::make_shared<StaticEmbeddingMetric>(
 		std::dynamic_pointer_cast<StaticEmbedding>(shared_from_this()),
+		p_sent_metric_def);
+
+	metric->initialize(
+		p_query,
 		p_metric,
-		p_sent_metric_def,
 		p_vocabulary_to_embedding);
+
+	return metric;
 }

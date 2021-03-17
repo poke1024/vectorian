@@ -6,9 +6,12 @@
 
 class StaticEmbeddingMetric : public Metric {
 protected:
-	const EmbeddingRef m_embedding;
+	const StaticEmbeddingRef m_embedding;
 	const py::dict m_options;
 	const py::dict m_alignment_def;
+
+	bool m_needs_magnitudes;
+	MatcherFactoryRef m_matcher_factory;
 
 	xt::xtensor<float, 2> m_similarity;
 	xt::xtensor<float, 1> m_mag_s;
@@ -46,17 +49,31 @@ protected:
 		}
 	}
 
+	MatcherFactoryRef create_matcher_factory(
+		const QueryRef &p_query);
+
 public:
-	StaticEmbeddingMetric(const py::dict &p_sent_metric_def) :
+	StaticEmbeddingMetric(
+		const py::dict &p_sent_metric_def) :
+
 		m_options(p_sent_metric_def),
-		m_alignment_def(m_options["alignment"].cast<py::dict>()){
+		m_alignment_def(m_options["alignment"].cast<py::dict>()),
+		m_needs_magnitudes(false) {
 	}
 
 	StaticEmbeddingMetric(
-		const QueryRef &p_query,
 		const StaticEmbeddingRef &p_embedding,
+		const py::dict &p_sent_metric_def) :
+
+		m_embedding(p_embedding),
+		m_options(p_sent_metric_def),
+		m_alignment_def(m_options["alignment"].cast<py::dict>()),
+		m_needs_magnitudes(false) {
+	}
+
+	void initialize(
+		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
-		const py::dict &p_sent_metric_def,
 		const VocabularyToEmbedding &p_vocabulary_to_embedding);
 
 	inline const py::dict &options() const {
@@ -67,16 +84,22 @@ public:
 		return m_similarity;
 	}
 
-	inline float magnitude_s(int i) const {
+	inline float magnitude_s(size_t i) const {
 		return m_mag_s(i);
 	}
 
-	inline float magnitude_t(int i) const {
+	inline float magnitude_t(size_t i) const {
 		return m_mag_t(i);
 	}
 
-	virtual MatcherFactoryRef create_matcher_factory(
-		const QueryRef &p_query);
+	inline void assert_has_magnitudes() const {
+		PPK_ASSERT(m_mag_s.shape(0) > 0);
+		PPK_ASSERT(m_mag_t.shape(0) > 0);
+	}
+
+	virtual MatcherFactoryRef matcher_factory() const {
+		return m_matcher_factory;
+	}
 
 	virtual const std::string &name() const;
 

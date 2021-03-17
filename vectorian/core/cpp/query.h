@@ -49,13 +49,8 @@ struct SliceStrategy {
 
 class Query : public std::enable_shared_from_this<Query> {
 
-	struct MatchStrategy {
-		MetricRef metric;
-		MatcherFactoryRef matcher_factory;
-	};
-
 	const QueryVocabularyRef m_vocab;
-	std::vector<MatchStrategy> m_match_strategies;
+	std::vector<MetricRef> m_metrics;
 	TokenVectorRef m_t_tokens;
 	py::dict m_py_t_tokens;
 	float m_submatch_weight;
@@ -171,15 +166,10 @@ public:
 		if (p_kwargs && p_kwargs.contains("metric")) {
 			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
-			const auto metric = m_vocab->create_metric(
+			m_metrics.push_back(m_vocab->create_metric(
 				shared_from_this(),
 				metric_def_dict,
-				metric_def_dict["token_metric"]);
-
-			const auto matcher_factory =
-				metric->create_matcher_factory(shared_from_this());
-
-			m_match_strategies.emplace_back(MatchStrategy{metric, matcher_factory});
+				metric_def_dict["token_metric"]));
 		}
 	}
 
@@ -207,8 +197,8 @@ public:
 		return m_pos_weights;
 	}
 
-	const std::vector<MatchStrategy> &match_strategies() const {
-		return m_match_strategies;
+	const std::vector<MetricRef> &metrics() const {
+		return m_metrics;
 	}
 
 	inline bool bidirectional() const {

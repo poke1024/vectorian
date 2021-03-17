@@ -102,6 +102,10 @@ public:
 		return m_metric->magnitude_t(i);
 	}
 
+	inline void assert_has_magnitudes() const {
+		m_metric->assert_has_magnitudes();
+	}
+
 	inline float max_similarity_for_t(int i) const {
 		return 1.0f;
 	}
@@ -199,6 +203,10 @@ public:
 		return m_delegate.magnitude_t(i);
 	}
 
+	inline void assert_has_magnitudes() const {
+		return m_delegate.assert_has_magnitudes();
+	}
+
 	inline float max_similarity_for_t(int i) const {
 		return m_modifiers.t_pos_weights[i];
 	}
@@ -267,6 +275,10 @@ public:
 	inline float magnitude_t(int i) const {
 		const auto len_t = m_slice.len_t();
 		return m_slice.magnitude_t(len_t - 1 - i);
+	}
+
+	inline void assert_has_magnitudes() const {
+		m_slice.assert_has_magnitudes();
 	}
 
 	inline float max_similarity_for_t(int i) const {

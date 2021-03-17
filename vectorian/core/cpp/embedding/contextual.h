@@ -31,11 +31,13 @@ public:
 		const py::dict &p_sent_metric_def,
 		const VocabularyToEmbedding&) {
 
-		const auto m = std::make_shared<ContextualEmbeddingMetric>(
+		const auto metric = std::make_shared<ContextualEmbeddingMetric>(
 			shared_from_this(),
 			p_sent_metric_def);
 
-		return m;
+		metric->initialize(p_query);
+
+		return metric;
 	}
 
 	inline const py::object &compute_embedding_callback() const {

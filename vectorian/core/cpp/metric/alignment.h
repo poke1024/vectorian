@@ -447,9 +447,11 @@ public:
 template<typename Index>
 class WordRotatorsDistance {
 	WRD<Index> m_wrd;
+	const float m_extra_mass_penalty;
 
 public:
-	WordRotatorsDistance() {
+	WordRotatorsDistance(const float p_extra_mass_penalty) :
+		m_extra_mass_penalty(p_extra_mass_penalty) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
@@ -470,7 +472,7 @@ public:
 			p_result_set->flow_factory();
 
 		const auto r = m_wrd.compute(
-			p_matcher->query(), p_slice, flow_factory);
+			p_matcher->query(), p_slice, flow_factory, m_extra_mass_penalty);
 
 		const float score = r.score / reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
@@ -501,7 +503,7 @@ inline MatcherOptions create_alignment_matcher_options(
 	const py::dict &p_alignment_def) {
 
 	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
-	return MatcherOptions{algorithm == "wrd"};
+	return MatcherOptions{algorithm == "word-rotators-distance"};
 }
 
 template<typename Index, typename SliceFactory>
@@ -510,6 +512,7 @@ MatcherRef create_alignment_matcher(
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
 	const py::dict &p_alignment_def,
+	const MatcherOptions &p_matcher_options,
 	const SliceFactory &p_factory) {
 
 	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
@@ -600,8 +603,16 @@ MatcherRef create_alignment_matcher(
 
 	} else if (algorithm == "word-rotators-distance") {
 
+		PPK_ASSERT(p_matcher_options.needs_magnitudes);
+
+		float extra_mass_penalty = -1.0f;
+
+		if (p_alignment_def.contains("extra_mass_penalty")) {
+			extra_mass_penalty = p_alignment_def["extra_mass_penalty"].cast<float>();
+		}
+
 		return make_matcher(p_query, p_document, p_metric, p_factory,
-			std::move(WordRotatorsDistance<Index>()),
+			std::move(WordRotatorsDistance<Index>(extra_mass_penalty)),
 			NoScoreComputer());
 
 	} else {

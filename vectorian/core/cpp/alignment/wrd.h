@@ -11,7 +11,7 @@ class WRD {
 	xt::xtensor<float, 1> m_mag_s_storage;
 	xt::xtensor<float, 1> m_mag_t_storage;
 	xt::xtensor<float, 2> m_cost_storage;
-	xt::xtensor<float, 2> m_flow_dist_result;
+	xt::xtensor<float, 3> m_flow_dist_result;
 
 	OptimalTransport m_ot;
 
@@ -50,10 +50,16 @@ public:
 	WRDSolution<FlowRef> compute(
 		const QueryRef &p_query,
 		const Slice &slice,
-		const FlowFactoryRef<Index> &p_flow_factory) {
+		const FlowFactoryRef<Index> &p_flow_factory,
+		const float p_extra_mass_penalty) {
+
+		slice.assert_has_magnitudes();
 
 		const size_t len_s = slice.len_s();
 		const size_t len_t = slice.len_t();
+
+		PPK_ASSERT(len_s <= m_mag_s_storage.shape(0));
+		PPK_ASSERT(len_t <= m_mag_t_storage.shape(0));
 
 		auto mag_s = xt::view(m_mag_s_storage, xt::range(0, len_s));
 		auto mag_t = xt::view(m_mag_t_storage, xt::range(0, len_t));
@@ -70,13 +76,13 @@ public:
 		mag_s /= xt::sum(mag_s);
 		mag_t /= xt::sum(mag_t);
 
-		for (size_t s = 0; s < len_s; s++) {
-			for (size_t t = 0; t < len_t; t++) {
+		for (size_t t = 0; t < len_t; t++) {
+			for (size_t s = 0; s < len_s; s++) {
 				distance_matrix(t, s) = 1.0f - slice.similarity(s, t);
 			}
 		}
 
-		const auto r = m_ot.emd(mag_t, mag_s, distance_matrix);
+		const auto r = m_ot.emd(mag_t, mag_s, distance_matrix, p_extra_mass_penalty);
 
 		if (p_query->debug_hook().has_value()) {
 			call_debug_hook(
@@ -87,7 +93,8 @@ public:
 			auto flow_dist_by_pos = xt::view(
 				m_flow_dist_result,
 				xt::range(0, len_t),
-				xt::range(0, len_s));
+				xt::range(0, len_s),
+				xt::all());
 
 			for (size_t t = 0; t < len_t; t++) {
 				const float max_flow = mag_t[t];
@@ -114,8 +121,8 @@ public:
 		m_mag_s_storage.resize({max_len_s});
 		m_mag_t_storage.resize({max_len_t});
 		m_cost_storage.resize({max_len_t, max_len_s});
-		m_flow_dist_result.resize({max_len_t, max_len_s});
+		m_flow_dist_result.resize({max_len_t, max_len_s, 2});
 
-		m_ot.resize(max_len_s, max_len_t);
+		m_ot.resize(max_len_t, max_len_s);
 	}
 };

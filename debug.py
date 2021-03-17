@@ -16,12 +16,12 @@ vectorian.compile(for_debugging=True)
 import vectorian.utils as utils
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
 from vectorian.importers import NovelImporter
-from vectorian.embeddings import FastText
+from vectorian.embeddings import PretrainedFastText
 from vectorian.session import Session
 from vectorian.corpus import Corpus
-from vectorian.render.render import LocationFormatter
+from vectorian.render.location import LocationFormatter
 
-fasttext = FastText("en")
+fasttext = PretrainedFastText("en")
 
 # use case 1.
 if False:
@@ -73,7 +73,7 @@ matches = index.find("write female", n=3)
 # index = session.index_for_metric("auto", nlp=nlp)
 # matches = index.find("company")
 with open("/Users/arbeit/Desktop/temp.json", "w") as f:
-    f.write(json.dumps(matches.to_json(formatter), indent=4))
+    f.write(json.dumps(matches.to_json(), indent=4))
 
 
 
@@ -86,17 +86,18 @@ import tabulate
 debug_data = []
 
 
-def debug_hook(data):
+def debug_hook(hook, data):
     # numpy arrays here might be mapped, copy them for later processing.
-    debug_data.append({
-        's': data['s'],
-        't': data['t'],
-        'D': data['D'].copy(),
-        'G': data['G'].copy()})
+    if False:
+        debug_data.append({
+            's': data['s'],
+            't': data['t'],
+            'D': data['D'].copy(),
+            'G': data['G'].copy()})
 
 
 wrd_metric = AlignmentSentenceMetric(
-    word_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
+    token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
     alignment=WordRotatorsDistance())
 index = session.partition("sentence").index(wrd_metric, nlp)
 
