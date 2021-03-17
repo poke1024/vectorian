@@ -9,14 +9,7 @@ class VocabularyToEmbedding;
 class Needle;
 
 class SimilarityMatrixBuilder {
-protected:
-	const WordVectors &m_embeddings;
-
 public:
-	inline SimilarityMatrixBuilder(
-		const WordVectors &p_embeddings) : m_embeddings(p_embeddings) {
-	}
-
 	virtual ~SimilarityMatrixBuilder() {
 	}
 
@@ -35,6 +28,16 @@ public:
 
 typedef std::shared_ptr<SimilarityMatrixBuilder> SimilarityMatrixBuilderRef;
 
+template<typename WordVectors>
+class SimilarityMatrixBuilderImpl : public SimilarityMatrixBuilder {
+protected:
+	const WordVectors &m_embeddings;
+
+public:
+	inline SimilarityMatrixBuilderImpl(
+		const WordVectors &p_embeddings) : m_embeddings(p_embeddings) {
+	}
+};
 
 class WordMetricDef {
 public:
@@ -43,13 +46,14 @@ public:
 	const std::string metric; // e.g. cosine
 	const py::dict options;
 
+	template<typename WordVectors>
 	SimilarityMatrixBuilderRef instantiate(
 		const WordVectors &p_vectors) const;
 };
 
 
-template<typename Distance>
-class BuiltinSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
+template<typename WordVectors, typename Distance>
+class BuiltinSimilarityMatrixBuilder : public SimilarityMatrixBuilderImpl<WordVectors> {
 protected:
 	Distance m_distance;
 
@@ -58,7 +62,7 @@ public:
 		const WordVectors &p_embeddings,
 		const Distance p_distance = Distance()) :
 
-		SimilarityMatrixBuilder(p_embeddings),
+		SimilarityMatrixBuilderImpl<WordVectors>(p_embeddings),
 		m_distance(p_distance) {
 	}
 
@@ -92,7 +96,7 @@ public:
 					if (s == t) {
 						score = 1.0f;
 					} else if (t >= 0) {
-						score = m_distance(m_embeddings, s, t);
+						score = m_distance(this->m_embeddings, s, t);
 					} else {
 						score = 0.0f;
 					}
@@ -122,7 +126,8 @@ inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
 	return xt::view(filtered_a, xt::range(0, k));
 }
 
-class CustomSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
+template<typename WordVectors>
+class CustomSimilarityMatrixBuilder : public SimilarityMatrixBuilderImpl<WordVectors> {
 	const py::object m_callback;
 
 public:
@@ -130,7 +135,7 @@ public:
 		const WordVectors &p_embeddings,
 		const py::object p_callback) :
 
-		SimilarityMatrixBuilder(p_embeddings),
+		SimilarityMatrixBuilderImpl<WordVectors>(p_embeddings),
 		m_callback(p_callback) {
 	}
 
@@ -146,7 +151,7 @@ public:
 		TokenIdArray filtered_a = filter_token_ids(p_a);
 		TokenIdArray filtered_b = filter_token_ids(p_b);
 
-		const py::dict vectors = m_embeddings.to_py();
+		const py::dict vectors = this->m_embeddings.to_py();
 
 		py::array_t<float> output;
 		output.resize({filtered_a.shape(0), filtered_b.shape(0)});
@@ -189,5 +194,106 @@ public:
 	}
 };
 
+struct Cosine {
+	template<typename WordVectors>
+	inline float operator()(
+		const WordVectors &p_vectors,
+		const token_t p_s,
+		const token_t p_t) const {
+
+		//PPK_ASSERT(p_s >= 0 && p_s < p_vectors.normalized.rows());
+		//PPK_ASSERT(p_t >= 0 && p_t < p_vectors.normalized.rows());
+
+		const auto s = xt::view(p_vectors.normalized, p_s, xt::all());
+		const auto t = xt::view(p_vectors.normalized, p_t, xt::all());
+		return xt::linalg::dot(s, t)();
+	}
+};
+
+struct ZhuCosine {
+	// Zhu et al.
+
+	template<typename WordVectors>
+	inline float operator()(
+		const WordVectors &p_vectors,
+		const token_t p_s,
+		const token_t p_t) const {
+
+		const auto s = xt::view(p_vectors.unmodified, p_s, xt::all());
+		const auto t = xt::view(p_vectors.unmodified, p_t, xt::all());
+
+		const float num = xt::sum(xt::sqrt(s * t))();
+		const float denom = xt::sum(s)() * xt::sum(t)();
+		return num / denom;
+
+	}
+};
+
+struct SohangirCosine {
+	/*
+	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”
+	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
+	*/
+
+	template<typename WordVectors>
+	inline float operator()(
+		const WordVectors &p_vectors,
+		const token_t p_s,
+		const token_t p_t) const {
+
+		const auto s = xt::view(p_vectors.unmodified, p_s, xt::all());
+		const auto t = xt::view(p_vectors.unmodified, p_t, xt::all());
+
+		const float num = xt::sum(xt::sqrt(s * t))();
+		const float denom = std::sqrt(xt::sum(s)()) * std::sqrt(xt::sum(t)());
+		return num / denom;
+	}
+};
+
+struct PNorm {
+	const float m_p;
+	const float m_distance_scale;
+
+	inline PNorm(float p = 2.0f, float scale = 1.0f) : m_p(p), m_distance_scale(scale) {
+	}
+
+	template<typename WordVectors>
+	inline float operator()(
+		const WordVectors &p_vectors,
+		const token_t p_s,
+		const token_t p_t) const {
+
+		const auto s = xt::view(p_vectors.unmodified, p_s, xt::all());
+		const auto t = xt::view(p_vectors.unmodified, p_t, xt::all());
+		const float d = xt::sum(xt::pow(xt::abs(s - t), m_p))();
+		return std::max(0.0f, 1.0f - std::pow(d, 1.0f / m_p) * m_distance_scale);
+	}
+};
+
+template<typename WordVectors>
+SimilarityMatrixBuilderRef WordMetricDef::instantiate(
+	const WordVectors &p_vectors) const {
+
+	if (metric == "cosine") {
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<WordVectors, Cosine>>(p_vectors);
+	} if (metric == "zhu-cosine") {
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<WordVectors, ZhuCosine>>(p_vectors);
+	} if (metric == "sohangir-cosine") {
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<WordVectors, SohangirCosine>>(p_vectors);
+	} else if (metric == "p-norm") {
+		return std::make_shared<BuiltinSimilarityMatrixBuilder<WordVectors, PNorm>>(
+			p_vectors, PNorm(
+				options["p"].cast<float>(),
+				options["scale"].cast<float>()));
+
+	} else if (metric == "custom") {
+		return std::make_shared<CustomSimilarityMatrixBuilder<WordVectors>>(
+			p_vectors, options["fn"]);
+	} else {
+		std::ostringstream err;
+		err << "unsupported metric " << metric;
+		throw std::runtime_error(err.str());
+	}
+}
 
 #endif // __VECTORIAN_EMBEDDING_SIMILARITY_H__

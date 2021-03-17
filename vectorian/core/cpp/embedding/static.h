@@ -76,7 +76,7 @@ class StaticEmbedding : public Embedding {
 	//std::vector<std::string> m_tokens;
 	std::unordered_map<std::string, token_t> m_tokens;
 	WordVectors m_embeddings;
-	std::map<std::string, SimilarityMatrixBuilderRef> m_similarity_measures;
+	//std::map<std::string, SimilarityMatrixBuilderRef> m_similarity_measures;
 
 public:
 	StaticEmbedding(
@@ -256,13 +256,13 @@ public:
 		return m_embeddings.unmodified.shape(0);
 	}
 
-	py::list measures() const {
+	/*py::list measures() const {
 		py::list names;
 		for (auto i : m_similarity_measures) {
 			names.append(py::str(i.first));
 		}
 		return names;
-	}
+	}*/
 };
 
 typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;
