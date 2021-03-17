@@ -7,6 +7,16 @@ conda install -c conda-forge xtensor-blas
 conda install -c conda-forge xtensor-python
 
 
+# fasttext
+
+let's get this right:
+class Embedding:
+    @property
+    def n_dims(self):
+        return 300
+    def get_embeddings(tokens, array):
+        # fill
+
 # Important Related Packages
 https://github.com/christianj6/binarized-word-movers-distance
 https://github.com/flairNLP/flair

@@ -51,6 +51,7 @@ public:
 		const QueryRef &p_query,
 		const Slice &slice,
 		const FlowFactoryRef<Index> &p_flow_factory,
+		const bool p_normalize_magnitudes,
 		const float p_extra_mass_penalty) {
 
 		slice.assert_has_magnitudes();
@@ -73,8 +74,10 @@ public:
 			mag_t(i) = slice.magnitude_t(i);
 		}
 
-		mag_s /= xt::sum(mag_s);
-		mag_t /= xt::sum(mag_t);
+		if (p_normalize_magnitudes) {
+			mag_s /= xt::sum(mag_s);
+			mag_t /= xt::sum(mag_t);
+		}
 
 		for (size_t t = 0; t < len_t; t++) {
 			for (size_t s = 0; s < len_s; s++) {

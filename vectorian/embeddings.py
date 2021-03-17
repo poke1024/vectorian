@@ -140,6 +140,10 @@ class EmbeddingLoadingProgress:
 
 
 class StaticEmbeddingInstance:
+	pass
+
+
+class StaticWordEmbeddingInstance(StaticEmbeddingInstance):
 	def __init__(self, name, table):
 		self._name = name
 		self._table = table

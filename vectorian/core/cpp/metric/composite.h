@@ -3,6 +3,10 @@
 
 #include "metric/static.h"
 
+// class Farthest
+// class Nearest
+// class Mix (multiple embeddings and factors)
+
 class MinMaxMetric : public StaticEmbeddingMetric {
 	const StaticEmbeddingMetricRef m_a;
 	const StaticEmbeddingMetricRef m_b;

@@ -447,10 +447,14 @@ public:
 template<typename Index>
 class WordRotatorsDistance {
 	WRD<Index> m_wrd;
+	const bool m_normalize_magnitudes;
 	const float m_extra_mass_penalty;
 
 public:
-	WordRotatorsDistance(const float p_extra_mass_penalty) :
+	WordRotatorsDistance(
+		const bool p_normalize_magnitudes,
+		const float p_extra_mass_penalty) :
+		m_normalize_magnitudes(p_normalize_magnitudes),
 		m_extra_mass_penalty(p_extra_mass_penalty) {
 	}
 
@@ -472,7 +476,9 @@ public:
 			p_result_set->flow_factory();
 
 		const auto r = m_wrd.compute(
-			p_matcher->query(), p_slice, flow_factory, m_extra_mass_penalty);
+			p_matcher->query(), p_slice, flow_factory,
+			m_normalize_magnitudes,
+			m_extra_mass_penalty);
 
 		const float score = r.score / reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
@@ -605,14 +611,18 @@ MatcherRef create_alignment_matcher(
 
 		PPK_ASSERT(p_matcher_options.needs_magnitudes);
 
-		float extra_mass_penalty = -1.0f;
+		bool normalize_magnitudes = true;
+		if (p_alignment_def.contains("normalize_magnitudes")) {
+			normalize_magnitudes = p_alignment_def["normalize_magnitudes"].cast<bool>();
+		}
 
+		float extra_mass_penalty = -1.0f;
 		if (p_alignment_def.contains("extra_mass_penalty")) {
 			extra_mass_penalty = p_alignment_def["extra_mass_penalty"].cast<float>();
 		}
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
-			std::move(WordRotatorsDistance<Index>(extra_mass_penalty)),
+			std::move(WordRotatorsDistance<Index>(normalize_magnitudes, extra_mass_penalty)),
 			NoScoreComputer());
 
 	} else {
