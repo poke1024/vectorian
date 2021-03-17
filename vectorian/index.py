@@ -344,7 +344,8 @@ class Index:
 
 	def find(
 		self, text,
-		n=10, min_score=0.0, debug=None, run_query=None,
+		n=10, min_score=0.0, debug=None,
+		run_task=None, make_result=None,
 		options: dict = dict()):
 
 		options = options.copy()
@@ -362,13 +363,15 @@ class Index:
 		start_time = time.time()
 
 		session = self._partition.session
-		if run_query is None:
-			run_query = session.run_query
+		if make_result is None:
+			make_result = session.make_result
+		if run_task is None:
+			run_task = session.on_progress
 
 		query = Query(self, session.vocab, text, options)
-		result_class, matches = run_query(self._find, query)
+		matches = run_task(lambda progress: self._find(query, progress=progress))
 
-		return result_class(
+		return make_result(
 			self,
 			matches,
 			duration=time.time() - start_time)

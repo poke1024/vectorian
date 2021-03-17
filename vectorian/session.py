@@ -178,17 +178,16 @@ class Session:
 	def max_len(self, level, window_size):
 		return self._collection.max_len(level, window_size)
 
-	@property
-	def result_class(self):
-		return Result
+	def make_result(self, *args, **kwargs):
+		return Result(*args, **kwargs)
+
+	def on_progress(self, task):
+		return task(None)
 
 	def partition(self, level, window_size=1, window_step=None):
 		if window_step is None:
 			window_step = window_size
 		return Partition(self, level, window_size, window_step)
-
-	def run_query(self, find, query):
-		return Result, find(query)
 
 	def token_mapper(self, stage):
 		if stage not in ('tokenizer', 'tagger'):
@@ -278,7 +277,13 @@ class LabSession(Session):
 	def interact(self):
 		pass  # return InteractiveQuery(self)
 
-	def run_query(self, find, query):
+	def make_result(self, *args, **kwargs):
+		return LabResult(
+			*args, **kwargs,
+			renderers=[ExcerptRenderer()],
+			location_formatter=self._location_formatter)
+
+	def on_progress(self, task):
 		import ipywidgets as widgets
 		from IPython.display import display
 
@@ -292,16 +297,8 @@ class LabSession(Session):
 			progress.value = progress.max * t
 
 		try:
-			result = find(
-				query,
-				progress=update_progress)
+			result = task(update_progress)
 		finally:
 			progress.close()
 
-		def make_result(*args, **kwargs):
-			return LabResult(
-				*args, **kwargs,
-				renderers=[ExcerptRenderer()],
-				location_formatter=self._location_formatter)
-
-		return make_result, result
+		return result

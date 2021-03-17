@@ -8,22 +8,24 @@ from vectorian.index import PartitionData
 
 class Renderer:
 	# see https://github.com/ipython/ipython/blob/master/IPython/lib/display.py
-	iframe_template = string.Template('''
+	_iframe_template = string.Template('''
 	<iframe
 		id="$id"
 		width="$width"
 		height="$height"
 		srcdoc="$srcdoc"
+		onload="$onload"
 		frameborder="0"
 		allowfullscreen
 	></iframe>
-	<script>
-		document.getElementById("$id").onload = function() {
-			var f = document.getElementById("$id");
-			f.height = f.contentWindow.document.body.scrollHeight + "px";
-		}
-	</script>
 	''')
+
+	_onload = string.Template("""
+		(function() {
+			var f = parent.document.getElementById('${iframe_id}');
+			f.height = f.contentWindow.document.body.scrollHeight + 'px';
+		})();
+	""")
 
 	def __init__(self, renderers, location_formatter, annotate=None):
 		self._annotate = annotate or {}
@@ -145,15 +147,10 @@ class Renderer:
 		# we need the following script_code for widget outputs to
 		# work (correctly resize) in Jupyter Lab interactive mode.
 
-		script_code = string.Template('''
-		<script>
-		(function() {
-			var f = parent.document.getElementById("${iframe_id}");
-			f.height = f.contentWindow.document.body.scrollHeight + "px";
-		})();
-		</script>
-		''').safe_substitute(iframe_id=iframe_id)
+		onload = Renderer._onload.safe_substitute(iframe_id=iframe_id)
+		script_code = ''.join(['<script>', onload, '</script>'])
 
-		return Renderer.iframe_template.safe_substitute(
+		return Renderer._iframe_template.safe_substitute(
 			id=iframe_id, width="100%", height="100%",
-			srcdoc=html.escape(doc.getvalue() + script_code))
+			srcdoc=html.escape(doc.getvalue() + script_code),
+			onload=onload)
