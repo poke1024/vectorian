@@ -172,16 +172,24 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 
 
 class TagWeightedSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, word_metric: TokenSimilarityMetric, alignment, **kwargs):
-		assert isinstance(word_metric, TokenSimilarityMetric)
+	def __init__(self, token_metric: TokenSimilarityMetric, alignment, **kwargs):
+		assert isinstance(token_metric, TokenSimilarityMetric)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
 
-		self._word_metric = word_metric
+		self._token_metric = token_metric
 		self._alignment = alignment
 
 		self._options = kwargs
+
+	@property
+	def token_similarity_metric(self):
+		return self._token_metric
+
+	@property
+	def alignment(self):
+		return self._alignment
 
 	def create_index(self, partition, **kwargs):
 		return BruteForceIndex(partition, self, **kwargs)
@@ -189,7 +197,7 @@ class TagWeightedSentenceMetric(SentenceSimilarityMetric):
 	def to_args(self, partition):
 		return {
 			'metric': 'alignment-tag-weighted',
-			'word_metric': self._word_metric.to_args(),
+			'token_metric': self._token_metric.to_args(),
 			'alignment': self._alignment.to_args(partition),
 			'pos_mismatch_penalty': self._options.get('pos_mismatch_penalty', 0),
 			'similarity_threshold': self._options.get('similarity_threshold', 0),
