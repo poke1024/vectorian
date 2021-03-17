@@ -257,7 +257,7 @@ class PretrainedFastText(StaticEmbedding):
 		return f"fasttext-{self._lang}"
 
 
-class PretrainedGlove(StaticEmbedding):
+class PretrainedGloVe(StaticEmbedding):
 	def __init__(self, name="6B", ndims=300):
 		"""
 		:param name: one of "6B", "42B.300d", "840B.300d",
@@ -269,10 +269,10 @@ class PretrainedGlove(StaticEmbedding):
 		self._ndims = ndims
 
 	def _load(self):
-		download_path = self._cache_path / 'models'
+		download_path = self._cache_path / "models"
 		download_path.mkdir(exist_ok=True, parents=True)
 
-		txt_data_path = download_path / self.unique_name
+		txt_data_path = download_path / f"glove-{self._glove_name}"
 
 		if not txt_data_path.exists():
 			url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
