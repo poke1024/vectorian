@@ -56,27 +56,6 @@ def _make_table(tokens, embeddings, normalizer, sampling='nearest'):
 		['token'] + vecs_name)
 
 
-def _load_fasttext_txt(csv_path):
-	tokens = []
-	with open(csv_path, "r") as f:
-		n_rows, n_cols = map(int, f.readline().strip().split())
-
-		embeddings = np.empty(
-			shape=(n_rows, n_cols), dtype=np.float32)
-
-		for _ in tqdm(range(n_rows), desc="Importing " + csv_path):
-			values = f.readline().strip().split()
-			if values:
-				t = values[0]
-				if t:
-					embeddings[len(tokens), :] = values[1:]
-					tokens.append(t)
-
-	embeddings = embeddings[:len(tokens), :]
-
-	return tokens, embeddings
-
-
 def _load_glove_txt(csv_path):
 	tokens = []
 	with open(csv_path, "r") as f:
@@ -89,7 +68,7 @@ def _load_glove_txt(csv_path):
 	embeddings = np.empty(
 		shape=(n_rows, n_cols), dtype=np.float32)
 
-	for line in tqdm(lines, desc="Importing " + csv_path):
+	for line in tqdm(lines, desc="Importing " + str(csv_path)):
 		values = line.strip().split()
 		if values:
 			t = values[0]
@@ -149,22 +128,6 @@ class StaticEmbedding:
 		return loaded
 
 
-class StaticEmbeddingFromFile(StaticEmbedding):
-	def __init__(self, embeddings=None, tokens=None, vectors=None, name=None):
-		if embeddings:
-			self._tokens = list(embeddings.keys())
-			self._vectors = np.vstack(embeddings.values())
-			self._path = None
-
-	@staticmethod
-	def import_from_file(path, **kwargs):
-		tokens, vectors = _load_glove_txt(path)
-		return StaticEmbedding(tokens=tokens, vectors=vectors, **kwargs)
-
-	def _load(self):
-		raise NotImplementedError()
-
-
 class EmbeddingLoadingProgress:
 	def __init__(self, pbar):
 		self._pbar = pbar
@@ -216,33 +179,6 @@ class StaticEmbeddingInstance:
 		return self._core
 
 
-class Glove(StaticEmbedding):
-	def __init__(self, name="6B"):
-		"""
-		:param name: one of "6B", "42B.300d", "840B.300d",
-		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
-		"""
-
-		self._glove_name = name
-
-		self._cache_path = Path.home() / ".vectorian" / "embeddings" / "glove"
-		self._cache_path.mkdir(exist_ok=True, parents=True)
-		pq_path = self._cache_path / f"{name}.parquet"
-
-		super().__init__(path=pq_path, name=f"glove-{name}")
-
-	def _load(self):
-		name = self._glove_name
-		txt_data_path = self._cache_path / name
-
-		if not txt_data_path.exists():
-			url = f"http://nlp.stanford.edu/data/glove.{name}.zip"
-			download.download(url, txt_data_path, kind="zip", progressbar=True)
-
-		return _load_glove_txt(
-			txt_data_path / f"glove.{name}.300d.txt")
-
-
 class InstalledStaticEmbedding(StaticEmbedding):
 	def __init__(self, path, unique_name=None):
 		super().__init__()
@@ -280,13 +216,13 @@ class FastTextVectors(InstalledStaticEmbedding):
 		small_model.save(path)
 
 
-class CompressedFastTextVectors(InstalledStaticEmbedding):
+class CompressedVectors(InstalledStaticEmbedding):
 	def _load(self):
 		wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(self._path)
 		return wv.index2word, np.array([wv.word_vec(word) for word in wv.index2word])
 
 
-class FacebookFastTextVectors(StaticEmbedding):
+class PretrainedFastText(StaticEmbedding):
 	def __init__(self, lang):
 		"""
 		:param lang: language code of precomputed fasttext encodings, see
@@ -319,6 +255,34 @@ class FacebookFastTextVectors(StaticEmbedding):
 	@property
 	def unique_name(self):
 		return f"fasttext-{self._lang}"
+
+
+class PretrainedGlove(StaticEmbedding):
+	def __init__(self, name="6B"):
+		"""
+		:param name: one of "6B", "42B.300d", "840B.300d",
+		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
+		"""
+
+		super().__init__()
+		self._glove_name = name
+
+	def _load(self):
+		download_path = self._cache_path / 'models'
+		download_path.mkdir(exist_ok=True, parents=True)
+
+		txt_data_path = download_path / self.unique_name
+
+		if not txt_data_path.exists():
+			url = f"http://nlp.stanford.edu/data/glove.{self._glove_name}.zip"
+			download.download(url, txt_data_path, kind="zip", progressbar=True)
+
+		return _load_glove_txt(
+			txt_data_path / f"glove.{self._glove_name}.300d.txt")
+
+	@property
+	def unique_name(self):
+		return f"glove-{self._glove_name}"
 
 
 class ContextualEmbedding:

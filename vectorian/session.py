@@ -167,6 +167,9 @@ class Session:
 	def embeddings(self):
 		return self._embeddings.values()
 
+	def get_embedding_instance(self, embedding):
+		return self._embeddings[embedding.name]
+
 	@property
 	def vocab(self):
 		return self._vocab
