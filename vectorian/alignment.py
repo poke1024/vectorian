@@ -226,12 +226,14 @@ class WordMoversDistance(AlignmentAlgorithm):
 
 
 class WordRotatorsDistance(AlignmentAlgorithm):
-	def __init__(self, extra_mass_penalty=-1):
+	def __init__(self, normalize_magnitudes=True, extra_mass_penalty=-1):
+		self._normalize_magnitudes = normalize_magnitudes
 		self._extra_mass_penalty = extra_mass_penalty
 
 	def to_description(self, partition):
 		return {
 			'WordRotatorsDistance': {
+				'normalize_magnitudes': self._normalize_magnitudes,
 				'extra_mass_penalty': self._extra_mass_penalty
 			}
 		}
@@ -239,5 +241,6 @@ class WordRotatorsDistance(AlignmentAlgorithm):
 	def to_args(self, partition):
 		return {
 			'algorithm': 'word-rotators-distance',
+			'normalize_magnitudes': self._normalize_magnitudes,
 			'extra_mass_penalty': self._extra_mass_penalty
 		}

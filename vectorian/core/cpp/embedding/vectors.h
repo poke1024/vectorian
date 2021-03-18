@@ -8,6 +8,7 @@ struct WordVectors {
 
 	V unmodified;
 	V normalized;
+	xt::xtensor<float, 1> magnitudes;
 
 	void free_unmodified() {
 		unmodified.resize({0, 0});
@@ -18,16 +19,31 @@ struct WordVectors {
 	}
 
 	void update_normalized() {
+		compute_magnitudes();
+
 		constexpr float eps = std::numeric_limits<float>::epsilon() * 100.0f;
 		normalized.resize({unmodified.shape(0), unmodified.shape(1)});
-		for (size_t j = 0; j < unmodified.shape(0); j++) {
-			const auto row = xt::view(unmodified, j, xt::all());
-			const float len = xt::linalg::norm(row);
+		for (size_t i = 0; i < unmodified.shape(0); i++) {
+			const float len = magnitudes(i);
 			if (len > eps) {
-				xt::view(normalized, j, xt::all()) = row / len;
+				const auto row = xt::view(unmodified, i, xt::all());
+				xt::view(normalized, i, xt::all()) = row / len;
 			} else {
-				xt::view(normalized, j, xt::all()).fill(0.0f);
+				xt::view(normalized, i, xt::all()).fill(0.0f);
 			}
+		}
+	}
+
+	void compute_magnitudes() {
+		const size_t n = unmodified.shape(0);
+		if (magnitudes.shape(0) == n) {
+			return;
+		}
+		magnitudes.resize({n});
+
+		for (size_t i = 0; i < n; i++) {
+			const auto row = xt::view(unmodified, i, xt::all());
+			magnitudes(i) = xt::linalg::norm(row);
 		}
 	}
 

@@ -7,7 +7,6 @@ import numpy as np
 import json
 import os
 import download
-import logging
 import compress_fasttext
 
 
@@ -316,6 +315,48 @@ class PretrainedGloVe(CachedWordEmbedding):
 	@property
 	def unique_name(self):
 		return f"glove-{self._glove_name}-{self._ndims}"
+
+
+class StackedEmbedding:
+	class Instance:
+		def __init__(self, name, embeddings):
+			self._name = name
+			self._embeddings = embeddings
+
+		@property
+		def name(self):
+			return self._name
+
+		def word_vec(self, t):
+			return np.hstack([e.word_vec(t) for e in self.embeddings])
+
+		@property
+		def dimension(self):
+			return sum(e.dimension for e in self._embeddings)
+
+		def get_embeddings(self, tokens):
+			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
+			for i, t in tqdm(enumerate(tokens)):
+				data[i, :] = self.word_vec(t)
+			return data
+
+		def to_core(self, tokens):
+			return core.StaticEmbedding(self, tokens)
+
+	def __init__(self, embeddings, name=None):
+		if name is None:
+			name = '[' + ', '.join([e.name for e in embeddings]) + ']'
+
+		self._embeddings = embeddings
+		self._name = name
+
+	def create_instance(self, session):
+		return StackedEmbedding.Instance(
+			self.name, [e.create_instance(session) for e in self._embeddings])
+
+	@property
+	def name(self):
+		return self._name
 
 
 class ContextualEmbedding:

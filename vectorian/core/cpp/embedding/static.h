@@ -76,7 +76,7 @@ public:
 		py::object p_embedding_factory,
 		py::list p_tokens);
 
-	inline const WordVectors &vectors() const {
+	inline WordVectors &vectors() {
 		return m_embeddings;
 	}
 

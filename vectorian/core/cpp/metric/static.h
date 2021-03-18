@@ -25,12 +25,10 @@ protected:
 		m_mag_s.resize({p_vocabulary->size()});
 		size_t offset = 0;
 		for (const auto &embedding : m_embeddings) {
-			const auto &vectors = embedding->vectors();
+			auto &vectors = embedding->vectors();
 			const size_t size = vectors.unmodified.shape(0);
-			for (size_t i = 0; i < size; i++) {
-				const auto row = xt::view(vectors.unmodified, i, xt::all());
-				m_mag_s(offset + i) = xt::linalg::norm(row);
-			}
+			vectors.compute_magnitudes();
+			xt::view(m_mag_s, xt::range(offset, offset + size)) = vectors.magnitudes;
 			offset += size;
 		}
 		PPK_ASSERT(offset == p_vocabulary->size());
