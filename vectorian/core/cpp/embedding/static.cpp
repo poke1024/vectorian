@@ -26,28 +26,18 @@ StaticEmbedding::StaticEmbedding(
 			p_tokens).cast<py::array_t<float>>();
 		const auto read = xt::pyarray<float>(data);
 
+		m_embeddings.unmodified.resize({p_tokens.size(), read.shape(1)});
+
 		const size_t n = read.shape(0);
-		m_embeddings.unmodified.resize({n, read.shape(1)});
 		if (n != p_tokens.size()) {
 			throw std::runtime_error("embedding matrix size does not match requested token count");
 		}
+
 		for (size_t i = 0; i < n; i++) {
 			xt::view(m_embeddings.unmodified, i, xt::all()) = xt::view(read, i, xt::all());
 		}
 
 		m_embeddings.update_normalized();
-
-		/*printf("StaticEmbedding:\n");
-		printf("unmodified(0, j): ");
-		for (size_t i = 0; i < 10; i++) {
-			printf("%.4f ", m_embeddings.unmodified(0, i));
-		}
-		printf("\n");
-		printf("normalized(0, j): ");
-		for (size_t i = 0; i < 10; i++) {
-			printf("%.4f ", m_embeddings.normalized(0, i));
-		}
-		printf("\n");*/
 	}
 }
 
