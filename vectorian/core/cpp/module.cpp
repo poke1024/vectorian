@@ -70,8 +70,8 @@ PYBIND11_MODULE(core, m) {
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
 
 	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> fast_embedding(m, "StaticEmbedding");
-	fast_embedding.def(py::init<const std::string &, py::object, py::object>());
-	fast_embedding.def("token_to_id", &StaticEmbedding::token_to_id);
+	fast_embedding.def(py::init<py::object, py::list>());
+	//fast_embedding.def("token_to_id", &StaticEmbedding::token_to_id);
 	fast_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
 	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);
 	//fast_embedding.def("similarity_matrix", &StaticEmbedding::similarity_matrix);
@@ -84,6 +84,7 @@ PYBIND11_MODULE(core, m) {
 	vocabulary.def("token_to_id", &Vocabulary::token_to_id);
 	vocabulary.def("id_to_token", &Vocabulary::id_to_token);
 	vocabulary.def("add_embedding", &Vocabulary::add_embedding);
+	vocabulary.def("compile_embeddings", &Vocabulary::compile_embeddings);
 
 	py::class_<Query, QueryRef> query(m, "Query");
 	query.def(py::init<VocabularyRef>());

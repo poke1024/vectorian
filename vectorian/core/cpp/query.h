@@ -84,6 +84,8 @@ public:
 		m_t_tokens = unpack_tokens(
 			m_vocab, table, p_tokens_strings);
 
+		m_vocab->compile_embeddings();
+
 		m_py_t_tokens = to_py_array(m_t_tokens);
 
 		static const std::set<std::string> valid_options = {

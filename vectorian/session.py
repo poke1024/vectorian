@@ -139,15 +139,22 @@ class Session:
 			static_embeddings = []
 		self._embeddings = {}
 		for embedding in static_embeddings:
-			if not isinstance(embedding, StaticEmbedding):
-				raise TypeError(f"expected StaticEmbedding, got {embedding}")
-			instance = embedding.create_instance(
-				self.token_mapper("tokenizer"), embedding_sampling)
+			#if not isinstance(embedding, StaticEmbedding):
+			#	raise TypeError(f"expected StaticEmbedding, got {embedding}")
+			#instance = embedding.create_instance(
+			#	self.token_mapper("tokenizer"), embedding_sampling)
+			instance = embedding.create_instance(self)
 			self._embeddings[instance.name] = instance
-			self._vocab.add_embedding(instance.to_core())
+			self._vocab.add_embedding(instance)
 
 		self._collection = Collection(
 			self, self._vocab, docs)
+
+		# make sure all core.Documents are instantiated at this point so that
+		# the interval vocabulary is setup and complete.
+		self.c_documents
+
+		self._vocab.compile_embeddings()
 
 	def default_metric(self):
 		embedding = list(self._embeddings.values())[0]

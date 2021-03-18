@@ -4,7 +4,7 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "metric/metric.h"
-#include "metric/composite.h"
+//#include "metric/composite.h"
 #include <iostream>
 
 /*template<typename T>
@@ -176,8 +176,8 @@ protected:
 	const LexiconRef<int8_t> m_tag;
 
 	struct Embedding {
-		EmbeddingRef embedding;
-		std::vector<token_t> map;
+		py::object embedding; // py embedding session instance
+		EmbeddingRef compiled;
 	};
 
 	struct EmbeddingTokenRef {
@@ -275,23 +275,34 @@ public:
 		return m_tokens->size();
 	}
 
-	int add_embedding(EmbeddingRef p_embedding) {
-
-		std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
+	int add_embedding(py::object p_embedding) {
 		if (m_tokens->size() > 0) {
 			throw std::runtime_error(
 				"cannot add embeddings after tokens were added.");
 		}
 
 		const size_t next_id = m_embeddings.size();
-		m_embeddings_by_name[p_embedding->name()] = next_id;
+		m_embeddings_by_name[p_embedding.attr("name").cast<std::string>()] = next_id;
 
 		Embedding e;
 		e.embedding = p_embedding;
 		m_embeddings.push_back(e);
 
 		return next_id;
+	}
+
+	void compile_embeddings() {
+		py::list tokens;
+		for (const auto &s : m_tokens->inc_strings()) {
+			tokens.append(py::str(s));
+		}
+		if (tokens.size() == 0) {
+			throw std::runtime_error("no tokens in vocabulary");
+		}
+
+		for (auto &e : m_embeddings) {
+			e.compiled = e.embedding.attr("to_core")(tokens).cast<EmbeddingRef>();
+		}
 	}
 
 	inline int add_pos(const std::string &p_name) {
@@ -318,12 +329,12 @@ public:
 		return m_tokens->add(p_token);
 	}
 
-	const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
+	/*const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
 		auto &e = m_embeddings[p_emb_idx];
 		e.embedding->update_map(
 			e.map, m_tokens->inc_strings(), m_tokens->inc_offset());
 		return e.map;
-	}
+	}*/
 
 	inline const std::string &id_to_token(token_t p_token) const {
 		return m_tokens->to_str(p_token);
@@ -348,8 +359,8 @@ class QueryVocabulary {
 	const IncrementalLexiconRef<int8_t> m_tag;
 
 	struct Embedding {
-		EmbeddingRef embedding;
-		std::vector<token_t> extra_map;
+		py::object embedding; // py embedding session instance
+		EmbeddingRef compiled;
 	};
 
 	std::vector<Embedding> m_embeddings;
@@ -388,12 +399,23 @@ public:
 		return m_tokens->add(p_token);
 	}
 
-	const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
+	void compile_embeddings() {
+		py::list tokens;
+		for (const auto &s : m_tokens->inc_strings()) {
+			tokens.append(py::str(s));
+		}
+
+		for (auto &e : m_embeddings) {
+			e.compiled = e.embedding.attr("to_core")(tokens).cast<EmbeddingRef>();
+		}
+	}
+
+	/*const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
 		auto &e = m_embeddings[p_emb_idx];
 		e.embedding->update_map(
 			e.extra_map, m_tokens->inc_strings(), m_tokens->inc_offset());
 		return e.extra_map;
-	}
+	}*/
 
 	inline int add_pos(const std::string &p_name) {
 		return m_pos->add(p_name);

@@ -1,6 +1,7 @@
 #include "vocabulary.h"
 #include "utils.h"
 #include "embedding/static.h"
+#include "metric/composite.h"
 
 template<typename VocabularyRef>
 TokenVectorRef _unpack_tokens(
@@ -143,15 +144,17 @@ MetricRef QueryVocabulary::create_metric(
 			err << "unknown embedding " << metric_def.embedding << " referenced in metric " << metric_def.name;
 			throw std::runtime_error(err.str());
 		}
+		const auto embedding_index = it->second;
 
-		VocabularyToEmbedding vocabulary_to_embedding;
-		vocabulary_to_embedding.append(m_vocab->get_embedding_map(it->second));
-		vocabulary_to_embedding.append(get_embedding_map(it->second));
+		std::vector<EmbeddingRef> embeddings = {
+			m_vocab->m_embeddings[embedding_index].compiled,
+			m_embeddings[embedding_index].compiled
+		};
 
-		return m_embeddings[it->second].embedding->create_metric(
+		return m_embeddings[embedding_index].compiled->create_metric(
 			p_query,
 			metric_def,
 			p_sent_metric_def,
-			vocabulary_to_embedding);
+			embeddings);
 	}
 }

@@ -3,43 +3,51 @@
 #include "query.h"
 
 Needle::Needle(
-	const QueryRef &p_query,
-	const VocabularyToEmbedding &p_vocabulary_to_embedding) :
+	const QueryRef &p_query) :
 
 	m_needle(p_query->tokens()) {
 
 	const auto &needle = *m_needle;
 
-	m_needle_vocabulary_token_ids.resize({needle.size()});
+	m_token_ids.resize({needle.size()});
 	for (size_t i = 0; i < needle.size(); i++) {
-		m_needle_vocabulary_token_ids(i) = needle[i].id;
+		m_token_ids(i) = needle[i].id;
 	}
+}
 
-	// p_a maps from a Vocabulary corpus token id to an Embedding token id,
-	// e.g. 3 in the corpus and 127 in the embedding.
+StaticEmbedding::StaticEmbedding(
+	py::object p_embedding_factory,
+	py::list p_tokens) : Embedding(p_embedding_factory.attr("name").cast<std::string>()) {
 
-	// p_b are the needle's Vocabulary token ids (not yet mapped to Embedding)
+	if (p_tokens.size() > 0) {
 
-	m_needle_embedding_token_ids.resize({needle.size()});
+		// FIXME do this in chunks to save memory.
+		const auto data = p_embedding_factory.attr("get_embeddings")(
+			p_tokens).cast<py::array_t<float>>();
+		const auto read = xt::pyarray<float>(data);
 
-	for (size_t i = 0; i < needle.size(); i++) {
-		const token_t t = m_needle_vocabulary_token_ids(i);
-		if (t >= 0) {
-			token_t mapped = -1;
-			token_t r = t;
-			for (const auto &x : p_vocabulary_to_embedding.unpack()) {
-				if (r < static_cast<ssize_t>(x.shape(0))) {
-					mapped = x[r];
-					break;
-				} else {
-					r -= x.shape(0);
-				}
-			}
-			PPK_ASSERT(mapped >= 0);
-			m_needle_embedding_token_ids(i) = mapped; // map to Embedding token ids
-		} else {
-			m_needle_embedding_token_ids(i) = -1;
+		const size_t n = read.shape(0);
+		m_embeddings.unmodified.resize({n, read.shape(1)});
+		if (n != p_tokens.size()) {
+			throw std::runtime_error("embedding matrix size does not match requested token count");
 		}
+		for (size_t i = 0; i < n; i++) {
+			xt::view(m_embeddings.unmodified, i, xt::all()) = xt::view(read, i, xt::all());
+		}
+
+		m_embeddings.update_normalized();
+
+		/*printf("StaticEmbedding:\n");
+		printf("unmodified(0, j): ");
+		for (size_t i = 0; i < 10; i++) {
+			printf("%.4f ", m_embeddings.unmodified(0, i));
+		}
+		printf("\n");
+		printf("normalized(0, j): ");
+		for (size_t i = 0; i < 10; i++) {
+			printf("%.4f ", m_embeddings.normalized(0, i));
+		}
+		printf("\n");*/
 	}
 }
 
@@ -47,16 +55,20 @@ MetricRef StaticEmbedding::create_metric(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric,
 	const py::dict &p_sent_metric_def,
-	const VocabularyToEmbedding &p_vocabulary_to_embedding) {
+	const std::vector<EmbeddingRef> &p_embeddings) {
+
+	std::vector<StaticEmbeddingRef> embeddings;
+	for (auto e : p_embeddings) {
+		embeddings.push_back(std::dynamic_pointer_cast<StaticEmbedding>(e));
+	}
 
 	const auto metric = std::make_shared<StaticEmbeddingMetric>(
-		std::dynamic_pointer_cast<StaticEmbedding>(shared_from_this()),
+		embeddings,
 		p_sent_metric_def);
 
 	metric->initialize(
 		p_query,
-		p_metric,
-		p_vocabulary_to_embedding);
+		p_metric);
 
 	return metric;
 }

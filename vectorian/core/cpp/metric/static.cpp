@@ -4,20 +4,16 @@
 #include "match/matcher_impl.h"
 #include "metric/alignment.h"
 #include "metric/factory.h"
+#include "embedding/sim.h"
 
 void StaticEmbeddingMetric::initialize(
 	const QueryRef &p_query,
-	const WordMetricDef &p_metric,
-	const VocabularyToEmbedding &p_vocabulary_to_embedding) {
+	const WordMetricDef &p_metric) {
 
-	const auto builder = p_metric.instantiate(
-		m_embedding->embeddings());
-
-	const Needle needle(p_query, p_vocabulary_to_embedding);
+	const auto builder = p_metric.instantiate(m_embeddings);
 
 	builder->build_similarity_matrix(
-		needle,
-		p_vocabulary_to_embedding,
+		p_query,
 		m_similarity);
 
 	if (m_options.contains("similarity_falloff")) {
@@ -27,30 +23,31 @@ void StaticEmbeddingMetric::initialize(
 
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
 	if (p_query->debug_hook().has_value()) {
-		auto gen_labels = py::cpp_function([&] () {
+		auto gen_rows = py::cpp_function([&] () {
 			const auto &vocab = p_query->vocabulary();
 
 			py::list row_tokens;
-			p_vocabulary_to_embedding.iterate([&] (
-				const auto &ids, const size_t offset) {
-				for (size_t i = 0; i < ids.size(); i++) {
-					row_tokens.append(vocab->id_to_token(ids[i]));
-				}
-			});
+			const size_t n = vocab->size();
+			for (size_t i = 0; i < n; i++) {
+				row_tokens.append(vocab->id_to_token(i));
+			}
+			return row_tokens;
+		});
+
+		auto gen_columns = py::cpp_function([&] () {
+			const auto &vocab = p_query->vocabulary();
+
 			py::list col_tokens;
 			for (const auto &t : *p_query->tokens()) {
 				col_tokens.append(vocab->id_to_token(t.id));
 			}
-
-			py::dict labels;
-			labels["rows"] = row_tokens;
-			labels["columns"] = col_tokens;
-			return labels;
+			return col_tokens;
 		});
 
 		py::dict data;
 		data["matrix"] = xt::pyarray<float>(m_similarity);
-		data["labels"] = gen_labels;
+		data["rows"] = gen_rows;
+		data["columns"] = gen_columns;
 
 		(*p_query->debug_hook())("similarity_matrix", data);
 	}
@@ -58,9 +55,9 @@ void StaticEmbeddingMetric::initialize(
 	m_matcher_factory = create_matcher_factory(p_query);
 
 	if (m_needs_magnitudes) { // set in create_matcher_factory
+		const Needle needle(p_query);
 		compute_magnitudes(
-			m_embedding->embeddings(),
-			p_vocabulary_to_embedding,
+			p_query->vocabulary(),
 			needle);
 	}
 }
@@ -181,5 +178,5 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 }
 
 const std::string &StaticEmbeddingMetric::name() const {
-	return m_embedding->name();
+	return m_embeddings[0]->name();
 }

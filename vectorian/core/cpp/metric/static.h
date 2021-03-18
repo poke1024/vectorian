@@ -3,10 +3,11 @@
 
 #include "metric/metric.h"
 #include "embedding/static.h"
+#include "vocabulary.h"
 
 class StaticEmbeddingMetric : public Metric {
 protected:
-	const StaticEmbeddingRef m_embedding;
+	const std::vector<StaticEmbeddingRef> m_embeddings;
 	const py::dict m_options;
 	const py::dict m_alignment_def;
 
@@ -18,34 +19,29 @@ protected:
 	xt::xtensor<float, 1> m_mag_t;
 
 	void compute_magnitudes(
-		const WordVectors &p_embeddings,
-		const VocabularyToEmbedding &p_vocabulary_to_embedding,
+		const QueryVocabularyRef &p_vocabulary,
 		const Needle &p_needle) {
 
-		m_mag_s.resize({p_vocabulary_to_embedding.size()});
-		p_vocabulary_to_embedding.iterate([&] (const auto &x, const size_t offset) {
-			const size_t n = static_cast<size_t>(x.shape(0));
-			PPK_ASSERT(offset + n <= static_cast<size_t>(m_mag_s.shape(0)));
-			for (size_t i = 0; i < n; i++) {
-				const token_t k = x(i);
-				if (k >= 0) {
-					const auto row = xt::view(p_embeddings.unmodified, k, xt::all());
-					m_mag_s(offset + i) = xt::linalg::norm(row);
-				} else {
-					m_mag_s(offset + i) = 0.0f;
-				}
+		m_mag_s.resize({p_vocabulary->size()});
+		size_t offset = 0;
+		for (const auto &embedding : m_embeddings) {
+			const auto &vectors = embedding->vectors();
+			const size_t size = vectors.unmodified.shape(0);
+			for (size_t i = 0; i < size; i++) {
+				const auto row = xt::view(vectors.unmodified, i, xt::all());
+				m_mag_s(offset + i) = xt::linalg::norm(row);
 			}
-		});
+			offset += size;
+		}
+		PPK_ASSERT(offset == p_vocabulary->size());
 
 		m_mag_t.resize({p_needle.size()});
 		for (size_t j = 0; j < p_needle.size(); j++) {
-			const token_t k = p_needle.embedding_token_ids()[j];
-			if (k >= 0) {
-				const auto row = xt::view(p_embeddings.unmodified, k, xt::all());
-				m_mag_t(j) = xt::linalg::norm(row);
-			} else {
-				m_mag_t(j) = 0.0f;
-			}
+			const token_t t = p_needle.token_ids()[j];
+			size_t t_rel;
+			const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
+			const auto row = xt::view(t_vectors.unmodified, t_rel, xt::all());
+			m_mag_t(j) = xt::linalg::norm(row);
 		}
 	}
 
@@ -62,10 +58,10 @@ public:
 	}
 
 	StaticEmbeddingMetric(
-		const StaticEmbeddingRef &p_embedding,
+		const std::vector<StaticEmbeddingRef> &p_embeddings,
 		const py::dict &p_sent_metric_def) :
 
-		m_embedding(p_embedding),
+		m_embeddings(p_embeddings),
 		m_options(p_sent_metric_def),
 		m_alignment_def(m_options["alignment"].cast<py::dict>()),
 		m_needs_magnitudes(false) {
@@ -73,8 +69,7 @@ public:
 
 	void initialize(
 		const QueryRef &p_query,
-		const WordMetricDef &p_metric,
-		const VocabularyToEmbedding &p_vocabulary_to_embedding);
+		const WordMetricDef &p_metric);
 
 	inline const py::dict &options() const {
 		return m_options;

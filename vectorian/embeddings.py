@@ -81,12 +81,29 @@ def _load_glove_txt(csv_path):
 	return tokens, embeddings
 
 
+def _make_cache_path():
+	cache_path = Path.home() / ".vectorian" / "embeddings"
+	cache_path.mkdir(exist_ok=True, parents=True)
+	return cache_path
+
+
 class StaticEmbedding:
+	def create_instance(self, normalizer, embedding_sampling):
+		raise NotImplementedError()
+
+
+class WordEmbeddingCache:
 	def __init__(self):
 		self._loaded = {}
-		cache_path = Path.home() / ".vectorian" / "embeddings"
-		cache_path.mkdir(exist_ok=True, parents=True)
-		self._cache_path = cache_path
+		self._cache_path = _make_cache_path()
+
+	@property
+	def get_dimension(self):
+		return self._ndims
+
+	def get_embeddings(self, tokens, array):
+		for i, t in tqdm(enumerate(tokens)):
+			array[i, :] = self._ft.get_word_vector(t)
 
 	def _load(self):
 		raise NotImplementedError()
@@ -227,47 +244,68 @@ class CompressedFastTextVectors(InstalledStaticEmbedding):
 
 
 class PretrainedFastText(StaticEmbedding):
+	class Instance:
+		def __init__(self, name, ft):
+			self._name = name
+			self._ft = ft
+
+		@property
+		def name(self):
+			return self._name
+
+		@property
+		def dimension(self):
+			return self._ft.get_dimension()
+
+		def get_embeddings(self, tokens):
+			print("get_embeddings", len(tokens))
+			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
+			for i, t in tqdm(enumerate(tokens)):
+				data[i, :] = self._ft.get_word_vector(t)
+			return data
+
+		def to_core(self, tokens):
+			return core.StaticEmbedding(self, tokens)
+
 	def __init__(self, lang):
 		"""
 		:param lang: language code of precomputed fasttext encodings, see
 		https://fasttext.cc/docs/en/crawl-vectors.html
 		"""
 
+		import fasttext
+		import fasttext.util
+
 		super().__init__()
 		self._lang = lang
 
-	def _load(self):
-		import fasttext
-		import fasttext.util
-		download_path = self._cache_path / 'models'
+		download_path = _make_cache_path() / 'models'
 		download_path.mkdir(exist_ok=True, parents=True)
-		os.chdir(download_path)
-		with tqdm(desc="Downloading " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
-			filename = fasttext.util.download_model(
-				self._lang, if_exists='ignore')
-			pbar.update(1)
+
+		filename = "cc.%s.300.bin" % self._lang
+		if not (download_path / filename).exists():
+			os.chdir(download_path)
+			with tqdm(desc="Downloading " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
+				filename = fasttext.util.download_model(
+					self._lang, if_exists='ignore')
+				pbar.update(1)
+
 		with tqdm(desc="Opening " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
 			ft = fasttext.load_model(str(download_path / filename))
 			pbar.update(1)
-		words = ft.get_words()
-		ndims = ft.get_dimension()
-		embeddings = np.empty((len(words), ndims), dtype=np.float32)
-		for i, w in enumerate(tqdm(words, desc=f"Importing {self.unique_name}")):
-			embeddings[i] = ft.get_word_vector(w)
-		return words, embeddings
+
+		self._ft = ft
+
+	def create_instance(self, session):
+		return PretrainedFastText.Instance(self.name, self._ft)
 
 	@property
-	def unique_name(self):
+	def name(self):
 		return f"fasttext-{self._lang}"
 
 
-class PretrainedGloVe(StaticEmbedding):
+class GloVeCache(WordEmbeddingCache):
 	def __init__(self, name="6B", ndims=300):
-		"""
-		:param name: one of "6B", "42B.300d", "840B.300d",
-		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
-		"""
-
 		super().__init__()
 		self._glove_name = name
 		self._ndims = ndims
@@ -284,6 +322,27 @@ class PretrainedGloVe(StaticEmbedding):
 
 		return _load_glove_txt(
 			txt_data_path / f"glove.{self._glove_name}.{self._ndims}d.txt")
+
+	@property
+	def unique_name(self):
+		return f"glove-{self._glove_name}-{self._ndims}"
+
+
+class PretrainedGloVe(StaticEmbedding):
+	def __init__(self, name="6B", ndims=300):
+		"""
+		:param name: one of "6B", "42B.300d", "840B.300d",
+		"twitter.27B", see https://nlp.stanford.edu/projects/glove/
+		"""
+
+		super().__init__()
+		self._glove_name = name
+		self._ndims = ndims
+
+	def load(self, session):
+		# normalizer, embedding_sampling,
+		pass
+
 
 	@property
 	def unique_name(self):

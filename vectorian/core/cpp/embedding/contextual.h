@@ -29,7 +29,7 @@ public:
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
 		const py::dict &p_sent_metric_def,
-		const VocabularyToEmbedding&) {
+		const std::vector<EmbeddingRef>&) {
 
 		const auto metric = std::make_shared<ContextualEmbeddingMetric>(
 			shared_from_this(),

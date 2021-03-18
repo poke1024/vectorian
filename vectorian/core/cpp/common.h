@@ -91,6 +91,23 @@ class Match;
 typedef std::shared_ptr<Match> MatchRef;
 class ResultSet;
 typedef std::shared_ptr<ResultSet> ResultSetRef;
+class QueryVocabulary;
+typedef std::shared_ptr<QueryVocabulary> QueryVocabularyRef;
+class StaticEmbedding;
+typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;
+class SimilarityMatrixBuilder;
+typedef std::shared_ptr<SimilarityMatrixBuilder> SimilarityMatrixBuilderRef;
+
+class WordMetricDef {
+public:
+	const std::string name;
+	const std::string embedding; // e.g. fasttext
+	const std::string metric; // e.g. cosine
+	const py::dict options;
+
+	inline SimilarityMatrixBuilderRef instantiate(
+		const std::vector<StaticEmbeddingRef> &p_embeddings) const;
+};
 
 py::dict to_py_array(const TokenVectorRef &p_array);
 

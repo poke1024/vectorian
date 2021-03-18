@@ -90,10 +90,6 @@ class PreparedQuery:
 			return tokens
 
 	def to_core(self):
-		# make sure all core.Documents are instantiated at this point so that
-		# the interval vocabulary is setup and complete.
-		self.index.session.c_documents
-
 		query = core.Query(self._vocab)
 		query.initialize(
 			self._token_table,
