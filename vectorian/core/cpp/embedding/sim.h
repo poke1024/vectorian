@@ -8,6 +8,7 @@
 
 class Needle;
 
+/*
 class SimilarityMatrixBuilder {
 protected:
 	const std::vector<StaticEmbeddingRef> m_embeddings;
@@ -82,7 +83,7 @@ inline TokenIdArray filter_token_ids(const TokenIdArray &p_a) {
 		}
 	}
 	return xt::view(filtered_a, xt::range(0, k));
-}
+}*/
 
 /*class CustomSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
 	const py::object m_callback;
@@ -230,6 +231,7 @@ struct PNorm {
 	}
 };
 
+#if 0
 inline SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 	const std::vector<StaticEmbeddingRef> &p_embeddings) const {
 
@@ -255,5 +257,6 @@ inline SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 		throw std::runtime_error(err.str());
 	}
 }
+#endif
 
 #endif // __VECTORIAN_EMBEDDING_SIMILARITY_H__

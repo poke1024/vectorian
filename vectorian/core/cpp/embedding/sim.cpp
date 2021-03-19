@@ -3,7 +3,7 @@
 #include "vocabulary.h"
 #include "query.h"
 
-void SimilarityMatrixBuilder::build_similarity_matrix(
+/*void SimilarityMatrixBuilder::build_similarity_matrix(
 	const QueryRef &p_query,
 	xt::xtensor<float, 2> &r_matrix) const {
 
@@ -30,6 +30,7 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 			size_t t_rel;
 			const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
 
+			// python call?
 			fill_matrix(vectors, offset, size, t_vectors, t_rel, j, r_matrix);
 
 			if (p_query->debug_hook().has_value()) {
@@ -47,15 +48,6 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 	}
 	PPK_ASSERT(offset == vocab_size);
 
-	/*p_vocabulary_to_embedding.iterate([&] (const auto &embedding_token_ids, size_t offset) {
-		fill_matrix(
-			embedding_token_ids,
-			p_needle.token_ids(),
-			offset,
-			0,
-			r_matrix);
-	});*/
-
 	for (size_t j = 0; j < needle.size(); j++) { // for each token in needle
 
 		// since the j-th needle token is a specific vocabulary token, we always
@@ -67,3 +59,4 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 		}
 	}
 }
+*/

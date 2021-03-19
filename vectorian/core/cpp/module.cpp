@@ -75,7 +75,7 @@ PYBIND11_MODULE(core, m) {
 	fast_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
 	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);
 	//fast_embedding.def("similarity_matrix", &StaticEmbedding::similarity_matrix);
-	fast_embedding.def_property_readonly("n_tokens", &StaticEmbedding::n_tokens);
+	fast_embedding.def_property_readonly("size", &StaticEmbedding::size);
 	//fast_embedding.def_property_readonly("measures", &StaticEmbedding::measures);
 
 	py::class_<Vocabulary, VocabularyRef> vocabulary(m, "Vocabulary");

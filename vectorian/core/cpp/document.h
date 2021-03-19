@@ -138,7 +138,29 @@ public:
 typedef std::shared_ptr<Spans> SpansRef;
 
 
-class Document : public std::enable_shared_from_this<Document> {
+/*class ContextualVectorsContainer {
+	std::unordered_map<std::string, ContextualEmbeddingVectorsRef> m_vectors;
+
+public:
+	void add_contextual_embedding_vectors(
+		const std::string &p_name,
+		const ContextualEmbeddingVectorsRef &p_vectors) {
+
+		m_vectors[p_name] = p_vectors;
+	}
+
+	ContextualEmbeddingVectorsRef get_contextual_embedding_vectors(
+		const std::string &p_name) const {
+
+		return ContextualEmbeddingVectorsRef();
+	}
+
+};*/
+
+class Document :
+	public std::enable_shared_from_this<Document>/*,
+	public ContextualVectorsContainer*/ {
+
 private:
 	const int64_t m_id;
 	const VocabularyRef m_vocab;

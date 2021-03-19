@@ -48,7 +48,8 @@ if os.environ.get('DEBUG_VECTORIAN_CORE', False):
 	logging.info("compiling for debugging.")
 
 	cfg['compiler_args'].append('-g')
-	cfg['compiler_args'].append('-O1')
+	cfg['compiler_args'].append('-O0')
+	cfg['compiler_args'].append('-UNDEBUG')
 
 	if os.environ.get('VECTORIAN_SANITIZE_ADDRESS', False):
 		cfg['compiler_args'].append('-fsanitize=address')
@@ -92,10 +93,10 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'metric/static.cpp',
 	'embedding/sim.cpp',
 	'vocabulary.cpp',
 	'embedding/static.cpp',
-	'metric/static.cpp',
 	'match/flow.cpp',
 	'match/match.cpp',
 	'match/matcher.cpp',
@@ -114,6 +115,8 @@ if platform.system() == 'Darwin':  # >= macOS 10.14.6
 	# see https://github.com/pybind/python_example/issues/44
 	cfg['compiler_args'].append("-mmacosx-version-min=10.15")
 	cfg['linker_args'].append("-mmacosx-version-min=10.15")
+
+#cfg['parallel'] = True
 
 logging.debug(f"cpp core: compiling with {cfg}")
 

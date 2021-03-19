@@ -2,6 +2,7 @@ import vectorian.core as core
 
 from tqdm import tqdm
 from pathlib import Path
+from cached_property import cached_property
 
 import numpy as np
 import json
@@ -84,6 +85,64 @@ class StaticEmbedding:
 		raise NotImplementedError()
 
 
+class Vectors:  # future: CudaVectors
+	def __init__(self, unmodified):
+		self._unmodified = unmodified
+
+	@property
+	def size(self):
+		return self._unmodified.shape[0]
+
+	@property
+	def shape(self):
+		return self._unmodified.shape
+
+	@property
+	def unmodified(self):
+		return self._unmodified
+
+	@cached_property
+	def normalized(self):
+		eps = np.finfo(np.float32).eps * 100
+		vanishing = self.magnitudes < eps
+		data = self._unmodified / self.magnitudes[:, np.newaxis]
+		data[vanishing, :].fill(0)
+		return data
+
+	@cached_property
+	def magnitudes(self):
+		return np.linalg.norm(self._unmodified, axis=1)
+
+
+class StackedVectors:
+	def __init__(self, sources, indices):
+		self._sources = sources
+		self._indices = indices
+
+	@cached_property
+	def size(self):
+		return self.unmodified.shape[0]
+
+	@cached_property
+	def shape(self):
+		return self.unmodified.shape
+
+	@cached_property
+	def unmodified(self):
+		return np.vstack([
+			s.unmodified[i] for s, i in zip(self._sources, self._indices)])
+
+	@cached_property
+	def normalized(self):
+		return np.vstack([
+			s.normalized[i] for s, i in zip(self._sources, self._indices)])
+
+	@cached_property
+	def magnitudes(self):
+		return [s.magnitudes[i] for s, i in zip(self._sources, self._indices)]
+
+
+
 class CachedWordEmbedding(StaticEmbedding):
 	class Instance:
 		def __init__(self, name, tokens, vectors):
@@ -111,7 +170,7 @@ class CachedWordEmbedding(StaticEmbedding):
 			oov = indices < 0
 			data = self._vectors[np.maximum(indices, 0)].copy()
 			data[oov, :].fill(0)  # now zero out those elements that are actually oov
-			return data
+			return Vectors(data)
 
 		def to_core(self, tokens):
 			return core.StaticEmbedding(self, tokens)
@@ -194,7 +253,7 @@ class GensimKeyedVectors(StaticEmbedding):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self._wv.word_vec(t)
-			return data
+			return Vectors(data)
 
 		def to_core(self, tokens):
 			return core.StaticEmbedding(self, tokens)
@@ -251,7 +310,7 @@ class PretrainedFastText(StaticEmbedding):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self._ft.get_word_vector(t)
-			return data
+			return Vectors(data)
 
 		def to_core(self, tokens):
 			return core.StaticEmbedding(self, tokens)
@@ -338,7 +397,7 @@ class StackedEmbedding:
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self.word_vec(t)
-			return data
+			return Vectors(data)
 
 		def to_core(self, tokens):
 			return core.StaticEmbedding(self, tokens)
@@ -368,3 +427,9 @@ class TransformerEmbedding(ContextualEmbedding):
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
 		return doc._.trf_data.tensors[-1]
+
+
+def compute_cosine(a, b):
+	# temporary hack
+	print("hello.", a.shape, b.shape)
+	return np.linalg.multi_dot([a.normalized, b.normalized.T])

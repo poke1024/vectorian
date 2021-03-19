@@ -6,15 +6,81 @@
 #include "metric/factory.h"
 #include "embedding/sim.h"
 
+void StaticEmbeddingMetric::build_similarity_matrix(
+	const QueryRef &p_query,
+	const WordMetricDef &p_metric) {
+
+	// FIXME
+	// const std::string embedding; // e.g. fasttext
+	// const std::string metric; // e.g. cosine
+
+	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
+	const Needle needle(p_query);
+
+	const size_t vocab_size = p_vocabulary->size();
+	const size_t needle_size = static_cast<size_t>(needle.size());
+	m_similarity.resize({vocab_size, needle_size});
+
+	const auto &needle_tokens = needle.token_ids();
+	py::list sources;
+	py::array_t<size_t> indices{static_cast<py::ssize_t>(needle_size)};
+	auto mutable_indices = indices.mutable_unchecked<1>();
+
+	for (size_t j = 0; j < needle_size; j++) { // for each token in needle
+		const auto t = needle_tokens[j];
+		size_t t_rel;
+		const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
+		sources.append(t_vectors);
+		mutable_indices[j] = t_rel;
+	}
+
+	const auto py_embeddings = py::module_::import("vectorian.embeddings");
+	auto needle_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
+
+	size_t offset = 0;
+	for (const auto &embedding : m_embeddings) {
+		const auto &vectors = embedding->vectors();
+		const size_t size = embedding->size();
+
+		// HACK
+		const auto sim = py_embeddings.attr("compute_cosine")(
+			vectors, needle_vectors).cast<py::array_t<float>>();
+		const auto r_sim = sim.unchecked<2>();
+		PPK_ASSERT(static_cast<size_t>(r_sim.shape(0)) == size);
+		PPK_ASSERT(static_cast<size_t>(r_sim.shape(1)) == m_similarity.shape(1));
+
+		// FIXME.
+		for (size_t i = 0; i < size; i++) {
+			for (size_t j = 0; j < needle_size; j++) {
+				m_similarity(i, j) = r_sim(i, j);
+			}
+		}
+
+		PPK_ASSERT(offset + size <= vocab_size);
+
+		offset += size;
+	}
+	PPK_ASSERT(offset == vocab_size);
+
+	for (size_t j = 0; j < needle.size(); j++) { // for each token in needle
+
+		// since the j-th needle token is a specific vocabulary token, we always
+		// set that specific vocabulary token similarity to 1 (regardless of the
+		// embedding distance).
+		const auto k = needle_tokens[j];
+		if (k >= 0) {
+			m_similarity(k, j) = 1.0f;
+		}
+	}
+}
+
 void StaticEmbeddingMetric::initialize(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
 
-	const auto builder = p_metric.instantiate(m_embeddings);
-
-	builder->build_similarity_matrix(
+	build_similarity_matrix(
 		p_query,
-		m_similarity);
+		p_metric);
 
 	if (m_options.contains("similarity_falloff")) {
 		const float similarity_falloff = m_options["similarity_falloff"].cast<float>();

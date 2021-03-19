@@ -82,22 +82,67 @@ struct StaticEmbeddingVectors {
 	}
 };
 
+#if 0
+// ContextualEmbeddingVectors should be implemented in py?
+
 class ContextualEmbeddingVectors {
 	xt::xtensor<float, 2> m_vectors;
 
 public:
-	// https://github.com/xtensor-stack/xtensor-io/pull/18/files#diff-4f602a45ff1e0fd1ebc810d7566a0b98R175
+	/*ContextualEmbeddingVectors(
+		const std::string &p_path,
+		const size_t p_num_vectors,
+		const size_t p_num_dimensions) {
 
-	auto unmodified(size_t p_index) const {
+		// https://github.com/xtensor-stack/xtensor-io/pull/18/files#diff-4f602a45ff1e0fd1ebc810d7566a0b98R175
+		size_t sz = shape[0] * shape[1];
+		const size_t length = sz * sizeof(T);
+		void *ptr = mmap::mmap(
+			nullptr, length + offset - pa_offset, PROT_READ,
+			MAP_PRIVATE, *fd, pa_offset);
+		T* t_ptr = reinterpret_cast<T*>(ptr);
+		m_vectors = xt::adapt(
+			ptr, {p_num_vectors, p_num_dimensions}, xt::no_ownership());
+	}*/
+
+	~ContextualEmbeddingVectors() {
+	}
+
+
+	inline auto unmodified(size_t p_index) const {
 		return xt::view(m_vectors, p_index, xt::all());
 	}
 
-	auto normalized(size_t p_index) const {
+	inline auto normalized(size_t p_index) const {
 		const auto v = unmodified(p_index);
 		return v / xt::linalg::norm(v);
+	}
+
+	inline float magnitude(const size_t p_index) const {
+		const auto v = unmodified(p_index);
+		return xt::linalg::norm(v);
 	}
 };
 
 typedef std::shared_ptr<ContextualEmbeddingVectors> ContextualEmbeddingVectorsRef;
+
+class ContextualEmbeddingVectorsFactory {
+public:
+	ContextualEmbeddingVectorsFactory(const std::string &p_path) {
+	}
+
+	ContextualEmbeddingVectorsRef open() {
+		return ContextualEmbeddingVectorsRef();
+	}
+};
+
+typedef std::shared_ptr<ContextualEmbeddingVectorsFactory> ContextualEmbeddingVectorsFactoryRef;
+
+class ContextualSimilarityMatrix {
+public:
+};
+
+typedef std::shared_ptr<ContextualSimilarityMatrix> ContextualSimilarityMatrixRef;
+#endif
 
 #endif // __VECTORIAN_WORD_VECTORS_H__

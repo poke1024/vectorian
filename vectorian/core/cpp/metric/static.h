@@ -4,6 +4,7 @@
 #include "metric/metric.h"
 #include "embedding/static.h"
 #include "vocabulary.h"
+#include <xtensor/xadapt.hpp>
 
 class StaticEmbeddingMetric : public Metric {
 protected:
@@ -18,6 +19,10 @@ protected:
 	xt::xtensor<float, 1> m_mag_s;
 	xt::xtensor<float, 1> m_mag_t;
 
+	void build_similarity_matrix(
+		const QueryRef &p_query,
+		const WordMetricDef &p_metric);
+
 	void compute_magnitudes(
 		const QueryVocabularyRef &p_vocabulary,
 		const Needle &p_needle) {
@@ -25,10 +30,17 @@ protected:
 		m_mag_s.resize({p_vocabulary->size()});
 		size_t offset = 0;
 		for (const auto &embedding : m_embeddings) {
-			auto &vectors = embedding->vectors();
-			const size_t size = vectors.size();
-			vectors.compute_magnitudes();
-			xt::view(m_mag_s, xt::range(offset, offset + size)) = vectors.magnitudes();
+			const auto &vectors = embedding->vectors();
+			const size_t size = embedding->size();
+
+			const auto magnitudes = vectors.attr("magnitudes").cast<py::array_t<float>>();
+			const auto r_mag = magnitudes.unchecked<1>();
+			PPK_ASSERT(static_cast<size_t>(r_mag.shape(0)) == size);
+			auto data = xt::adapt(
+				const_cast<float*>(r_mag.data(0)), {r_mag.shape(0)});
+
+			xt::view(m_mag_s, xt::range(offset, offset + size)) = data;
+
 			offset += size;
 		}
 		PPK_ASSERT(offset == p_vocabulary->size());
@@ -36,10 +48,7 @@ protected:
 		m_mag_t.resize({p_needle.size()});
 		for (size_t j = 0; j < p_needle.size(); j++) {
 			const token_t t = p_needle.token_ids()[j];
-			size_t t_rel;
-			const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
-			const auto row = t_vectors.unmodified(t_rel);
-			m_mag_t(j) = xt::linalg::norm(row);
+			m_mag_t(j) = m_mag_s(t);
 		}
 	}
 

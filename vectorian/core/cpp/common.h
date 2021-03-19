@@ -105,9 +105,6 @@ public:
 	const std::string embedding; // e.g. fasttext
 	const std::string metric; // e.g. cosine
 	const py::dict options;
-
-	inline SimilarityMatrixBuilderRef instantiate(
-		const std::vector<StaticEmbeddingRef> &p_embeddings) const;
 };
 
 py::dict to_py_array(const TokenVectorRef &p_array);

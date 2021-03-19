@@ -100,7 +100,9 @@ public:
 		}
 
 		auto bow(const int p_doc) const {
-			return xt::adapt(m_doc[p_doc].bow.data(), {m_vocabulary_size});
+			return xt::adapt(
+				m_doc[p_doc].bow.data(),
+				{m_vocabulary_size});
 		}
 
 		py::dict py_vocab_to_pos(const int p_doc) const {

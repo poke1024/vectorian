@@ -72,7 +72,7 @@ public:
 		m_max_len_t = max_len_t;
 	}
 
-	template<typename Slice>
+	template<bool Hook, typename Slice>
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
@@ -92,7 +92,7 @@ public:
 			const auto flow = m_cached_flow;
 			m_cached_flow.reset();
 
-			if (p_matcher->query()->debug_hook().has_value()) {
+			if (Hook) {
 				call_debug_hook(p_matcher->query(), p_slice, flow, m_aligner->score());
 			}
 
@@ -365,7 +365,7 @@ class WordMoversDistance {
 		}
 	}
 
-	template<typename Slice, typename Solver>
+	template<bool Hook, typename Slice, typename Solver>
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
@@ -384,7 +384,7 @@ class WordMoversDistance {
 		const float score = r.score / reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
 
-		if (p_matcher->query()->debug_hook().has_value()) {
+		if (Hook) {
 			py::gil_scoped_acquire acquire;
 			const auto callback = *p_matcher->query()->debug_hook();
 			py::dict data;
@@ -419,7 +419,7 @@ public:
 		return 0;
 	}
 
-	template<typename Slice>
+	template<bool Hook, typename Slice>
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
@@ -429,13 +429,13 @@ public:
 			p_result_set->flow_factory();
 
 		if (m_options.relaxed) {
-			return make_match(
+			return make_match<Hook>(
 				p_matcher,
 				p_slice,
 				p_result_set,
 				typename AbstractWMD<Index>::RelaxedSolver(flow_factory));
 		} else {
-			return make_match(
+			return make_match<Hook>(
 				p_matcher,
 				p_slice,
 				p_result_set,
@@ -463,7 +463,7 @@ public:
 		return 0;
 	}
 
-	template<typename Slice>
+	template<bool Hook, typename Slice>
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,

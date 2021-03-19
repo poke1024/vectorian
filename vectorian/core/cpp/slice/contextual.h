@@ -2,9 +2,7 @@
 
 template<typename VectorSimilarity>
 class ContextualEmbeddingSlice {
-	const ContextualEmbeddingVectors &m_s_vectors;
-	const ContextualEmbeddingVectors &m_t_vectors;
-	const VectorSimilarity m_vector_sim;
+	const SimilarityMatrix &m_matrix;
 	const size_t m_slice_id;
 	const TokenSpan m_s;
 	const TokenSpan m_t;
@@ -12,12 +10,12 @@ class ContextualEmbeddingSlice {
 
 public:
 	inline ContextualEmbeddingSlice(
-		const StaticEmbeddingMetric *metric,
+		const SimilarityMatrix &matrix,
 		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 
-		m_metric(metric),
+		m_matrix(matrix),
 		m_slice_id(slice_id),
 		m_s(s),
 		m_t(t) {
@@ -48,9 +46,7 @@ public:
 	}
 
 	inline float similarity(int i, int j) const {
-		return m_vector_sim(
-			m_vector_sim.vector(m_s_vectors, m_s.offset + i),
-			m_vector_sim.vector(m_t_vectors, m_t.offset + j));
+		return m_matrix(m_s.offset + i, m_t.offset + j);
 	}
 
 	inline float magnitude_s(int i) const {

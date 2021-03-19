@@ -17,29 +17,14 @@ Needle::Needle(
 
 StaticEmbedding::StaticEmbedding(
 	py::object p_embedding_factory,
-	py::list p_tokens) : Embedding(p_embedding_factory.attr("name").cast<std::string>()) {
+	py::list p_tokens) :
+
+	Embedding(p_embedding_factory.attr("name").cast<std::string>()),
+	m_size(0) {
 
 	if (p_tokens.size() > 0) {
-
-		// FIXME do this in chunks to save memory.
-		const auto data = p_embedding_factory.attr("get_embeddings")(
-			p_tokens).cast<py::array_t<float>>();
-		const auto read = xt::pyarray<float>(data);
-
-		auto &unmodified = m_embeddings.mutable_unmodified();
-
-		unmodified.resize({p_tokens.size(), read.shape(1)});
-
-		const size_t n = read.shape(0);
-		if (n != p_tokens.size()) {
-			throw std::runtime_error("embedding matrix size does not match requested token count");
-		}
-
-		for (size_t i = 0; i < n; i++) {
-			xt::view(unmodified, i, xt::all()) = xt::view(read, i, xt::all());
-		}
-
-		m_embeddings.update_normalized();
+		m_vectors = p_embedding_factory.attr("get_embeddings")(p_tokens);
+		m_size = m_vectors.attr("size").cast<size_t>();
 	}
 }
 
