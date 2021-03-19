@@ -5,45 +5,16 @@
 #include "document.h"
 #include "query.h"
 #include "metric/static.h"
+#include "slice/encoder.h"
 
-class TokenIdEncoder {
-public:
-	inline wvec_t to_embedding(const Token &p_token) const {
-		return p_token.id;
-	}
-};
-
-class TokenIdPosEncoder {
-	const size_t m_npos;
-
-public:
-	inline TokenIdPosEncoder(const size_t p_npos) : m_npos(p_npos) {
-	}
-
-	inline wvec_t to_embedding(const Token &p_token) const {
-		return p_token.id * m_npos + p_token.pos;
-	}
-};
-
-class TokenIdTagEncoder {
-	const size_t m_ntag;
-
-public:
-	inline TokenIdTagEncoder(const size_t p_ntag) : m_ntag(p_ntag) {
-	}
-
-	inline wvec_t to_embedding(const Token &p_token) const {
-		return p_token.id * m_ntag + p_token.tag;
-	}
-};
-
+template<typename Index>
 class StaticEmbeddingSlice {
 	const StaticEmbeddingMetric &m_metric;
 	const size_t m_slice_id;
 	const Token * const s_tokens;
-	const int32_t m_len_s;
+	const Index m_len_s;
 	const Token * const t_tokens;
-	const int32_t m_len_t;
+	const Index m_len_t;
 	const TokenIdEncoder m_encoder;
 
 public:
@@ -57,9 +28,9 @@ public:
 
 		m_metric(metric),
 		m_slice_id(slice_id),
-		s_tokens(s.tokens),
+		s_tokens(s.tokens + s.offset),
 		m_len_s(s.len),
-		t_tokens(t.tokens),
+		t_tokens(t.tokens + t.offset),
 		m_len_t(t.len) {
 	}
 
@@ -71,34 +42,34 @@ public:
 		return m_encoder;
 	}
 
-	inline const Token &s(int i) const {
+	inline const Token &s(Index i) const {
 		return s_tokens[i];
 	}
 
-	inline const Token &t(int i) const {
+	inline const Token &t(Index i) const {
 		return t_tokens[i];
 	}
 
-	inline int32_t len_s() const {
+	inline Index len_s() const {
 		return m_len_s;
 	}
 
-	inline int32_t len_t() const {
+	inline Index len_t() const {
 		return m_len_t;
 	}
 
-	inline float similarity(int i, int j) const {
+	inline float similarity(Index i, Index j) const {
 		const Token &s = s_tokens[i];
 		const auto &sim = m_metric.similarity();
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
-	inline float magnitude_s(int i) const {
+	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
 		return m_metric.magnitude_s(m_encoder.to_embedding(s));
 	}
 
-	inline float magnitude_t(int i) const {
+	inline float magnitude_t(Index i) const {
 		return m_metric.magnitude_t(i);
 	}
 
@@ -106,7 +77,7 @@ public:
 		m_metric.assert_has_magnitudes();
 	}
 
-	inline float max_similarity_for_t(int i) const {
+	inline float max_similarity_for_t(Index i) const {
 		return 1.0f;
 	}
 
@@ -118,7 +89,7 @@ public:
 		return false;
 	}
 
-	inline float unmodified_similarity(int i, int j) const {
+	inline float unmodified_similarity(Index i, Index j) const {
 		return similarity(i, j);
 	}
 };
@@ -336,7 +307,7 @@ public:
 
 		} else {
 
-		    const Token *s = s_span.tokens;
+		    const Token *s = s_span.tokens + s_span.offset;
 		    const auto len_s = s_span.len;
 
 		    Token *new_s = m_filtered.data();
@@ -350,7 +321,7 @@ public:
 	        }
 
 			return m_delegate.create_slice(
-				slice_id, TokenSpan{new_s, new_len_s}, t_span);
+				slice_id, TokenSpan{new_s, 0, new_len_s}, t_span);
 		}
 	}
 };

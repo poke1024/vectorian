@@ -131,8 +131,8 @@ public:
 
 	        const auto slice = m_factory.create_slice(
 	            0,
-	            TokenSpan{s_tokens + token_at, match_slice.len},
-	            TokenSpan{t_tokens->data(), static_cast<int32_t>(t_tokens->size())});
+	            TokenSpan{s_tokens, token_at, match_slice.len},
+	            TokenSpan{t_tokens->data(), 0, static_cast<int32_t>(t_tokens->size())});
 
 	        Index i = 0;
 	        for (auto &m : mapping) {

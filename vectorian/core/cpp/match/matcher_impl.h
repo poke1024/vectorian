@@ -118,8 +118,8 @@ public:
 
 			const auto slice = m_slice_factory.create_slice(
 				slice_id,
-			    TokenSpan{s_tokens + token_at, len_s},
-			    TokenSpan{t_tokens, len_t});
+			    TokenSpan{s_tokens, static_cast<int32_t>(token_at), len_s},
+			    TokenSpan{t_tokens, 0, len_t});
 
 			const MatchRef m = this->m_aligner.make_match(
 				matcher, slice, p_matches);

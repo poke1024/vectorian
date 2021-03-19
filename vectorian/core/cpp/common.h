@@ -42,6 +42,7 @@ struct Token {
 
 struct TokenSpan {
 	const Token *tokens;
+	int32_t offset;
 	int32_t len;
 };
 

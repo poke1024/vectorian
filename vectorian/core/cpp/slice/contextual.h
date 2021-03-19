@@ -1,15 +1,13 @@
+#include "slice/encoder.h"
+
 template<typename VectorSimilarity>
 class ContextualEmbeddingSlice {
 	const ContextualEmbeddingVectors &m_s_vectors;
 	const ContextualEmbeddingVectors &m_t_vectors;
 	const VectorSimilarity m_vector_sim;
 	const size_t m_slice_id;
-	const Token * const s_tokens;
-	const int32_t m_offset_s;
-	const int32_t m_len_s;
-	const Token * const t_tokens;
-	const int32_t m_offset_t;
-	const int32_t m_len_t;
+	const TokenSpan m_s;
+	const TokenSpan m_t;
 	const TokenIdEncoder m_encoder;
 
 public:
@@ -21,10 +19,8 @@ public:
 
 		m_metric(metric),
 		m_slice_id(slice_id),
-		s_tokens(s.tokens),
-		m_len_s(s.len),
-		t_tokens(t.tokens),
-		m_len_t(t.len) {
+		m_s(s),
+		m_t(t) {
 	}
 
 	size_t id() const {
@@ -36,33 +32,33 @@ public:
 	}
 
 	inline const Token &s(int i) const {
-		return s_tokens[i];
+		return m_s.tokens[m_s.offset + i];
 	}
 
 	inline const Token &t(int i) const {
-		return t_tokens[i];
+		return m_t.tokens[m_t.offset + i];
 	}
 
 	inline int32_t len_s() const {
-		return m_len_s;
+		return m_s.len;
 	}
 
 	inline int32_t len_t() const {
-		return m_len_t;
+		return m_t.len;
 	}
 
 	inline float similarity(int i, int j) const {
 		return m_vector_sim(
-			m_vector_sim.vector(m_s_vectors, m_offset_s + i),
-			m_vector_sim.vector(m_t_vectors, m_offset_t + j));
+			m_vector_sim.vector(m_s_vectors, m_s.offset + i),
+			m_vector_sim.vector(m_t_vectors, m_t.offset + j));
 	}
 
 	inline float magnitude_s(int i) const {
-		return m_s_vectors.magnitude(m_offset_s + i);
+		return m_s_vectors.magnitude(m_s.offset + i);
 	}
 
 	inline float magnitude_t(int i) const {
-		return m_t_vectors.magnitude(m_offset_t + i);
+		return m_t_vectors.magnitude(m_t.offset + i);
 	}
 
 	inline void assert_has_magnitudes() const {
@@ -74,7 +70,7 @@ public:
 	}
 
 	inline float max_sum_of_similarities() const {
-		return m_len_t;
+		return m_t.len;
 	}
 
 	inline bool similarity_depends_on_pos() const {

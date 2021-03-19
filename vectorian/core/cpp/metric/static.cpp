@@ -119,7 +119,7 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return StaticEmbeddingSlice(*metric.get(), slice_id, s, t);
+			        return StaticEmbeddingSlice<int16_t>(*metric.get(), slice_id, s, t);
 				});
 
 				return create_alignment_matcher<int16_t>(
@@ -155,7 +155,7 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 					const TokenSpan &t) {
 
 					return TagWeightedSlice(
-						StaticEmbeddingSlice(*metric.get(), slice_id, s, t),
+						StaticEmbeddingSlice<int16_t>(*metric.get(), slice_id, s, t),
 						options);
 				});
 

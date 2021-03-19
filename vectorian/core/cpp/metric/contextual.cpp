@@ -32,6 +32,12 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 				ContextualEmbeddingVectorsRef t_vectors = p_query->get_embedding_vectors(m_embedding->name());
 				ContextualEmbeddingVectorsRef s_vectors = p_document->get_embedding_vectors(m_embedding->name());
 
+				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
+				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
+
+				xt::xtensor<float, 2> sim_matrix;
+				sim_matrix.resize({s_vectors->size(), t_vectors->size()});
+
 				/*const auto cb = m_embedding->compute_embedding_callback();
 				py:array_t embeddings = cb(p_document->py_doc()).cast<py::array_t>();
 				PPK_ASSERT(embeddings.shape(0) == p_document->n_tokens());*/
@@ -41,7 +47,7 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return ContextualEmbeddingSlice(s_vectors.get(), t_vectors.get(), slice_id, s, t);
+			        return ContextualEmbeddingSlice(sim_matrix, slice_id, s, t);
 				});
 
 				return create_alignment_matcher<int16_t>(
