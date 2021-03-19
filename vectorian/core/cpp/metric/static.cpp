@@ -35,7 +35,7 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 	}
 
 	const auto py_embeddings = py::module_::import("vectorian.embeddings");
-	auto needle_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
+	const auto needle_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
 
 	size_t offset = 0;
 	for (const auto &embedding : m_embeddings) {
@@ -52,7 +52,7 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 		// FIXME.
 		for (size_t i = 0; i < size; i++) {
 			for (size_t j = 0; j < needle_size; j++) {
-				m_similarity(i, j) = r_sim(i, j);
+				m_similarity(offset + i, j) = r_sim(i, j);
 			}
 		}
 
@@ -72,6 +72,8 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 			m_similarity(k, j) = 1.0f;
 		}
 	}
+
+	printf("done.\n");
 }
 
 void StaticEmbeddingMetric::initialize(

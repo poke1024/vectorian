@@ -431,5 +431,4 @@ class TransformerEmbedding(ContextualEmbedding):
 
 def compute_cosine(a, b):
 	# temporary hack
-	print("hello.", a.shape, b.shape)
 	return np.linalg.multi_dot([a.normalized, b.normalized.T])

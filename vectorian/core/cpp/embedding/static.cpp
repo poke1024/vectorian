@@ -22,10 +22,8 @@ StaticEmbedding::StaticEmbedding(
 	Embedding(p_embedding_factory.attr("name").cast<std::string>()),
 	m_size(0) {
 
-	if (p_tokens.size() > 0) {
-		m_vectors = p_embedding_factory.attr("get_embeddings")(p_tokens);
-		m_size = m_vectors.attr("size").cast<size_t>();
-	}
+	m_vectors = p_embedding_factory.attr("get_embeddings")(p_tokens);
+	m_size = m_vectors.attr("size").cast<size_t>();
 }
 
 MetricRef StaticEmbedding::create_metric(
