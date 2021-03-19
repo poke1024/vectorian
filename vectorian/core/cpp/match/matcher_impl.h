@@ -125,6 +125,7 @@ public:
 				matcher, slice, p_matches);
 
 			if (measure_time) {
+				py::gil_scoped_acquire acquire;
 				const std::chrono::steady_clock::time_point time_end =
 					std::chrono::steady_clock::now();
 				const auto delta_time = std::chrono::duration_cast<std::chrono::microseconds>(
