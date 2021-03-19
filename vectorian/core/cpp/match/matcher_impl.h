@@ -98,7 +98,7 @@ public:
 		}
 
 		const MatcherRef matcher = this->shared_from_this();
-		const bool measure_time = p_query->debug_hook().has_value();
+		const bool measure_time = this->m_query->debug_hook().has_value();
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
@@ -129,6 +129,7 @@ public:
 					std::chrono::steady_clock::now();
 				const auto delta_time = std::chrono::duration_cast<std::chrono::microseconds>(
 					time_end - time_begin).count();
+				const auto callback = *this->m_query->debug_hook();
 				callback("document/match_time", delta_time);
 			}
 

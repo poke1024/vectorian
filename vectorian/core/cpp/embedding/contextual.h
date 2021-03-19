@@ -17,14 +17,6 @@ public:
 		m_compute_embedding_callback(p_compute) {
 	}
 
-	virtual void update_map(
-		std::vector<token_t> &p_map,
-		const std::vector<std::string> &p_tokens,
-		const size_t p_offset) const {
-
-		// nothing.
-	}
-
 	virtual MetricRef create_metric(
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric,

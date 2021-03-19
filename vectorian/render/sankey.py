@@ -12,14 +12,15 @@ hv.extension('bokeh')
 
 
 class FlowRenderer:
-	def __init__(self, width=400, height_per_node=60, node_padding=80, cmap='Pastel1'):
+	def __init__(self, cutoff=0, width=400, height_per_node=60, node_padding=80, cmap='Pastel1'):
 		self._flows = {}
+		self._cutoff = cutoff
 		self._width = width
 		self._height_per_node = height_per_node
 		self._node_padding = node_padding
 		self._cmap = cmap
 
-	def _flow_to_sankey(self, match, flow, cutoff=0.1):
+	def _flow_to_sankey(self, match, flow):
 		nodes = []
 		node_mapping = collections.defaultdict(dict)
 		spans = {'s': match.doc_span, 't': match.query}
@@ -33,7 +34,7 @@ class FlowRenderer:
 			nodes.append(' %s [%d] ' % (spans[name][i].text, i))
 			return idx[i]
 
-		edges = [(token('t', t), token('s', s), f) for t, s, f in flow_edges(flow, cutoff)]
+		edges = [(token('t', t), token('s', s), f) for t, s, f in flow_edges(flow, self._cutoff)]
 
 		if len(edges) < 1:
 			logging.warning("no edges found")
