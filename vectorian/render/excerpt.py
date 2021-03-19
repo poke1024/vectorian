@@ -53,7 +53,8 @@ class ExcerptRenderer:
 					with tag('span', style='display:table-cell;'):
 						self.add_light_tag(doc, edge['t'])
 					text(" ")
-					with tag('span', style=f'display:table-cell; opacity:{edge["flow"]};'):
+					opacity = 0.5 + 0.5 * edge["flow"]
+					with tag('span', style=f'display:table-cell; opacity:{opacity};'):
 						similarity = 1 - edge["distance"]
 						with tag('span', klass=score_color_class(similarity)):
 							text("%d%%" % int(math.floor(100 * similarity)))

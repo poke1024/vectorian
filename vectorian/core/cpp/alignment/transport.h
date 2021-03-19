@@ -1,6 +1,10 @@
 #ifndef __VECTORIAN_TRANSPORT_H__
 #define __VECTORIAN_TRANSPORT_H__
 
+enum EMDBackend {
+	pyemd
+};
+
 #if 1
 
 #pragma clang diagnostic push
@@ -35,8 +39,8 @@ class OptimalTransport {
 	emd_hat_gd_metric<scalar_t, WITHOUT_EXTRA_MASS_FLOW> m_emd;
 
 public:
-	void resize(const size_t max_n1, const size_t max_n2) {
-		m_G_storage.resize({max_n1, max_n2});
+	void resize(const size_t size) {
+		m_G_storage.resize({size, size});
 	}
 
 	template<typename Matrix>
@@ -60,15 +64,20 @@ public:
 		const Matrix &M,
 		const float extra_mass_penalty=-1.0f) {
 
+		// histogram lengths must be equal (N) and
+		// distance matrix must be quadratic N x N
+		PPK_ASSERT(a.size() == b.size());
+		PPK_ASSERT(M.shape(0) == M.shape(1));
+		PPK_ASSERT(M.shape(0) == a.size());
+
 		PPK_ASSERT(a.size() <= m_G_storage.shape(0));
 		PPK_ASSERT(b.size() <= m_G_storage.shape(1));
 
 		std::vector<std::vector<scalar_t>> C;
-		C.reserve(M.shape(0));
+		C.resize(M.shape(0));
 		for (size_t i = 0; i < M.shape(0); i++) {
-			C.emplace_back(std::vector<scalar_t>());
-			C.back().resize(M.shape(1));
-			auto &row = C.back();
+			auto &row = C[i];
+			row.resize(M.shape(1));
 			for (size_t j = 0; j < M.shape(1); j++) {
 				row[j] = M(i, j);
 			}
@@ -76,15 +85,20 @@ public:
 
 		const std::vector<scalar_t> P(a.begin(), a.end());
 		const std::vector<scalar_t> Q(b.begin(), b.end());
+
+		const size_t problem_size = P.size();
+		PPK_ASSERT(problem_size == Q.size());
+
 		std::vector<std::vector<scalar_t>> flow_tmp(
-			P.size(), std::vector<scalar_t>(P.size()));
+			problem_size, std::vector<scalar_t>(problem_size));
 		const scalar_t emd = m_emd(
 			P, Q, C, extra_mass_penalty, &flow_tmp);
 
 		PPK_ASSERT(P.size() <= m_G_storage.shape(0));
 		PPK_ASSERT(Q.size() <= m_G_storage.shape(1));
 		auto flow = xt::view(
-			m_G_storage, xt::range(0, P.size()), xt::range(0, Q.size()));
+			m_G_storage, xt::range(0, problem_size), xt::range(0, problem_size));
+
 		size_t i = 0;
 		for (const auto &row : flow_tmp) {
 			size_t j = 0;

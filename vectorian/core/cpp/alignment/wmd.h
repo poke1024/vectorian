@@ -9,6 +9,7 @@ struct WMDOptions {
 	bool normalize_bow;
 	bool symmetric;
 	bool injective;
+	EMDBackend emd_backend;
 	float extra_mass_penalty;
 };
 
@@ -137,7 +138,7 @@ public:
 			m_distance_matrix.resize({size, size});
 			m_candidates.reserve(size);
 
-			m_ot.resize(size, size);
+			m_ot.resize(size);
 			m_flow_dist_result.resize({max_len_t, max_len_s, 2});
 		}
 

@@ -98,6 +98,7 @@ public:
 		}
 
 		const MatcherRef matcher = this->shared_from_this();
+		const bool measure_time = p_query->debug_hook().has_value();
 
 		for (size_t slice_id = 0;
 			slice_id < n_slices && !this->m_query->aborted();
@@ -110,6 +111,11 @@ public:
 				continue;
 			}
 
+			std::chrono::steady_clock::time_point time_begin;
+			if (measure_time) {
+				time_begin = std::chrono::steady_clock::now();
+			}
+
 			const auto slice = m_slice_factory.create_slice(
 				slice_id,
 			    TokenSpan{s_tokens + token_at, len_s},
@@ -117,6 +123,14 @@ public:
 
 			const MatchRef m = this->m_aligner.make_match(
 				matcher, slice, p_matches);
+
+			if (measure_time) {
+				const std::chrono::steady_clock::time_point time_end =
+					std::chrono::steady_clock::now();
+				const auto delta_time = std::chrono::duration_cast<std::chrono::microseconds>(
+					time_end - time_begin).count();
+				callback("document/match_time", delta_time);
+			}
 
 			token_at += spans->safe_len(
 				slice_id, slice_strategy.window_step);

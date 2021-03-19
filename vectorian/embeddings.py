@@ -192,7 +192,7 @@ class GensimKeyedVectors(StaticEmbedding):
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens)):
+			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self._wv.word_vec(t)
 			return data
 
@@ -249,7 +249,7 @@ class PretrainedFastText(StaticEmbedding):
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens)):
+			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self._ft.get_word_vector(t)
 			return data
 
@@ -336,7 +336,7 @@ class StackedEmbedding:
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens)):
+			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
 				data[i, :] = self.word_vec(t)
 			return data
 
