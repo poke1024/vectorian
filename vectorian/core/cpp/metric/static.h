@@ -26,9 +26,9 @@ protected:
 		size_t offset = 0;
 		for (const auto &embedding : m_embeddings) {
 			auto &vectors = embedding->vectors();
-			const size_t size = vectors.unmodified.shape(0);
+			const size_t size = vectors.size();
 			vectors.compute_magnitudes();
-			xt::view(m_mag_s, xt::range(offset, offset + size)) = vectors.magnitudes;
+			xt::view(m_mag_s, xt::range(offset, offset + size)) = vectors.magnitudes();
 			offset += size;
 		}
 		PPK_ASSERT(offset == p_vocabulary->size());
@@ -38,7 +38,7 @@ protected:
 			const token_t t = p_needle.token_ids()[j];
 			size_t t_rel;
 			const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
-			const auto row = xt::view(t_vectors.unmodified, t_rel, xt::all());
+			const auto row = t_vectors.unmodified(t_rel);
 			m_mag_t(j) = xt::linalg::norm(row);
 		}
 	}

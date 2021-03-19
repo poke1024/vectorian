@@ -69,14 +69,14 @@ public:
 };
 
 class StaticEmbedding : public Embedding {
-	WordVectors m_embeddings;
+	StaticEmbeddingVectors m_embeddings;
 
 public:
 	StaticEmbedding(
 		py::object p_embedding_factory,
 		py::list p_tokens);
 
-	inline WordVectors &vectors() {
+	inline StaticEmbeddingVectors &vectors() {
 		return m_embeddings;
 	}
 
@@ -152,7 +152,7 @@ public:
 	}*/
 
 	size_t n_tokens() const {
-		return m_embeddings.unmodified.shape(0);
+		return m_embeddings.size();
 	}
 
 	/*py::list measures() const {
@@ -166,7 +166,7 @@ public:
 
 typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;
 
-inline const WordVectors &pick_vectors(
+inline const StaticEmbeddingVectors &pick_vectors(
 	const std::vector<StaticEmbeddingRef> &p_embeddings,
 	const size_t p_index,
 	size_t &r_index) {
@@ -174,7 +174,7 @@ inline const WordVectors &pick_vectors(
 	size_t i = p_index;
 	for (const auto &embedding : p_embeddings) {
 		const auto &vectors = embedding->vectors();
-		const size_t size = vectors.unmodified.shape(0);
+		const size_t size = vectors.size();
 		if (i < size) {
 			r_index = i;
 			return vectors;
@@ -185,7 +185,7 @@ inline const WordVectors &pick_vectors(
 	std::ostringstream err;
 	err << "pick_vectors: " << p_index << " > ";
 	for (const auto &embedding : p_embeddings) {
-		err << embedding->vectors().unmodified.shape(0);
+		err << embedding->vectors().size();
 		if (embedding != p_embeddings.back()) {
 			err << " + ";
 		}

@@ -22,7 +22,7 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 	for (const auto &embedding : m_embeddings) {
 		const auto &vectors = embedding->vectors();
 
-		const size_t size = vectors.unmodified.shape(0);
+		const size_t size = vectors.size();
 		PPK_ASSERT(offset + size <= vocab_size);
 
 		for (size_t j = 0; j < needle_size; j++) { // for each token in needle
@@ -33,9 +33,10 @@ void SimilarityMatrixBuilder::build_similarity_matrix(
 			fill_matrix(vectors, offset, size, t_vectors, t_rel, j, r_matrix);
 
 			if (p_query->debug_hook().has_value()) {
+				const auto vec_data = vectors.to_py();
 				py::dict data;
-				data["s"] = xt::pyarray<float>(vectors.normalized);
-				data["t"] = xt::pyarray<float>(xt::view(t_vectors.normalized, t_rel, xt::all()));
+				data["s"] = vec_data["normalized"];
+				data["t"] = xt::pyarray<float>(t_vectors.normalized(t_rel));
 				data["similarity"] = xt::pyarray<float>(
 					xt::view(r_matrix, xt::range(offset, offset + size), j));
 				(*p_query->debug_hook())("fill_matrix", data);

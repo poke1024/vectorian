@@ -1,6 +1,8 @@
+template<typename VectorSimilarity>
 class ContextualEmbeddingSlice {
 	const ContextualEmbeddingVectors &m_s_vectors;
 	const ContextualEmbeddingVectors &m_t_vectors;
+	const VectorSimilarity m_vector_sim;
 	const size_t m_slice_id;
 	const Token * const s_tokens;
 	const int32_t m_offset_s;
@@ -50,22 +52,17 @@ public:
 	}
 
 	inline float similarity(int i, int j) const {
-		m_s_vectors.get_vector(m_offset_s + i)
-		m_t_vectors.get_vector(m_offset_t + j)
-
-
-		const Token &s = s_tokens[i];
-		const auto &sim = m_metric->similarity();
-		return sim(m_encoder.to_embedding(s), j);
+		return m_vector_sim(
+			m_vector_sim.vector(m_s_vectors, m_offset_s + i),
+			m_vector_sim.vector(m_t_vectors, m_offset_t + j));
 	}
 
 	inline float magnitude_s(int i) const {
-		const Token &s = s_tokens[i];
-		return m_metric->magnitude_s(m_encoder.to_embedding(s));
+		return m_s_vectors.magnitude(m_offset_s + i);
 	}
 
 	inline float magnitude_t(int i) const {
-		return m_metric->magnitude_t(i);
+		return m_t_vectors.magnitude(m_offset_t + i);
 	}
 
 	inline void assert_has_magnitudes() const {

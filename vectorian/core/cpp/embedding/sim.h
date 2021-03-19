@@ -6,9 +6,6 @@
 #include "embedding/static.h"
 #include <iostream>
 
-//class StaticEmbedding;
-//typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;
-
 class Needle;
 
 class SimilarityMatrixBuilder {
@@ -16,10 +13,10 @@ protected:
 	const std::vector<StaticEmbeddingRef> m_embeddings;
 
 	virtual void fill_matrix(
-		const WordVectors &p_s_vectors,
+		const StaticEmbeddingVectors &p_s_vectors,
 		const size_t p_offset,
 		const size_t p_size,
-		const WordVectors &p_t_vectors,
+		const StaticEmbeddingVectors &p_t_vectors,
 		const size_t p_t_index,
 		const size_t p_column,
 		xt::xtensor<float, 2> &r_matrix) const = 0;
@@ -42,33 +39,34 @@ public:
 
 typedef std::shared_ptr<SimilarityMatrixBuilder> SimilarityMatrixBuilderRef;
 
-template<typename Distance>
+template<typename Similarity>
 class BuiltinSimilarityMatrixBuilder : public SimilarityMatrixBuilder {
 protected:
-	Distance m_distance;
+	Similarity m_similarity;
 
 	virtual void fill_matrix(
-		const WordVectors &p_s_vectors,
+		const StaticEmbeddingVectors &p_s_vectors,
 		const size_t p_offset,
 		const size_t p_size,
-		const WordVectors &p_t_vectors,
+		const StaticEmbeddingVectors &p_t_vectors,
 		const size_t p_t_index,
 		const size_t p_column,
 		xt::xtensor<float, 2> &r_matrix) const {
 
 		for (size_t i = 0; i < p_size; i++) { // for each token in vocabulary
-			r_matrix(i + p_offset, p_column) = m_distance(
-				p_s_vectors, i, p_t_vectors, p_t_index);
+			r_matrix(i + p_offset, p_column) = m_similarity(
+				m_similarity.vector(p_s_vectors, i),
+				m_similarity.vector(p_t_vectors, p_t_index));
 		}
 	}
 
 public:
 	BuiltinSimilarityMatrixBuilder(
 		const std::vector<StaticEmbeddingRef> &p_embeddings,
-		const Distance p_distance = Distance()) :
+		const Similarity p_similarity = Similarity()) :
 
 		SimilarityMatrixBuilder(p_embeddings),
-		m_distance(p_distance) {
+		m_similarity(p_similarity) {
 	}
 };
 
@@ -154,41 +152,35 @@ public:
 };*/
 
 struct Cosine {
-	/*template<typename WordVectors, typename Selector>
-	inline auto rows(
-		const WordVectors &p_vs,
-		const Selector p_s) const {
-		return xt::view(p_vs.normalized, p_s, xt::all());
-	}*/
+	template<typename EmbeddingVectors>
+	inline auto vector(const EmbeddingVectors &p_vectors, const size_t p_index) const {
+		return p_vectors.normalized(p_index);
+	}
 
-	template<typename WordVectors>
+	template<typename V>
 	inline float operator()(
-		const WordVectors &p_vs,
-		const token_t p_s,
-		const WordVectors &p_vt,
-		const token_t p_t) const {
+		const V &p_s,
+		const V &p_t) const {
 
-		const auto s = xt::view(p_vs.normalized, p_s, xt::all());
-		const auto t = xt::view(p_vt.normalized, p_t, xt::all());
-		return xt::linalg::dot(s, t)();
+		return xt::linalg::dot(p_s, p_t)();
 	}
 };
 
 struct ZhuCosine {
 	// Zhu et al.
 
-	template<typename WordVectors>
+	template<typename EmbeddingVectors>
+	inline auto vector(const EmbeddingVectors &p_vectors, const size_t p_index) const {
+		return p_vectors.unmodified(p_index);
+	}
+
+	template<typename V>
 	inline float operator()(
-		const WordVectors &p_vs,
-		const token_t p_s,
-		const WordVectors &p_vt,
-		const token_t p_t) const {
+		const V &p_s,
+		const V &p_t) const {
 
-		const auto s = xt::view(p_vs.unmodified, p_s, xt::all());
-		const auto t = xt::view(p_vt.unmodified, p_t, xt::all());
-
-		const float num = xt::sum(xt::sqrt(s * t))();
-		const float denom = xt::sum(s)() * xt::sum(t)();
+		const float num = xt::sum(xt::sqrt(p_s * p_t))();
+		const float denom = xt::sum(p_s)() * xt::sum(p_t)();
 		return num / denom;
 
 	}
@@ -200,18 +192,18 @@ struct SohangirCosine {
 	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
 	*/
 
-	template<typename WordVectors>
+	template<typename EmbeddingVectors>
+	inline auto vector(const EmbeddingVectors &p_vectors, const size_t p_index) const {
+		return p_vectors.unmodified(p_index);
+	}
+
+	template<typename V>
 	inline float operator()(
-		const WordVectors &p_vs,
-		const token_t p_s,
-		const WordVectors &p_vt,
-		const token_t p_t) const {
+		const V &p_s,
+		const V &p_t) const {
 
-		const auto s = xt::view(p_vs.unmodified, p_s, xt::all());
-		const auto t = xt::view(p_vt.unmodified, p_t, xt::all());
-
-		const float num = xt::sum(xt::sqrt(s * t))();
-		const float denom = std::sqrt(xt::sum(s)()) * std::sqrt(xt::sum(t)());
+		const float num = xt::sum(xt::sqrt(p_s * p_t))();
+		const float denom = std::sqrt(xt::sum(p_s)()) * std::sqrt(xt::sum(p_t)());
 		return num / denom;
 	}
 };
@@ -223,16 +215,17 @@ struct PNorm {
 	inline PNorm(float p = 2.0f, float scale = 1.0f) : m_p(p), m_distance_scale(scale) {
 	}
 
-	template<typename WordVectors>
-	inline float operator()(
-		const WordVectors &p_vs,
-		const token_t p_s,
-		const WordVectors &p_vt,
-		const token_t p_t) const {
+	template<typename EmbeddingVectors>
+	inline auto vector(const EmbeddingVectors &p_vectors, const size_t p_index) const {
+		return p_vectors.unmodified(p_index);
+	}
 
-		const auto s = xt::view(p_vs.unmodified, p_s, xt::all());
-		const auto t = xt::view(p_vt.unmodified, p_t, xt::all());
-		const float d = xt::sum(xt::pow(xt::abs(s - t), m_p))();
+	template<typename V>
+	inline float operator()(
+		const V &p_s,
+		const V &p_t) const {
+
+		const float d = xt::sum(xt::pow(xt::abs(p_s - p_t), m_p))();
 		return std::max(0.0f, 1.0f - std::pow(d, 1.0f / m_p) * m_distance_scale);
 	}
 };
@@ -253,7 +246,7 @@ inline SimilarityMatrixBuilderRef WordMetricDef::instantiate(
 				options["scale"].cast<float>()));
 
 	/*} else if (metric == "custom") {
-		return std::make_shared<CustomSimilarityMatrixBuilder<WordVectors>>(
+		return std::make_shared<CustomSimilarityMatrixBuilder<StaticEmbeddingVectors>>(
 			p_embeddings, options["fn"]);
 	*/
 	} else {
