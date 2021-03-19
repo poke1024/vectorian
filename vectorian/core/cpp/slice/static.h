@@ -38,7 +38,7 @@ public:
 };
 
 class StaticEmbeddingSlice {
-	const StaticEmbeddingMetric *m_metric;
+	const StaticEmbeddingMetric &m_metric;
 	const size_t m_slice_id;
 	const Token * const s_tokens;
 	const int32_t m_len_s;
@@ -50,7 +50,7 @@ public:
 	typedef TokenIdEncoder Encoder;
 
 	inline StaticEmbeddingSlice(
-		const StaticEmbeddingMetric *metric,
+		const StaticEmbeddingMetric &metric,
 		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
@@ -89,21 +89,21 @@ public:
 
 	inline float similarity(int i, int j) const {
 		const Token &s = s_tokens[i];
-		const auto &sim = m_metric->similarity();
+		const auto &sim = m_metric.similarity();
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
 	inline float magnitude_s(int i) const {
 		const Token &s = s_tokens[i];
-		return m_metric->magnitude_s(m_encoder.to_embedding(s));
+		return m_metric.magnitude_s(m_encoder.to_embedding(s));
 	}
 
 	inline float magnitude_t(int i) const {
-		return m_metric->magnitude_t(i);
+		return m_metric.magnitude_t(i);
 	}
 
 	inline void assert_has_magnitudes() const {
-		m_metric->assert_has_magnitudes();
+		m_metric.assert_has_magnitudes();
 	}
 
 	inline float max_similarity_for_t(int i) const {

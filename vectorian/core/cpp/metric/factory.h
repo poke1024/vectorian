@@ -12,7 +12,7 @@ MatcherRef make_matcher(
 }
 
 template<typename MakeSlice>
-class FactoryGenerator {
+class SliceFactoryFactory {
 	const MakeSlice m_make_slice;
 
 public:
@@ -22,7 +22,7 @@ public:
 		const TokenSpan&,
 		const TokenSpan&>::type Slice;
 
-	FactoryGenerator(const MakeSlice &make_slice) :
+	SliceFactoryFactory(const MakeSlice &make_slice) :
 		m_make_slice(make_slice) {
 	}
 

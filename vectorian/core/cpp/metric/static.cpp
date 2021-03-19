@@ -113,20 +113,18 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 		return MatcherFactory::create(
 			matcher_options,
 			[p_query, metric] (const DocumentRef &p_document, const auto &p_matcher_options) {
-				const auto make_fast_slice = [metric] (
+
+				const SliceFactoryFactory gen_slices([metric] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return StaticEmbeddingSlice(metric.get(), slice_id, s, t);
-				};
-
-				const FactoryGenerator gen(make_fast_slice);
-				const auto &token_filter = p_query->token_filter();
+			        return StaticEmbeddingSlice(*metric.get(), slice_id, s, t);
+				});
 
 				return create_alignment_matcher<int16_t>(
 					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
-					gen.create_filtered(p_query, p_document, token_filter));
+					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
@@ -151,22 +149,19 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 			matcher_options,
 			[p_query, metric, options] (const DocumentRef &p_document, const auto &p_matcher_options) {
 
-				const auto make_tag_weighted_slice = [metric, options] (
+				const SliceFactoryFactory gen_slices([metric, options] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
 					return TagWeightedSlice(
-						StaticEmbeddingSlice(metric.get(), slice_id, s, t),
+						StaticEmbeddingSlice(*metric.get(), slice_id, s, t),
 						options);
-				};
-
-				const FactoryGenerator gen(make_tag_weighted_slice);
-				const auto &token_filter = p_query->token_filter();
+				});
 
 				return create_alignment_matcher<int16_t>(
 					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
-					gen.create_filtered(p_query, p_document, token_filter));
+					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
 
 	} else {

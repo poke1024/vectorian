@@ -8,10 +8,6 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 
 	py::gil_scoped_acquire acquire;
 
-	/*const auto cb = m_embedding->compute_embedding_callback();
-	py:array_t embeddings = cb(p_document->py_doc()).cast<py::array_t>();
-	PPK_ASSERT(embeddings.shape(0) == p_document->n_tokens());*/
-
 	// embeddings is a numpy array that can either be dynamically
 	// computed or loaded via a cache (loaded via numpy.memmap).
 
@@ -20,23 +16,38 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 
 	const std::string sentence_metric_kind =
 		m_options["metric"].cast<py::str>();
-	//const auto &token_filter = p_query->token_filter();
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
 #if 0
-		const auto make_contextual_slice = [metric, embeddings] (
-			const TokenSpan &s,
-			const TokenSpan &t) {
+		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
+		if (matcher_options.needs_magnitudes) {
+			m_needs_magnitudes = true;
+		}
 
-	        return ContextualEmbeddingSlice(metric, embeddings, s, t);
-		};
+		return MatcherFactory::create(
+			matcher_options,
+			[p_query, metric] (const DocumentRef &p_document, const auto &p_matcher_options) {
 
-		const FactoryGenerator gen(make_contextual_slice);
+				ContextualEmbeddingVectorsRef t_vectors = p_query->get_embedding_vectors(m_embedding->name());
+				ContextualEmbeddingVectorsRef s_vectors = p_document->get_embedding_vectors(m_embedding->name());
 
-		return create_alignment_matcher(
-			p_query, p_document, metric, metric->alignment_def(),
-			gen.create_filtered(p_query, p_document, token_filter));
+				/*const auto cb = m_embedding->compute_embedding_callback();
+				py:array_t embeddings = cb(p_document->py_doc()).cast<py::array_t>();
+				PPK_ASSERT(embeddings.shape(0) == p_document->n_tokens());*/
+
+				const SliceFactoryFactory gen_slices([t_vectors, s_vectors] (
+					const size_t slice_id,
+					const TokenSpan &s,
+					const TokenSpan &t) {
+
+			        return ContextualEmbeddingSlice(s_vectors.get(), t_vectors.get(), slice_id, s, t);
+				});
+
+				return create_alignment_matcher<int16_t>(
+					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
+					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
+			});
 #endif
 
 	} /*else if (sentence_metric_kind == "alignment-tag-weighted") {
@@ -61,7 +72,7 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 				options);
 		};
 
-		const FactoryGenerator gen(make_tag_weighted_slice);
+		const SliceFactoryFactory gen(make_tag_weighted_slice);
 
 		return create_alignment_matcher(
 			p_query, p_document, metric, metric->alignment_def(),
