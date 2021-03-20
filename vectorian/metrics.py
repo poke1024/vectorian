@@ -106,22 +106,18 @@ class MixedTokenSimilarityMeasure(AbstractTokenSimilarityMeasure):
 
 	@property
 	def is_interpolator(self):
-		print("??1", flush=True)
 		return True
 
 	@property
 	def operands(self):
-		print("??2", flush=True)
 		return self._metrics
 
 	def __call__(self, operands, out):
-		print("??3", flush=True)
 		for k in out.keys():
 			data = [x[k] for x in operands]
 			avg = np.average(data, axis=0, weights=self._weights)
 			assert avg.shape == out[k].shape
 			out[k][:] = avg
-		print("??4", out, flush=True)
 
 	@property
 	def name(self):

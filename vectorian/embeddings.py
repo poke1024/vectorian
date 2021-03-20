@@ -147,7 +147,6 @@ class StackedVectors:
 		return [s.magnitudes[i] for s, i in zip(self._sources, self._indices)]
 
 
-
 class CachedWordEmbedding(StaticEmbedding):
 	class Instance:
 		def __init__(self, name, tokens, vectors):

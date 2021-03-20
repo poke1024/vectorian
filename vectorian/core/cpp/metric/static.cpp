@@ -251,7 +251,6 @@ void StaticEmbeddingMetricInterpolator::initialize(
 		PPK_ASSERT(operand->similarity().shape(0) == vocab_size);
 		PPK_ASSERT(operand->similarity().shape(1) == needle_size);
 		if (operand->magnitudes().shape(0) > 0) {
-			std::cout << "??xx " << operand->magnitudes().shape(0) << " != " << vocab_size << "\n";
 			data["magnitudes"] = operand->magnitudes();
 			PPK_ASSERT(operand->magnitudes().shape(0) == vocab_size);
 			has_magnitudes = true;
