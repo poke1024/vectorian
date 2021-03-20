@@ -26,7 +26,7 @@ class CosineMetric(VectorSpaceMetric):
 		return "cosine"
 
 
-class ZhuCosineMetric(VectorSpaceMetric):
+class SqrtCosineMetric(VectorSpaceMetric):
 	def __call__(self, a, b, out):
 		'''
 		const float num = xt::sum(xt::sqrt(p_s * p_t))();
@@ -39,7 +39,7 @@ class ZhuCosineMetric(VectorSpaceMetric):
 		return "sqrt-cosine"
 
 
-class SohangirCosineMetric(VectorSpaceMetric):
+class ImprovedSqrtCosineMetric(VectorSpaceMetric):
 	"""
 	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”
 	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
