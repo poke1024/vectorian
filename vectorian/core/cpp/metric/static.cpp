@@ -14,7 +14,7 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 
 	const size_t vocab_size = p_vocabulary->size();
 	const size_t needle_size = static_cast<size_t>(needle.size());
-	m_similarity.resize({vocab_size, needle_size});
+	m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
 
 	const auto &needle_tokens = needle.token_ids();
 	py::list sources;
@@ -37,18 +37,10 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 		const auto &vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
-		const auto sim = p_metric.vector_metric(
-			vectors, needle_vectors).cast<py::array_t<float>>();
-		const auto r_sim = sim.unchecked<2>();
-		PPK_ASSERT(static_cast<size_t>(r_sim.shape(0)) == size);
-		PPK_ASSERT(static_cast<size_t>(r_sim.shape(1)) == m_similarity.shape(1));
-
-		// FIXME.
-		for (size_t i = 0; i < size; i++) {
-			for (size_t j = 0; j < needle_size; j++) {
-				m_similarity(offset + i, j) = r_sim(i, j);
-			}
-		}
+		p_metric.vector_metric(
+			vectors,
+			needle_vectors,
+			xt::strided_view(m_similarity, {xt::range(offset, offset + size), xt::all()}));
 
 		PPK_ASSERT(offset + size <= vocab_size);
 
@@ -105,7 +97,7 @@ void StaticEmbeddingMetric::initialize(
 		});
 
 		py::dict data;
-		data["matrix"] = xt::pyarray<float>(m_similarity);
+		data["matrix"] = m_similarity;
 		data["rows"] = gen_rows;
 		data["columns"] = gen_columns;
 

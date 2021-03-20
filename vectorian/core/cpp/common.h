@@ -8,6 +8,7 @@
 #include <xtensor/xnorm.hpp>
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor-python/pyarray.hpp>
+#include <xtensor-python/pytensor.hpp>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>

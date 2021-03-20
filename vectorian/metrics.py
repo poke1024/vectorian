@@ -5,7 +5,7 @@ from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
 class VectorSpaceMetric:
-	def __call__(self, a, b):
+	def __call__(self, a, b, out):
 		raise NotImplementedError()
 
 	def to_args(self):
@@ -17,8 +17,8 @@ class VectorSpaceMetric:
 
 
 class CosineMetric(VectorSpaceMetric):
-	def __call__(self, a, b):
-		return np.linalg.multi_dot([a.normalized, b.normalized.T])
+	def __call__(self, a, b, out):
+		np.linalg.multi_dot([a.normalized, b.normalized.T], out=out)
 
 	def to_args(self):
 		return {
@@ -28,7 +28,7 @@ class CosineMetric(VectorSpaceMetric):
 
 
 class ZhuCosineMetric(VectorSpaceMetric):
-	def __call__(self, a, b):
+	def __call__(self, a, b, out):
 		'''
 		const float num = xt::sum(xt::sqrt(p_s * p_t))();
 		const float denom = xt::sum(p_s)() * xt::sum(p_t)();
@@ -48,12 +48,12 @@ class SohangirCosineMetric(VectorSpaceMetric):
 	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
 	"""
 
-	def __call__(self, a, b):
+	def __call__(self, a, b, out):
 		num = np.sum(np.sqrt(a.unmodified[:, np.newaxis] * b.unmodified[np.newaxis, :]), axis=-1)
 		x = np.sqrt(np.sum(a.unmodified, axis=-1))
 		y = np.sqrt(np.sum(b.unmodified, axis=-1))
 		denom = x[:, np.newaxis] * y[np.newaxis, :]
-		return num / denom
+		out[:, :] = num / denom
 
 	def to_args(self):
 		return {
@@ -67,13 +67,13 @@ class PNormMetric(VectorSpaceMetric):
 		self._p = p
 		self._scale = scale
 
-	def __call__(self, a, b):
+	def __call__(self, a, b, out):
 		d = a.unmodified[:, np.newaxis] - b.unmodified[np.newaxis, :]
 		d = np.sum(np.power(np.abs(d), self._p), axis=-1)
 		d = np.power(d, 1 / self._p)
 
 		# now convert distance to similarity measure.
-		return np.maximum(0, 1 - d * self._scale)
+		out[:, :] = np.maximum(0, 1 - d * self._scale)
 
 	def to_args(self):
 		return {

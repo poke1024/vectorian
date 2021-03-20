@@ -6,6 +6,32 @@
 #include "vocabulary.h"
 #include <xtensor/xadapt.hpp>
 
+/*struct StaticEmbeddingTensors {
+	py:array_t<float> similarity;
+	py:array_t<float> mag_s;
+	py:array_t<float> mag_t;
+};
+
+template<typename R, typename M>
+class StaticEmbeddingTensorsReader {
+	S m_similarity;
+	M m_mag_s;
+	M m_mag_t;
+
+public:
+	inline float similarity(size_t i, size_t j) const {
+		return m_similarity(i, j);
+	}
+
+	inline float magnitude_s(size_t i) const {
+		return m_mag_s(i);
+	}
+
+	inline float magnitude_t(size_t i) const {
+		return m_mag_t(i);
+	}
+};*/
+
 class StaticEmbeddingMetric : public Metric {
 protected:
 	const std::vector<StaticEmbeddingRef> m_embeddings;
@@ -15,7 +41,7 @@ protected:
 	bool m_needs_magnitudes;
 	MatcherFactoryRef m_matcher_factory;
 
-	xt::xtensor<float, 2> m_similarity;
+	xt::pytensor<float, 2> m_similarity;
 	xt::xtensor<float, 1> m_mag_s;
 	xt::xtensor<float, 1> m_mag_t;
 
@@ -82,7 +108,7 @@ public:
 		return m_options;
 	}
 
-	inline const xt::xtensor<float, 2> &similarity() const {
+	inline const xt::pytensor<float, 2> &similarity() const {
 		return m_similarity;
 	}
 
