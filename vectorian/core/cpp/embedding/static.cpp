@@ -37,7 +37,7 @@ MetricRef StaticEmbedding::create_metric(
 		embeddings.push_back(std::dynamic_pointer_cast<StaticEmbedding>(e));
 	}
 
-	const auto metric = std::make_shared<StaticEmbeddingMetric>(
+	const auto metric = std::make_shared<StaticEmbeddingMetricAtom>(
 		embeddings,
 		p_sent_metric_def);
 

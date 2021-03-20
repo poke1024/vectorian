@@ -34,16 +34,56 @@ public:
 
 class StaticEmbeddingMetric : public Metric {
 protected:
-	const std::vector<StaticEmbeddingRef> m_embeddings;
 	const py::dict m_options;
-	const py::dict m_alignment_def;
-
-	bool m_needs_magnitudes;
-	MatcherFactoryRef m_matcher_factory;
 
 	xt::pytensor<float, 2> m_similarity;
 	xt::xtensor<float, 1> m_mag_s;
 	xt::xtensor<float, 1> m_mag_t;
+	bool m_needs_magnitudes;
+
+	MatcherFactoryRef create_matcher_factory(
+		const QueryRef &p_query);
+
+	inline py::dict alignment_def() const {
+		return m_options["alignment"].cast<py::dict>();
+	}
+
+public:
+	inline StaticEmbeddingMetric(
+		const py::dict &p_options) :
+
+		m_options(p_options),
+		m_needs_magnitudes(false) {
+	}
+
+	virtual void initialize(
+		const QueryRef &p_query,
+		const WordMetricDef &p_metric) = 0;
+
+	inline const xt::pytensor<float, 2> &similarity() const {
+		return m_similarity;
+	}
+
+	inline float magnitude_s(size_t i) const {
+		return m_mag_s(i);
+	}
+
+	inline float magnitude_t(size_t i) const {
+		return m_mag_t(i);
+	}
+
+	inline void assert_has_magnitudes() const {
+		PPK_ASSERT(m_mag_s.shape(0) > 0);
+		PPK_ASSERT(m_mag_t.shape(0) > 0);
+	}
+};
+
+typedef std::shared_ptr<StaticEmbeddingMetric> StaticEmbeddingMetricRef;
+
+class StaticEmbeddingMetricAtom : public StaticEmbeddingMetric {
+
+	const std::vector<StaticEmbeddingRef> m_embeddings;
+	MatcherFactoryRef m_matcher_factory;
 
 	void build_similarity_matrix(
 		const QueryRef &p_query,
@@ -78,26 +118,19 @@ protected:
 		}
 	}
 
-	MatcherFactoryRef create_matcher_factory(
-		const QueryRef &p_query);
-
 public:
-	StaticEmbeddingMetric(
+	StaticEmbeddingMetricAtom(
 		const py::dict &p_sent_metric_def) :
 
-		m_options(p_sent_metric_def),
-		m_alignment_def(m_options["alignment"].cast<py::dict>()),
-		m_needs_magnitudes(false) {
+		StaticEmbeddingMetric(p_sent_metric_def) {
 	}
 
-	StaticEmbeddingMetric(
+	StaticEmbeddingMetricAtom(
 		const std::vector<StaticEmbeddingRef> &p_embeddings,
 		const py::dict &p_sent_metric_def) :
 
-		m_embeddings(p_embeddings),
-		m_options(p_sent_metric_def),
-		m_alignment_def(m_options["alignment"].cast<py::dict>()),
-		m_needs_magnitudes(false) {
+		StaticEmbeddingMetric(p_sent_metric_def),
+		m_embeddings(p_embeddings) {
 	}
 
 	virtual void initialize(
@@ -108,34 +141,15 @@ public:
 		return m_options;
 	}
 
-	inline const xt::pytensor<float, 2> &similarity() const {
-		return m_similarity;
-	}
-
-	inline float magnitude_s(size_t i) const {
-		return m_mag_s(i);
-	}
-
-	inline float magnitude_t(size_t i) const {
-		return m_mag_t(i);
-	}
-
-	inline void assert_has_magnitudes() const {
-		PPK_ASSERT(m_mag_s.shape(0) > 0);
-		PPK_ASSERT(m_mag_t.shape(0) > 0);
-	}
-
 	virtual MatcherFactoryRef matcher_factory() const {
 		return m_matcher_factory;
 	}
 
 	virtual const std::string &name() const;
-
-	inline const py::dict &alignment_def() const {
-		return m_alignment_def;
-	}
 };
 
-typedef std::shared_ptr<StaticEmbeddingMetric> StaticEmbeddingMetricRef;
+/*
+class StaticEmbeddingOperator : public StaticEmbeddingMetric {
+};*/
 
 #endif // __VECTORIAN_FAST_METRIC_H__

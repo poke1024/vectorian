@@ -7,6 +7,7 @@
 // class Nearest
 // class Mix (multiple embeddings and factors)
 
+/*
 class MinMaxMetric : public StaticEmbeddingMetric {
 	const StaticEmbeddingMetricRef m_a;
 	const StaticEmbeddingMetricRef m_b;
@@ -103,5 +104,6 @@ public:
 };
 
 typedef std::shared_ptr<LerpMetric> LerpMetricRef;
+*/
 
 #endif // __VECTORIAN_COMPOSITE_METRIC_H__
