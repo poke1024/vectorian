@@ -114,14 +114,15 @@ MetricRef QueryVocabulary::create_metric(
 	const WordMetricDef metric_def{
 		p_word_metric_def["name"].cast<py::str>(),
 		p_word_metric_def["embedding"].cast<py::str>(),
-		p_word_metric_def["metric"].cast<py::str>(),
-		p_word_metric_def["options"].cast<py::dict>()};
+		p_word_metric_def["metric"].cast<py::object>()};
 
-	if (metric_def.name == "lerp") {
+	/*if (metric_def.name == "lerp") {
+
+		metric_def.vector_metric.attr("is_composite")
 
 		return std::make_shared<LerpMetric>(
-			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.vector_metric.attr("a").cast<py::dict>()),
+			create_metric(p_query, p_sent_metric_def, metric_def.vector_metric.attr("b").cast<py::dict>()),
 			metric_def.options["t"].cast<float>());
 
 	} else if (metric_def.name == "min") {
@@ -136,7 +137,7 @@ MetricRef QueryVocabulary::create_metric(
 			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
 			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
 
-	} else {
+	} else*/ {
 
 		const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
 		if (it == m_vocab->m_embeddings_by_name.end()) {

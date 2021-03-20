@@ -4,15 +4,10 @@
 #include "match/matcher_impl.h"
 #include "metric/alignment.h"
 #include "metric/factory.h"
-#include "embedding/sim.h"
 
 void StaticEmbeddingMetric::build_similarity_matrix(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
-
-	// FIXME
-	// const std::string embedding; // e.g. fasttext
-	// const std::string metric; // e.g. cosine
 
 	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
 	const Needle needle(p_query);
@@ -42,8 +37,7 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 		const auto &vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
-		// HACK
-		const auto sim = py_embeddings.attr("compute_cosine")(
+		const auto sim = p_metric.vector_metric(
 			vectors, needle_vectors).cast<py::array_t<float>>();
 		const auto r_sim = sim.unchecked<2>();
 		PPK_ASSERT(static_cast<size_t>(r_sim.shape(0)) == size);
@@ -72,8 +66,6 @@ void StaticEmbeddingMetric::build_similarity_matrix(
 			m_similarity(k, j) = 1.0f;
 		}
 	}
-
-	printf("done.\n");
 }
 
 void StaticEmbeddingMetric::initialize(

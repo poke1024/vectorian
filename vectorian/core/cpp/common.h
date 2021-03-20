@@ -103,8 +103,7 @@ class WordMetricDef {
 public:
 	const std::string name;
 	const std::string embedding; // e.g. fasttext
-	const std::string metric; // e.g. cosine
-	const py::dict options;
+	const py::object vector_metric; // e.g. cosine
 };
 
 py::dict to_py_array(const TokenVectorRef &p_array);

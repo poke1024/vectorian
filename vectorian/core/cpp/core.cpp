@@ -69,7 +69,6 @@ cfg['dependencies'] = [
 	'alignment/wrd.h',
 	'embedding/contextual.h',
 	'embedding/embedding.h',
-	'embedding/sim.h',
 	'embedding/static.h',
 	'embedding/vectors.h',
 	'match/match.h',
@@ -94,7 +93,6 @@ cfg['dependencies'] = [
 
 cfg['sources'] = [
 	'metric/static.cpp',
-	'embedding/sim.cpp',
 	'vocabulary.cpp',
 	'embedding/static.cpp',
 	'match/flow.cpp',

@@ -5,28 +5,36 @@ from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
 class VectorSpaceMetric:
+	def __call__(self, a, b):
+		raise NotImplementedError()
+
 	def to_args(self):
 		raise NotImplementedError()
 
-	def index(self, vectors, options):
-		def find(u, k):
-			for i, v in enumerate(vectors):
-				self.score(u, v)
-		return find
+	@property
+	def name(self):
+		return self.to_args()['metric']
 
 
 class CosineMetric(VectorSpaceMetric):
+	def __call__(self, a, b):
+		return np.linalg.multi_dot([a.normalized, b.normalized.T])
+
 	def to_args(self):
 		return {
 			'metric': 'cosine',
 			'options': {}
 		}
 
-	def index(self, vectors):
-		vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
-
 
 class ZhuCosineMetric(VectorSpaceMetric):
+	def __call__(self, a, b):
+		'''
+		const float num = xt::sum(xt::sqrt(p_s * p_t))();
+		const float denom = xt::sum(p_s)() * xt::sum(p_t)();
+		return num / denom;
+		'''
+
 	def to_args(self):
 		return {
 			'metric': 'zhu-cosine',
@@ -35,6 +43,18 @@ class ZhuCosineMetric(VectorSpaceMetric):
 
 
 class SohangirCosineMetric(VectorSpaceMetric):
+	"""
+	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”
+	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
+	"""
+
+	def __call__(self, a, b):
+		num = np.sum(np.sqrt(a.unmodified[:, np.newaxis] * b.unmodified[np.newaxis, :]), axis=-1)
+		x = np.sqrt(np.sum(a.unmodified, axis=-1))
+		y = np.sqrt(np.sum(b.unmodified, axis=-1))
+		denom = x[:, np.newaxis] * y[np.newaxis, :]
+		return num / denom
+
 	def to_args(self):
 		return {
 			'metric': 'sohangir-cosine',
@@ -46,6 +66,14 @@ class PNormMetric(VectorSpaceMetric):
 	def __init__(self, p=2, scale=1):
 		self._p = p
 		self._scale = scale
+
+	def __call__(self, a, b):
+		d = a.unmodified[:, np.newaxis] - b.unmodified[np.newaxis, :]
+		d = np.sum(np.power(np.abs(d), self._p), axis=-1)
+		d = np.power(d, 1 / self._p)
+
+		# now convert distance to similarity measure.
+		return np.maximum(0, 1 - d * self._scale)
 
 	def to_args(self):
 		return {
@@ -121,12 +149,10 @@ class TokenSimilarityMetric:
 		self._metric = metric
 
 	def to_args(self):
-		args = self._metric.to_args()
 		return {
-			'name': self._embedding.name + "-" + args['metric'],
+			'name': self._embedding.name + "-" + self._metric.name,
 			'embedding': self._embedding.name,
-			'metric': args['metric'],
-			'options': args['options']
+			'metric': self._metric
 		}
 
 

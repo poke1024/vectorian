@@ -105,7 +105,9 @@ class Vectors:  # future: CudaVectors
 	def normalized(self):
 		eps = np.finfo(np.float32).eps * 100
 		vanishing = self.magnitudes < eps
+		old_err_settings = np.seterr(divide='ignore')
 		data = self._unmodified / self.magnitudes[:, np.newaxis]
+		np.seterr(**old_err_settings)
 		data[vanishing, :].fill(0)
 		return data
 
@@ -427,8 +429,3 @@ class TransformerEmbedding(ContextualEmbedding):
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
 		return doc._.trf_data.tensors[-1]
-
-
-def compute_cosine(a, b):
-	# temporary hack
-	return np.linalg.multi_dot([a.normalized, b.normalized.T])

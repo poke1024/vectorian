@@ -74,7 +74,7 @@ public:
 		m_needs_magnitudes(false) {
 	}
 
-	void initialize(
+	virtual void initialize(
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric);
 
