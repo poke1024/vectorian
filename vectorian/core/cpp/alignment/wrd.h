@@ -101,7 +101,7 @@ public:
 		distance_matrix.fill(1.0f);
 		for (size_t t = 0; t < len_t; t++) {
 			for (size_t s = 0; s < len_s; s++) {
-				distance_matrix(t, len_t + s) = 1.0f - slice.similarity(s, t);
+				distance_matrix(t, len_t + s) = std::max(0.0f, 1.0f - slice.similarity(s, t));
 			}
 		}
 

@@ -231,3 +231,43 @@ void StaticEmbeddingMetricAtom::initialize(
 const std::string &StaticEmbeddingMetricAtom::name() const {
 	return m_embeddings[0]->name();
 }
+
+// --------------------------------------------------------------------------------
+
+/*
+void StaticEmbeddingMetricOperator::initialize(
+	const QueryRef &p_query,
+	const WordMetricDef &p_metric) {
+
+	py::list args;
+
+	for (const auto &operand : m_operands) {
+		operand->initialize(p_query, p_metric);
+		py::dict data;
+		data["similarity"] = operand->similarity();
+		data["magnitudes"] = operand->magnitudes();
+		args.append(data);
+	}
+
+	PPK_ASSERT(!m_operands.empty());
+	auto m = m_operands[0]->similarity();
+
+	m_similarity.resize({m.shape(0), m.shape(1)});
+	m_operator(args, m_similarity);
+
+	// duplicated code from atom:
+
+	m_matcher_factory = create_matcher_factory(p_query);
+
+	if (m_needs_magnitudes) { // set in create_matcher_factory
+		const Needle needle(p_query);
+		compute_magnitudes(
+			p_query->vocabulary(),
+			needle);
+	}
+}
+
+const std::string &StaticEmbeddingMetricOperator::name() const {
+	return m_name;
+}
+*/

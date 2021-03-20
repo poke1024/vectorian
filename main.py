@@ -5,7 +5,7 @@ import vectorian.utils as utils
 from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
 from vectorian.alignment import WordMoversDistance, WordRotatorsDistance
 from vectorian.importers import NovelImporter
-from vectorian.embeddings import PretrainedFastText
+from vectorian.embeddings import PretrainedFastText, CompressedFastTextVectors
 from vectorian.session import Session
 from vectorian.corpus import Corpus
 from vectorian.render.location import LocationFormatter
@@ -15,7 +15,8 @@ import spacy
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    fasttext = PretrainedFastText("en")
+    #fasttext = PretrainedFastText("en")
+    fasttext = CompressedFastTextVectors("models/fasttext-en-mini.kv")
 
     nlp = spacy.load("en_core_web_sm")
 
@@ -87,17 +88,18 @@ if __name__ == '__main__':
                 f.write("\n")
                 f.write("\n")
 
-            if False:
+            if True:
                 index = session.partition("sentence").index(AlignmentSentenceMetric(
                     token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
-                    alignment=WordMoversDistance.wmd('vectorian')), nlp=nlp)
+                    alignment=WordMoversDistance.wmd('kusner')), nlp=nlp)
             else:
                 index = session.partition("sentence").index(AlignmentSentenceMetric(
                     token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
                     alignment=WordRotatorsDistance()), nlp=nlp)
 
             #matches = index.find("write female", n=3, debug=debug)
-            matches = index.find("the great star", n=3, min_score=0.1, debug=debug)
+            #matches = index.find("the great star", n=3, debug=debug)
+            matches = index.find("speak", n=3)
 
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")

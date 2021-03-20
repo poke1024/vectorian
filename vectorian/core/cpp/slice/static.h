@@ -66,11 +66,12 @@ public:
 
 	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
-		return m_metric.magnitude_s(m_encoder.to_embedding(s));
+		return m_metric.magnitudes()(m_encoder.to_embedding(s));
 	}
 
 	inline float magnitude_t(Index i) const {
-		return m_metric.magnitude_t(i);
+		const Token &t = t_tokens[i];
+		return m_metric.magnitudes()(m_encoder.to_embedding(t));
 	}
 
 	inline void assert_has_magnitudes() const {

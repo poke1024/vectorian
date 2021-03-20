@@ -105,15 +105,18 @@ class Vectors:  # future: CudaVectors
 	def normalized(self):
 		eps = np.finfo(np.float32).eps * 100
 		vanishing = self.magnitudes < eps
-		old_err_settings = np.seterr(divide='ignore')
+		old_err_settings = np.seterr(divide='ignore', invalid='ignore')
 		data = self._unmodified / self.magnitudes[:, np.newaxis]
 		np.seterr(**old_err_settings)
 		data[vanishing, :].fill(0)
+		np.nan_to_num(data, copy=False, nan=0)
 		return data
 
 	@cached_property
 	def magnitudes(self):
-		return np.linalg.norm(self._unmodified, axis=1)
+		data = np.linalg.norm(self._unmodified, axis=1)
+		np.nan_to_num(data, copy=False, nan=0)
+		return data
 
 
 class StackedVectors:

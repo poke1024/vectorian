@@ -171,7 +171,7 @@ public:
 				const Index i = doc_s.vocab_to_pos[u].front();
 				for (const auto &v : doc_t.vocab) {
 					const Index j = doc_t.vocab_to_pos[v].front();
-					const float d = MAX_SIMILARITY - sim(i, j);
+					const float d = std::max(MAX_SIMILARITY - sim(i, j), 0.0f);
 
 					// since distance_matrix stores vocabulary indices and
 					// not positions into s and t, index of (x, y) vs (y, x)

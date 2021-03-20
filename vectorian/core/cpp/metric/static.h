@@ -6,39 +6,12 @@
 #include "vocabulary.h"
 #include <xtensor/xadapt.hpp>
 
-/*struct StaticEmbeddingTensors {
-	py:array_t<float> similarity;
-	py:array_t<float> mag_s;
-	py:array_t<float> mag_t;
-};
-
-template<typename R, typename M>
-class StaticEmbeddingTensorsReader {
-	S m_similarity;
-	M m_mag_s;
-	M m_mag_t;
-
-public:
-	inline float similarity(size_t i, size_t j) const {
-		return m_similarity(i, j);
-	}
-
-	inline float magnitude_s(size_t i) const {
-		return m_mag_s(i);
-	}
-
-	inline float magnitude_t(size_t i) const {
-		return m_mag_t(i);
-	}
-};*/
-
 class StaticEmbeddingMetric : public Metric {
 protected:
 	const py::dict m_options;
 
 	xt::pytensor<float, 2> m_similarity;
-	xt::xtensor<float, 1> m_mag_s;
-	xt::xtensor<float, 1> m_mag_t;
+	xt::pytensor<float, 1> m_magnitudes;
 	bool m_needs_magnitudes;
 
 	MatcherFactoryRef create_matcher_factory(
@@ -64,17 +37,12 @@ public:
 		return m_similarity;
 	}
 
-	inline float magnitude_s(size_t i) const {
-		return m_mag_s(i);
-	}
-
-	inline float magnitude_t(size_t i) const {
-		return m_mag_t(i);
+	inline const xt::pytensor<float, 1> &magnitudes() const {
+		return m_magnitudes;
 	}
 
 	inline void assert_has_magnitudes() const {
-		PPK_ASSERT(m_mag_s.shape(0) > 0);
-		PPK_ASSERT(m_mag_t.shape(0) > 0);
+		PPK_ASSERT(m_magnitudes.shape(0) > 0);
 	}
 };
 
@@ -93,29 +61,22 @@ class StaticEmbeddingMetricAtom : public StaticEmbeddingMetric {
 		const QueryVocabularyRef &p_vocabulary,
 		const Needle &p_needle) {
 
-		m_mag_s.resize({p_vocabulary->size()});
+		m_magnitudes.resize({static_cast<ssize_t>(p_vocabulary->size())});
 		size_t offset = 0;
 		for (const auto &embedding : m_embeddings) {
 			const auto &vectors = embedding->vectors();
 			const size_t size = embedding->size();
 
-			const auto magnitudes = vectors.attr("magnitudes").cast<py::array_t<float>>();
-			const auto r_mag = magnitudes.unchecked<1>();
-			PPK_ASSERT(static_cast<size_t>(r_mag.shape(0)) == size);
-			auto data = xt::adapt(
-				const_cast<float*>(r_mag.data(0)), {r_mag.shape(0)});
-
-			xt::view(m_mag_s, xt::range(offset, offset + size)) = data;
+			const auto magnitudes = vectors.attr("magnitudes").cast<xt::pytensor<float, 1>>();
+			xt::strided_view(m_magnitudes, {xt::range(offset, offset + size)}) = magnitudes;
 
 			offset += size;
 		}
 		PPK_ASSERT(offset == p_vocabulary->size());
+	}
 
-		m_mag_t.resize({p_needle.size()});
-		for (size_t j = 0; j < p_needle.size(); j++) {
-			const token_t t = p_needle.token_ids()[j];
-			m_mag_t(j) = m_mag_s(t);
-		}
+	inline const py::dict &options() const {
+		return m_options;
 	}
 
 public:
@@ -137,10 +98,6 @@ public:
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric);
 
-	inline const py::dict &options() const {
-		return m_options;
-	}
-
 	virtual MatcherFactoryRef matcher_factory() const {
 		return m_matcher_factory;
 	}
@@ -149,7 +106,33 @@ public:
 };
 
 /*
-class StaticEmbeddingOperator : public StaticEmbeddingMetric {
-};*/
+class StaticEmbeddingMetricOperator : public StaticEmbeddingMetric {
+
+	const py::object m_operator;
+	const std::vector<StaticEmbeddingMetricRef> m_operands;
+	MatcherFactoryRef m_matcher_factory;
+	std::string m_name;
+
+public:
+
+	StaticEmbeddingMetricOperator(
+		py::object p_operator,
+		const std::vector<StaticEmbeddingMetricRef> &p_operands) :
+
+		m_operator(p_operator),
+		m_operands(p_operands) {
+	}
+
+	virtual void initialize(
+		const QueryRef &p_query,
+		const WordMetricDef &p_metric);
+
+	virtual MatcherFactoryRef matcher_factory() const {
+		return m_matcher_factory;
+	}
+
+	virtual const std::string &name() const;
+};
+*/
 
 #endif // __VECTORIAN_FAST_METRIC_H__
