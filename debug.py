@@ -14,7 +14,7 @@ import vectorian
 vectorian.compile(for_debugging=True)
 
 import vectorian.utils as utils
-from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
+from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, AlignmentSentenceMetric
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import PretrainedFastText
 from vectorian.session import Session
@@ -63,7 +63,7 @@ session = Session(
 formatter = LocationFormatter()
 
 metric = AlignmentSentenceMetric(
-    TokenSimilarityMetric(
+    TokenSimilarityMeasure(
         fasttext, CosineMetric()))
 
 # p = Partition("sentence")
@@ -78,7 +78,7 @@ with open("/Users/arbeit/Desktop/temp.json", "w") as f:
 
 
 
-from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
+from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, AlignmentSentenceMetric
 from vectorian.alignment import WordRotatorsDistance
 import tabulate
 

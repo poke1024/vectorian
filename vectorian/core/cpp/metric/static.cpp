@@ -235,35 +235,49 @@ const std::string &StaticEmbeddingMetricAtom::name() const {
 // --------------------------------------------------------------------------------
 
 void StaticEmbeddingMetricInterpolator::initialize(
-	const QueryRef &p_query,
-	const WordMetricDef &p_metric) {
+	const QueryRef &p_query) {
+
+	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
+	const Needle needle(p_query);
+	const size_t vocab_size = p_vocabulary->size();
+	const size_t needle_size = static_cast<size_t>(needle.size());
 
 	py::list args;
+	bool has_magnitudes = false;
 
 	for (const auto &operand : m_operands) {
-		operand->initialize(p_query, p_metric);
 		py::dict data;
 		data["similarity"] = operand->similarity();
-		data["magnitudes"] = operand->magnitudes();
+		PPK_ASSERT(operand->similarity().shape(0) == vocab_size);
+		PPK_ASSERT(operand->similarity().shape(1) == needle_size);
+		if (operand->magnitudes().shape(0) > 0) {
+			std::cout << "??xx " << operand->magnitudes().shape(0) << " != " << vocab_size << "\n";
+			data["magnitudes"] = operand->magnitudes();
+			PPK_ASSERT(operand->magnitudes().shape(0) == vocab_size);
+			has_magnitudes = true;
+		}
 		args.append(data);
 	}
 
-	PPK_ASSERT(!m_operands.empty());
-	const auto &m = m_operands[0]->similarity();
-	m_similarity.resize({ssize_t(m.shape(0)), ssize_t(m.shape(1))});
+	m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
+	if (has_magnitudes) {
+		m_magnitudes.resize({ssize_t(vocab_size)});
+	}
 
 	py::dict out;
 	out["similarity"] = m_similarity;
-	out["magnitudes"] = m_magnitudes;
+	if (has_magnitudes) {
+		out["magnitudes"] = m_magnitudes;
+	}
 	m_operator(args, out);
 
-	// duplicated code from atom:
+	PPK_ASSERT(m_similarity.shape(0) == vocab_size);
+	PPK_ASSERT(m_similarity.shape(1) == needle_size);
+	if (has_magnitudes) {
+		PPK_ASSERT(m_magnitudes.shape(0) == vocab_size);
+	}
 
 	m_matcher_factory = create_matcher_factory(p_query);
-
-	if (m_needs_magnitudes) { // set in create_matcher_factory
-		// FIXME. check that magnitudes are set.
-	}
 }
 
 const std::string &StaticEmbeddingMetricInterpolator::name() const {

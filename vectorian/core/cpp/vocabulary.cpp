@@ -108,36 +108,45 @@ TokenVectorRef unpack_tokens(
 
 MetricRef QueryVocabulary::create_metric(
 	const QueryRef &p_query,
-	const py::dict &p_sent_metric_def,
-	const py::dict &p_word_metric_def) {
+	const py::dict &p_sentence_metric,
+	const py::object &p_token_metric) {
 
-	const WordMetricDef metric_def{
-		p_word_metric_def["name"].cast<py::str>(),
-		p_word_metric_def["embedding"].cast<py::str>(),
-		p_word_metric_def["metric"].cast<py::object>()};
-
-	if (metric_def.vector_metric.attr("is_interpolator").cast<bool>()) {
+	if (p_token_metric.attr("is_interpolator").cast<bool>()) {
 
 		std::vector<StaticEmbeddingMetricRef> metrics;
 
-		const auto operands = metric_def.vector_metric.attr("operands").cast<py::list>();
+		const auto operands = p_token_metric.attr("operands").cast<py::list>();
 		for (const auto &operand : operands) {
 			auto metric = std::dynamic_pointer_cast<StaticEmbeddingMetric>(create_metric(
-				p_query, p_sent_metric_def, operand.cast<py::dict>()));
+				p_query, p_sentence_metric, operand.cast<py::object>()));
 			metrics.push_back(metric);
 		}
 
-		return std::make_shared<StaticEmbeddingMetricInterpolator>(
-			p_sent_metric_def,
-			metric_def.vector_metric,
+		const auto metric = std::make_shared<StaticEmbeddingMetricInterpolator>(
+			p_sentence_metric,
+			p_token_metric,
 			metrics);
 
+		metric->initialize(
+			p_query);
+
+		return metric;
+
 	} else {
+
+		const py::dict token_metric_def =
+			p_token_metric.attr("to_args")().cast<py::dict>();
+
+		const WordMetricDef metric_def{
+			token_metric_def["name"].cast<py::str>(),
+			token_metric_def["embedding"].cast<py::str>(),
+			token_metric_def["metric"].cast<py::object>()};
 
 		const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
 		if (it == m_vocab->m_embeddings_by_name.end()) {
 			std::ostringstream err;
-			err << "unknown embedding " << metric_def.embedding << " referenced in metric " << metric_def.name;
+			err << "unknown embedding \"" << metric_def.embedding << "\" referenced in metric \"" <<
+				metric_def.name << "\". did you miss to add it to your session?";
 			throw std::runtime_error(err.str());
 		}
 		const auto embedding_index = it->second;
@@ -150,7 +159,7 @@ MetricRef QueryVocabulary::create_metric(
 		return m_embeddings[embedding_index].compiled->create_metric(
 			p_query,
 			metric_def,
-			p_sent_metric_def,
+			p_sentence_metric,
 			embeddings);
 	}
 }

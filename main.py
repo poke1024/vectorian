@@ -2,10 +2,10 @@
 
 import vectorian.utils as utils
 
-from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric
+from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, MixedTokenSimilarityMeasure, AlignmentSentenceMetric
 from vectorian.alignment import WordMoversDistance, WordRotatorsDistance
 from vectorian.importers import NovelImporter
-from vectorian.embeddings import PretrainedFastText, CompressedFastTextVectors
+from vectorian.embeddings import PretrainedFastText, CompressedFastTextVectors, PretrainedGloVe
 from vectorian.session import Session
 from vectorian.corpus import Corpus
 from vectorian.render.location import LocationFormatter
@@ -17,6 +17,7 @@ if __name__ == '__main__':
 
     #fasttext = PretrainedFastText("en")
     fasttext = CompressedFastTextVectors("models/fasttext-en-mini.kv")
+    glove = PretrainedGloVe("6B", 50)
 
     nlp = spacy.load("en_core_web_sm")
 
@@ -48,7 +49,7 @@ if __name__ == '__main__':
 
     session = Session(
         corpus,
-        [fasttext],
+        [fasttext, glove],
         token_mappings)
 
     #doc.save("/Users/arbeit/temp.json")
@@ -89,8 +90,18 @@ if __name__ == '__main__':
                 f.write("\n")
 
             if True:
+                metric = MixedTokenSimilarityMeasure(
+                    [
+                        TokenSimilarityMeasure(fasttext, CosineMetric()),
+                        TokenSimilarityMeasure(glove, CosineMetric())
+                    ],
+                    [1, 1]
+                )
+
+                #metric = TokenSimilarityMeasure(fasttext, CosineMetric())
+
                 index = session.partition("sentence").index(AlignmentSentenceMetric(
-                    token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
+                    token_metric=metric,
                     alignment=WordMoversDistance.wmd('kusner')), nlp=nlp)
             else:
                 index = session.partition("sentence").index(AlignmentSentenceMetric(

@@ -27,11 +27,10 @@ public:
 
 		m_sent_metric_def(p_sent_metric_def),
 		m_needs_magnitudes(false) {
-	}
 
-	virtual void initialize(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric) = 0;
+		m_magnitudes.resize({0});
+		PPK_ASSERT(m_magnitudes.shape(0) == 0);
+	}
 
 	inline const xt::pytensor<float, 2> &similarity() const {
 		return m_similarity;
@@ -94,7 +93,7 @@ public:
 		m_embeddings(p_embeddings) {
 	}
 
-	virtual void initialize(
+	void initialize(
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric);
 
@@ -124,9 +123,8 @@ public:
 		m_operands(p_operands) {
 	}
 
-	virtual void initialize(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric);
+	void initialize(
+		const QueryRef &p_query);
 
 	virtual MatcherFactoryRef matcher_factory() const {
 		return m_matcher_factory;

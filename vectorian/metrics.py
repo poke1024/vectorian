@@ -80,26 +80,52 @@ class EuclideanMetric(PNormMetric):
 		super().__init__(p=2, scale=scale)
 
 
-class LerpMetric(VectorSpaceMetric):
-	def __init__(self, a: VectorSpaceMetric, b: VectorSpaceMetric, t: float):
-		self._a = a
-		self._b = b
-		self._t = t
-
+class AbstractTokenSimilarityMeasure:
 	@property
-	def operands(self):
-		return [self._a, self._b]
+	def is_interpolator(self):
+		return False
 
-	def __call__(self, operands, out):
-		out["similarity"][:, :] = operands[0]["similarity"]
 
-	@property
-	def name(self):
-		return "mix"
+class TokenSimilarityMeasure(AbstractTokenSimilarityMeasure):
+	def __init__(self, embedding, metric: VectorSpaceMetric):
+		self._embedding = embedding
+		self._metric = metric
+
+	def to_args(self):
+		return {
+			'name': self._embedding.name + "-" + self._metric.name,
+			'embedding': self._embedding.name,
+			'metric': self._metric
+		}
+
+
+class MixedTokenSimilarityMeasure(AbstractTokenSimilarityMeasure):
+	def __init__(self, metrics, weights):
+		self._metrics = metrics
+		self._weights = weights
 
 	@property
 	def is_interpolator(self):
+		print("??1", flush=True)
 		return True
+
+	@property
+	def operands(self):
+		print("??2", flush=True)
+		return self._metrics
+
+	def __call__(self, operands, out):
+		print("??3", flush=True)
+		for k in out.keys():
+			data = [x[k] for x in operands]
+			avg = np.average(data, axis=0, weights=self._weights)
+			assert avg.shape == out[k].shape
+			out[k][:] = avg
+		print("??4", out, flush=True)
+
+	@property
+	def name(self):
+		return "mixed"
 
 
 
@@ -116,19 +142,6 @@ class MaxMetric(VectorSpaceMetric):
 		self._b = b
 
 
-class TokenSimilarityMetric:
-	def __init__(self, embedding, metric: VectorSpaceMetric):
-		self._embedding = embedding
-		self._metric = metric
-
-	def to_args(self):
-		return {
-			'name': self._embedding.name + "-" + self._metric.name,
-			'embedding': self._embedding.name,
-			'metric': self._metric
-		}
-
-
 class SentenceSimilarityMetric:
 	def create_index(self, partition):
 		raise NotImplementedError()
@@ -138,8 +151,8 @@ class SentenceSimilarityMetric:
 
 
 class AlignmentSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, token_metric: TokenSimilarityMetric, alignment=None):
-		if not isinstance(token_metric, TokenSimilarityMetric):
+	def __init__(self, token_metric: AbstractTokenSimilarityMeasure, alignment=None):
+		if not isinstance(token_metric, AbstractTokenSimilarityMeasure):
 			raise TypeError(token_metric)
 
 		if alignment is None:
@@ -165,14 +178,14 @@ class AlignmentSentenceMetric(SentenceSimilarityMetric):
 	def to_args(self, partition):
 		return {
 			'metric': 'alignment-isolated',
-			'token_metric': self._token_metric.to_args(),
+			'token_metric': self._token_metric,
 			'alignment': self._alignment.to_args(partition)
 		}
 
 
 class TagWeightedSentenceMetric(SentenceSimilarityMetric):
-	def __init__(self, token_metric: TokenSimilarityMetric, alignment, **kwargs):
-		assert isinstance(token_metric, TokenSimilarityMetric)
+	def __init__(self, token_metric: AbstractTokenSimilarityMeasure, alignment, **kwargs):
+		assert isinstance(token_metric, AbstractTokenSimilarityMeasure)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -196,7 +209,7 @@ class TagWeightedSentenceMetric(SentenceSimilarityMetric):
 	def to_args(self, partition):
 		return {
 			'metric': 'alignment-tag-weighted',
-			'token_metric': self._token_metric.to_args(),
+			'token_metric': self._token_metric,
 			'alignment': self._alignment.to_args(partition),
 			'pos_mismatch_penalty': self._options.get('pos_mismatch_penalty', 0),
 			'similarity_threshold': self._options.get('similarity_threshold', 0),

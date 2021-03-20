@@ -435,8 +435,8 @@ public:
 
 	MetricRef create_metric(
 		const QueryRef &p_query,
-		const py::dict &p_sent_metric_def,
-		const py::dict &p_word_metric_def);
+		const py::dict &p_sentence_metric,
+		const py::object &p_token_metric);
 
 	POSWMap mapped_pos_weights(
 		const std::map<std::string, float> &p_pos_weights) const {

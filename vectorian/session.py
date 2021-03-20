@@ -7,7 +7,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineMetric, TokenSimilarityMetric, AlignmentSentenceMetric, SentenceSimilarityMetric
+from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, AlignmentSentenceMetric, SentenceSimilarityMetric
 from vectorian.embeddings import StaticEmbedding
 
 

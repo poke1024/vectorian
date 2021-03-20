@@ -171,7 +171,7 @@ public:
 			m_metrics.push_back(m_vocab->create_metric(
 				shared_from_this(),
 				metric_def_dict,
-				metric_def_dict["token_metric"]));
+				metric_def_dict["token_metric"].cast<py::object>()));
 		}
 	}
 
