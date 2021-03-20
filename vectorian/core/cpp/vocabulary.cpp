@@ -116,28 +116,23 @@ MetricRef QueryVocabulary::create_metric(
 		p_word_metric_def["embedding"].cast<py::str>(),
 		p_word_metric_def["metric"].cast<py::object>()};
 
-	/*if (metric_def.name == "lerp") {
+	if (metric_def.vector_metric.attr("is_interpolator").cast<bool>()) {
 
-		metric_def.vector_metric.attr("is_composite")
+		std::vector<StaticEmbeddingMetricRef> metrics;
 
-		return std::make_shared<LerpMetric>(
-			create_metric(p_query, p_sent_metric_def, metric_def.vector_metric.attr("a").cast<py::dict>()),
-			create_metric(p_query, p_sent_metric_def, metric_def.vector_metric.attr("b").cast<py::dict>()),
-			metric_def.options["t"].cast<float>());
+		const auto operands = metric_def.vector_metric.attr("operands").cast<py::list>();
+		for (const auto &operand : operands) {
+			auto metric = std::dynamic_pointer_cast<StaticEmbeddingMetric>(create_metric(
+				p_query, p_sent_metric_def, operand.cast<py::dict>()));
+			metrics.push_back(metric);
+		}
 
-	} else if (metric_def.name == "min") {
+		return std::make_shared<StaticEmbeddingMetricInterpolator>(
+			p_sent_metric_def,
+			metric_def.vector_metric,
+			metrics);
 
-		return std::make_shared<MinMetric>(
-			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
-
-	} else if (metric_def.name == "max") {
-
-		return std::make_shared<MaxMetric>(
-			create_metric(p_query, p_sent_metric_def, metric_def.options["a"].cast<py::dict>()),
-			create_metric(p_query, p_sent_metric_def, metric_def.options["b"].cast<py::dict>()));
-
-	} else*/ {
+	} else {
 
 		const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
 		if (it == m_vocab->m_embeddings_by_name.end()) {

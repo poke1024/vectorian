@@ -8,7 +8,7 @@
 
 class StaticEmbeddingMetric : public Metric {
 protected:
-	const py::dict m_options;
+	const py::dict m_sent_metric_def;
 
 	xt::pytensor<float, 2> m_similarity;
 	xt::pytensor<float, 1> m_magnitudes;
@@ -18,14 +18,14 @@ protected:
 		const QueryRef &p_query);
 
 	inline py::dict alignment_def() const {
-		return m_options["alignment"].cast<py::dict>();
+		return m_sent_metric_def["alignment"].cast<py::dict>();
 	}
 
 public:
 	inline StaticEmbeddingMetric(
-		const py::dict &p_options) :
+		const py::dict &p_sent_metric_def) :
 
-		m_options(p_options),
+		m_sent_metric_def(p_sent_metric_def),
 		m_needs_magnitudes(false) {
 	}
 
@@ -75,8 +75,8 @@ class StaticEmbeddingMetricAtom : public StaticEmbeddingMetric {
 		PPK_ASSERT(offset == p_vocabulary->size());
 	}
 
-	inline const py::dict &options() const {
-		return m_options;
+	inline const py::dict &sent_metric_def() const {
+		return m_sent_metric_def;
 	}
 
 public:
@@ -105,8 +105,7 @@ public:
 	virtual const std::string &name() const;
 };
 
-/*
-class StaticEmbeddingMetricOperator : public StaticEmbeddingMetric {
+class StaticEmbeddingMetricInterpolator : public StaticEmbeddingMetric {
 
 	const py::object m_operator;
 	const std::vector<StaticEmbeddingMetricRef> m_operands;
@@ -115,10 +114,12 @@ class StaticEmbeddingMetricOperator : public StaticEmbeddingMetric {
 
 public:
 
-	StaticEmbeddingMetricOperator(
-		py::object p_operator,
+	StaticEmbeddingMetricInterpolator(
+		const py::dict &p_sent_metric_def,
+		const py::object &p_operator,
 		const std::vector<StaticEmbeddingMetricRef> &p_operands) :
 
+		StaticEmbeddingMetric(p_sent_metric_def),
 		m_operator(p_operator),
 		m_operands(p_operands) {
 	}
@@ -133,6 +134,5 @@ public:
 
 	virtual const std::string &name() const;
 };
-*/
 
 #endif // __VECTORIAN_FAST_METRIC_H__

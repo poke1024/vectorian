@@ -44,7 +44,7 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 		shared_from_this());
 
 	const std::string sentence_metric_kind =
-		m_options["metric"].cast<py::str>();
+		m_sent_metric_def["metric"].cast<py::str>();
 
 	const py::dict alignment_def = this->alignment_def();
 
@@ -75,9 +75,9 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
 		TagWeightedOptions options;
-		options.t_pos_weights = parse_tag_weights(p_query, m_options["tag_weights"]);
-		options.pos_mismatch_penalty = m_options["pos_mismatch_penalty"].cast<float>();
-		options.similarity_threshold = m_options["similarity_threshold"].cast<float>();
+		options.t_pos_weights = parse_tag_weights(p_query, m_sent_metric_def["tag_weights"]);
+		options.pos_mismatch_penalty = m_sent_metric_def["pos_mismatch_penalty"].cast<float>();
+		options.similarity_threshold = m_sent_metric_def["similarity_threshold"].cast<float>();
 
 		float sum = 0.0f;
 		for (float w : options.t_pos_weights) {
@@ -182,8 +182,8 @@ void StaticEmbeddingMetricAtom::initialize(
 		p_query,
 		p_metric);
 
-	if (m_options.contains("similarity_falloff")) {
-		const float similarity_falloff = m_options["similarity_falloff"].cast<float>();
+	if (m_sent_metric_def.contains("similarity_falloff")) {
+		const float similarity_falloff = m_sent_metric_def["similarity_falloff"].cast<float>();
 		m_similarity = xt::pow(m_similarity, similarity_falloff);
 	}
 
@@ -234,8 +234,7 @@ const std::string &StaticEmbeddingMetricAtom::name() const {
 
 // --------------------------------------------------------------------------------
 
-/*
-void StaticEmbeddingMetricOperator::initialize(
+void StaticEmbeddingMetricInterpolator::initialize(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
 
@@ -250,24 +249,23 @@ void StaticEmbeddingMetricOperator::initialize(
 	}
 
 	PPK_ASSERT(!m_operands.empty());
-	auto m = m_operands[0]->similarity();
+	const auto &m = m_operands[0]->similarity();
+	m_similarity.resize({ssize_t(m.shape(0)), ssize_t(m.shape(1))});
 
-	m_similarity.resize({m.shape(0), m.shape(1)});
-	m_operator(args, m_similarity);
+	py::dict out;
+	out["similarity"] = m_similarity;
+	out["magnitudes"] = m_magnitudes;
+	m_operator(args, out);
 
 	// duplicated code from atom:
 
 	m_matcher_factory = create_matcher_factory(p_query);
 
 	if (m_needs_magnitudes) { // set in create_matcher_factory
-		const Needle needle(p_query);
-		compute_magnitudes(
-			p_query->vocabulary(),
-			needle);
+		// FIXME. check that magnitudes are set.
 	}
 }
 
-const std::string &StaticEmbeddingMetricOperator::name() const {
+const std::string &StaticEmbeddingMetricInterpolator::name() const {
 	return m_name;
 }
-*/

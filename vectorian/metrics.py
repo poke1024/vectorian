@@ -5,26 +5,25 @@ from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
 class VectorSpaceMetric:
-	def __call__(self, a, b, out):
-		raise NotImplementedError()
+	@property
+	def is_interpolator(self):
+		return False
 
-	def to_args(self):
+	def __call__(self, a, b, out):
 		raise NotImplementedError()
 
 	@property
 	def name(self):
-		return self.to_args()['metric']
+		raise NotImplementedError()
 
 
 class CosineMetric(VectorSpaceMetric):
 	def __call__(self, a, b, out):
 		np.linalg.multi_dot([a.normalized, b.normalized.T], out=out)
 
-	def to_args(self):
-		return {
-			'metric': 'cosine',
-			'options': {}
-		}
+	@property
+	def name(self):
+		return "cosine"
 
 
 class ZhuCosineMetric(VectorSpaceMetric):
@@ -35,11 +34,9 @@ class ZhuCosineMetric(VectorSpaceMetric):
 		return num / denom;
 		'''
 
-	def to_args(self):
-		return {
-			'metric': 'zhu-cosine',
-			'options': {}
-		}
+	@property
+	def name(self):
+		return "sqrt-cosine"
 
 
 class SohangirCosineMetric(VectorSpaceMetric):
@@ -55,11 +52,9 @@ class SohangirCosineMetric(VectorSpaceMetric):
 		denom = x[:, np.newaxis] * y[np.newaxis, :]
 		out[:, :] = num / denom
 
-	def to_args(self):
-		return {
-			'metric': 'sohangir-cosine',
-			'options': {}
-		}
+	@property
+	def name(self):
+		return "improved-sqrt-cosine"
 
 
 class PNormMetric(VectorSpaceMetric):
@@ -75,14 +70,9 @@ class PNormMetric(VectorSpaceMetric):
 		# now convert distance to similarity measure.
 		out[:, :] = np.maximum(0, 1 - d * self._scale)
 
-	def to_args(self):
-		return {
-			'metric': 'p-norm',
-			'options': {
-				'p': self._p,
-				'scale': self._scale
-			}
-		}
+	@property
+	def name(self):
+		return f"p-norm({self._p})"
 
 
 class EuclideanMetric(PNormMetric):
@@ -96,17 +86,21 @@ class LerpMetric(VectorSpaceMetric):
 		self._b = b
 		self._t = t
 
-	def to_args(self):
-		return {
-			'name': 'lerp',
-			'embedding': None,
-			'metric': 'lerp',
-			'options': {
-				'a': self._a.to_args(),
-				'b': self._b.to_args(),
-				't': self._t
-			}
-		}
+	@property
+	def operands(self):
+		return [self._a, self._b]
+
+	def __call__(self, operands, out):
+		out["similarity"][:, :] = operands[0]["similarity"]
+
+	@property
+	def name(self):
+		return "mix"
+
+	@property
+	def is_interpolator(self):
+		return True
+
 
 
 class MinMetric(VectorSpaceMetric):
@@ -114,33 +108,12 @@ class MinMetric(VectorSpaceMetric):
 		self._a = a
 		self._b = b
 
-	def to_args(self):
-		return {
-			'name': 'min',
-			'embedding': None,
-			'metric': 'min',
-			'options': {
-				'a': self._a.to_args(),
-				'b': self._b.to_args()
-			}
-		}
 
 
 class MaxMetric(VectorSpaceMetric):
 	def __init__(self, a: VectorSpaceMetric, b: VectorSpaceMetric):
 		self._a = a
 		self._b = b
-
-	def to_args(self):
-		return {
-			'name': 'max',
-			'embedding': None,
-			'metric': 'max',
-			'options': {
-				'a': self._a.to_args(),
-				'b': self._b.to_args()
-			}
-		}
 
 
 class TokenSimilarityMetric:
