@@ -8,7 +8,7 @@ from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSentenceSimilarity, SentenceSimilarity
-from vectorian.embeddings import StaticEmbedding
+from vectorian.embeddings import StaticEmbedding, VectorsCache
 
 
 class Result:
@@ -157,6 +157,8 @@ class Session:
 
 		self._vocab.compile_embeddings()
 
+		self._vectors_cache = VectorsCache()
+
 	def default_metric(self):
 		embedding = list(self._embeddings.values())[0]
 		return AlignmentSentenceSimilarity(
@@ -181,6 +183,10 @@ class Session:
 	@property
 	def vocab(self):
 		return self._vocab
+
+	@property
+	def vectors_cache(self):
+		return self._vectors_cache
 
 	@lru_cache(16)
 	def max_len(self, level, window_size):

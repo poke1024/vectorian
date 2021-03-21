@@ -183,7 +183,8 @@ class Document:
 		return self.metadata['title']
 
 	def prepare(self, session):
-		return PreparedDocument(session, self._json)
+		return PreparedDocument(
+			session, self._json, self._contextual_embeddings)
 
 
 class Token:
@@ -247,8 +248,10 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, session, json):
+	def __init__(self, session, json, contextual_embeddings):
 		self._session = session
+		self._contextual_embeddings = contextual_embeddings
+
 		token_mapper = session.token_mapper('tagger')
 
 		texts = []
@@ -396,4 +399,5 @@ class PreparedDocument:
 			self._spans,
 			self._token_table,
 			self._token_str,
-			self._metadata)
+			self._metadata,
+			self._contextual_embeddings)

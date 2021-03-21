@@ -90,7 +90,7 @@ class PreparedQuery:
 			return tokens
 
 	def to_core(self):
-		query = core.Query(self._vocab)
+		query = core.Query(self.index.session, self._vocab)
 		query.initialize(
 			self._token_table,
 			self._token_str,

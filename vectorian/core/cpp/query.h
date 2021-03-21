@@ -47,9 +47,42 @@ struct SliceStrategy {
 	size_t window_step;
 };
 
+class Handle {
+	const py::object m_object;
+
+public:
+	inline Handle(const py::object &p_object) : m_object(p_object) {
+	}
+
+	inline const py::object &get() const {
+		return m_object;
+	}
+
+	~Handle() {
+		py::gil_scoped_acquire acquire;
+		m_object.attr("close")();
+	}
+};
+
+typedef std::shared_ptr<Handle> HandleRef;
+
+class VectorsCache {
+	const py::object m_open;
+
+public:
+	inline VectorsCache(const py::object &p_vectors_cache) :
+		m_open(p_vectors_cache.attr("open").cast<py::object>()) {
+	}
+
+	HandleRef open(const py::object &p_vectors_ref) const {
+		return std::make_shared<Handle>(m_open(p_vectors_ref));
+	}
+};
+
 class Query : public std::enable_shared_from_this<Query> {
 
 	const QueryVocabularyRef m_vocab;
+	const VectorsCache m_vectors_cache;
 	std::vector<MetricRef> m_metrics;
 	TokenVectorRef m_t_tokens;
 	py::dict m_py_t_tokens;
@@ -65,9 +98,10 @@ class Query : public std::enable_shared_from_this<Query> {
 	std::optional<py::object> m_debug_hook;
 
 public:
-	Query(VocabularyRef p_vocab) :
+	Query(const py::object &p_session, VocabularyRef p_vocab) :
 
 		m_vocab(std::make_shared<QueryVocabulary>(p_vocab)),
+		m_vectors_cache(p_session.attr("vectors_cache").cast<py::object>()),
 		m_aborted(false) {
 	}
 
@@ -270,6 +304,10 @@ public:
 		}, p_slice.len_t());
 
 		return data;
+	}
+
+	inline const VectorsCache &vectors_cache() const {
+		return m_vectors_cache;
 	}
 };
 

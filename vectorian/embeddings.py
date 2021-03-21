@@ -445,7 +445,8 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 
 class VectorsCache:
-	pass
+	def open(self, vectors_ref):
+		pass
 
 
 class VectorsRef:

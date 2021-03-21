@@ -139,12 +139,12 @@ typedef std::shared_ptr<Spans> SpansRef;
 
 
 /*class ContextualVectorsContainer {
-	std::unordered_map<std::string, ContextualEmbeddingVectorsRef> m_vectors;
+	std::unordered_map<std::string, py::object> m_vectors;
 
 public:
 	void add_contextual_embedding_vectors(
 		const std::string &p_name,
-		const ContextualEmbeddingVectorsRef &p_vectors) {
+		const py::object &p_object) {
 
 		m_vectors[p_name] = p_vectors;
 	}
@@ -179,7 +179,8 @@ public:
 		const py::dict &p_spans,
 		const py::object &p_tokens_table,
 		const py::list &p_tokens_strings,
-		const py::dict &p_metadata);
+		const py::dict &p_metadata,
+		const py::dict &p_contextual_embeddings);
 
 	ResultSetRef find(const QueryRef &p_query);
 

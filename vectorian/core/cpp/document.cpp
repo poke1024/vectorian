@@ -25,11 +25,14 @@ Document::Document(
 	const py::dict &p_spans,
 	const py::object &p_tokens_table,
 	const py::list &p_tokens_strings,
-	const py::dict &p_metadata):
+	const py::dict &p_metadata,
+	const py::dict &p_contextual_embeddings):
 
 	m_id(p_document_id),
 	m_vocab(p_vocab),
 	m_metadata(p_metadata) {
+
+	// FIXME p_contextual_embeddings
 
 	for (auto item : p_spans) {
 		const auto table = unwrap_table(item.second.cast<py::object>());

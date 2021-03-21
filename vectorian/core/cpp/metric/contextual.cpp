@@ -32,10 +32,12 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 
 				py::gil_scoped_acquire acquire;
 
-				const py::object t_vectors = p_query->open_contextual_embedding_vectors(
-					p_query->session(), m_embedding->name());
-				const py::object s_vectors = p_document->open_contextual_embedding_vectors(
-					p_query->session(), m_embedding->name());
+				const HandleRef t_vectors = p_query->vectors_cache().open(
+					p_document->get_contextual_embedding_vectors(m_embedding->name())
+				);
+				const HandleRef s_vectors = p_query->vectors_cache().open(
+					p_query->get_contextual_embedding_vectors(m_embedding->name())
+				);
 
 				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
 				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
@@ -43,14 +45,13 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 				// we need the similarity matrix code from StaticEmbeddingMetricAtom::build_similarity_matrix here.
 
 				const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
-				matrix->matrix.resize({s_vectors->size(), t_vectors->size()});
 
 				xt::pytensor<float, 2> similarity;
 				similarity.resize({
-					s_vectors.attr("size").cast<ssize_t>(),
-					t_vectors.attr("size").cast<ssize_t>()});
+					s_vectors->attr("size").cast<ssize_t>(),
+					t_vectors->attr("size").cast<ssize_t>()});
 
-				p_word_metric.vector_metric(s_vectors, t_vectors, similarity);
+				p_word_metric.vector_metric(*s_vectors, *t_vectors, similarity);
 
 				const SliceFactoryFactory gen_slices([sim_matrix] (
 					const size_t slice_id,
