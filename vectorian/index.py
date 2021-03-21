@@ -6,6 +6,7 @@ import numpy as np
 import bisect
 import json
 import yaml
+import collections
 
 from cached_property import cached_property
 from collections import namedtuple
@@ -43,6 +44,14 @@ class PreparedQuery:
 		self._vocab = vocab
 
 		doc = nlp(self.text)
+
+		# FIXME gather contextual_embeddings actually used in this query
+		# by analyzing query
+
+		self._contextual_embeddings = collections.defaultdict(list)
+		for e in self._query.index.session.embeddings:
+			if e.is_contextual:
+				self._contextual_embeddings[e.name].append(e.encode(doc))
 
 		tokens = doc.to_json()["tokens"]
 		tokens = self._filter(tokens, 'pos_filter', 'pos')
@@ -90,6 +99,7 @@ class PreparedQuery:
 			return tokens
 
 	def to_core(self):
+		# FIXME self._contextual_embeddings
 		query = core.Query(self.index.session, self._vocab)
 		query.initialize(
 			self._token_table,

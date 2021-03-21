@@ -80,7 +80,25 @@ def _make_cache_path():
 	return cache_path
 
 
-class StaticEmbedding:
+class Embedding:
+	@property
+	def is_static(self):
+		return False
+
+	@property
+	def is_contextual(self):
+		return False
+
+	@property
+	def name(self):
+		raise NotImplementedError()
+
+
+class StaticEmbedding(Embedding):
+	@property
+	def is_static(self):
+		return True
+
 	def create_instance(self, session):
 		raise NotImplementedError()
 
@@ -422,12 +440,12 @@ class StackedEmbedding:
 		return self._name
 
 
-class ContextualEmbedding:
-	def encode(self, doc):
-		raise NotImplementedError()
-
+class ContextualEmbedding(Embedding):
 	@property
-	def unique_name(self):
+	def is_contextual(self):
+		return True
+
+	def encode(self, doc):
 		raise NotImplementedError()
 
 
@@ -440,7 +458,7 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		return doc._.trf_data.tensors[-1]
 
 	@cached_property
-	def unique_name(self):
+	def name(self):
 		return self._nlp.meta['name'], self._nlp.meta['version']
 
 

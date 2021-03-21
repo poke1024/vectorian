@@ -134,8 +134,8 @@ class Document:
 		self._json = json
 		self._contextual_embeddings = contextual_embeddings or {}
 
-	def embeddings(self, name):
-		return self._contextual_embeddings[name]
+	def has_contextual_embedding(self, name):
+		return name in self.__contextual_embeddings
 
 	@staticmethod
 	def load(path):

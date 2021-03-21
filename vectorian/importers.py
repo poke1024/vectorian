@@ -55,7 +55,7 @@ class Importer:
 			batch_size=self._batch_size,
 			disable=['ner', 'lemmatizer'])  # check nlp.pipe_names
 
-		contextual_vectors = dict((e.unique_name, []) for e in self._embeddings)
+		contextual_vectors = dict((e.name, []) for e in self._embeddings)
 
 		json_partitions = []
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=f'Importing {md.origin}'):
@@ -64,7 +64,7 @@ class Importer:
 			json_partitions.append(doc_json)
 
 			for e in self._embeddings:
-				contextual_vectors[e.unique_name].append(e.encode(doc))
+				contextual_vectors[e.name].append(e.encode(doc))
 
 		json = {
 			'metadata': md._asdict(),

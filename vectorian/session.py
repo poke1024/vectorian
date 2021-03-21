@@ -122,13 +122,16 @@ class Partition:
 
 
 class Session:
-	def __init__(self, docs, static_embeddings=None, token_mappings=None):
+	def __init__(self, docs, embeddings=None, token_mappings=None):
+		if embeddings is None:
+			embeddings = []
+
 		if token_mappings == "default":
 			token_mappings = utils.default_token_mappings()
 
 		self._vocab = core.Vocabulary()
 
-		if static_embeddings and not token_mappings:
+		if any(e.is_static for e in embeddings) and not token_mappings:
 			logging.warning("got static embeddings but not token mappings.")
 
 		if token_mappings is None:
@@ -138,15 +141,22 @@ class Session:
 		if any(k not in ("tokenizer", "tagger") for k in token_mappings):
 			raise ValueError(token_mappings)
 
-		if static_embeddings is None:
-			static_embeddings = []
 		self._embeddings = {}
-		for embedding in static_embeddings:
-			if not isinstance(embedding, StaticEmbedding):
-				raise TypeError(f"expected StaticEmbedding, got {embedding}")
-			instance = embedding.create_instance(self)
-			self._embeddings[instance.name] = instance
-			self._vocab.add_embedding(instance)
+		for embedding in embeddings:
+			self._embeddings[embedding.name] = embedding
+
+		self._embedding_instances = {}
+		for embedding in embeddings:
+			if embedding.is_static:
+				instance = embedding.create_instance(self)
+				self._embedding_instances[instance.name] = instance
+				self._vocab.add_embedding(instance)
+
+		for embedding in embeddings:
+			if embedding.is_contextual:
+				for doc in docs:
+					if not doc.has_contextual_embedding(embedding.name):
+						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
 
 		self._collection = Collection(
 			self, self._vocab, docs)
@@ -155,7 +165,7 @@ class Session:
 		# the interval vocabulary is setup and complete.
 		self.c_documents
 
-		self._vocab.compile_embeddings()
+		self._vocab.compile_embeddings()  # i.e. static embeddings
 
 		self._vectors_cache = VectorsCache()
 
@@ -178,7 +188,7 @@ class Session:
 		return list(self._embeddings.values())
 
 	def get_embedding_instance(self, embedding):
-		return self._embeddings[embedding.name]
+		return self._embedding_instances[embedding.name]
 
 	@property
 	def vocab(self):
