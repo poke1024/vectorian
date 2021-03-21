@@ -19,7 +19,7 @@ public:
 
 	virtual MetricRef create_metric(
 		const QueryRef &p_query,
-		const WordMetricDef &p_metric,
+		const WordMetricDef &p_word_metric,
 		const py::dict &p_sent_metric_def,
 		const std::vector<EmbeddingRef>&) {
 
@@ -27,7 +27,7 @@ public:
 			shared_from_this(),
 			p_sent_metric_def);
 
-		metric->initialize(p_query);
+		metric->initialize(p_query, p_word_metric);
 
 		return metric;
 	}

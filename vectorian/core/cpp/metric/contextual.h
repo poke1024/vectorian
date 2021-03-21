@@ -14,7 +14,8 @@ protected:
 	MatcherFactoryRef m_matcher_factory;
 
 	MatcherFactoryRef create_matcher_factory(
-		const QueryRef &p_query);
+		const QueryRef &p_query,
+		const WordMetricDef &p_word_metric);
 
 public:
 	ContextualEmbeddingMetric(
@@ -27,8 +28,11 @@ public:
 
 	}
 
-	void initialize(const QueryRef &p_query) {
-		m_matcher_factory = create_matcher_factory(p_query);
+	void initialize(
+		const QueryRef &p_query,
+		const WordMetricDef &p_word_metric) {
+
+		m_matcher_factory = create_matcher_factory(p_query, p_word_metric);
 	}
 
 	inline const py::dict &options() const {

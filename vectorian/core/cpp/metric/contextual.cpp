@@ -4,7 +4,8 @@
 #include "document.h"
 
 MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
-	const QueryRef &p_query) {
+	const QueryRef &p_query,
+	const WordMetricDef &p_word_metric) {
 
 	py::gil_scoped_acquire acquire;
 
@@ -41,21 +42,15 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 
 				// we need the similarity matrix code from StaticEmbeddingMetricAtom::build_similarity_matrix here.
 
-				/*
-				p_metric.vector_metric(
-					vectors,
-					needle_vectors,
-					xt::strided_view(m_similarity, {xt::range(offset, offset + size), xt::all()}));
-				*/
-
 				const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
 				matrix->matrix.resize({s_vectors->size(), t_vectors->size()});
-				//xt::xtensor<float, 2> sim_matrix;
-				//sim_matrix.resize({s_vectors->size(), t_vectors->size()});
 
-				/*const auto cb = m_embedding->compute_embedding_callback();
-				py:array_t embeddings = cb(p_document->py_doc()).cast<py::array_t>();
-				PPK_ASSERT(embeddings.shape(0) == p_document->n_tokens());*/
+				xt::pytensor<float, 2> similarity;
+				similarity.resize({
+					s_vectors.attr("size").cast<ssize_t>(),
+					t_vectors.attr("size").cast<ssize_t>()});
+
+				p_word_metric.vector_metric(s_vectors, t_vectors, similarity);
 
 				const SliceFactoryFactory gen_slices([sim_matrix] (
 					const size_t slice_id,
