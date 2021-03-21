@@ -111,7 +111,7 @@ class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
 
 	def __call__(self, operands, out):
 		data = operands[0]
-		out["similarity"][:] = self._compute(data["similarity"])
+		self._compute(data["similarity"], out=out["similarity"])
 		for k in data.keys():
 			if k != "similarity":
 				out[k][:] = data[k]
@@ -126,6 +126,19 @@ class TokenSimilarity(AbstractTokenSimilarity):
 		self._embedding = embedding
 		self._metric = metric
 
+	@staticmethod
+	def make_with_modifiers(embedding, general_metric):
+		# it's convenient to build Bias(CosineSimilarity(), 0.5) even if
+		# this is not supported in the core. rewrite expressions like
+		# this as Bias(TokenSimilarity(x, CosineSimilarity()), 0.5).
+
+		if isinstance(general_metric, UnaryTokenSimilarityModifier):
+			new_operand = TokenSimilarity.make_with_modifiers(
+				embedding, general_metric.operands[0])
+			return general_metric.rewrite(new_operand)
+		else:
+			return TokenSimilarity(embedding, general_metric)
+
 	def to_args(self):
 		return {
 			'name': self._embedding.name + "-" + self._metric.name,
@@ -135,8 +148,11 @@ class TokenSimilarity(AbstractTokenSimilarity):
 
 
 class DistanceToSimilarity(UnaryTokenSimilarityModifier):
-	def _compute(self, similarity):
-		return np.maximum(0, 1 - similarity)
+	def rewrite(self, operand):
+		return DistanceToSimilarity(operand)
+
+	def _compute(self, similarity, out):
+		out[:, :] = np.maximum(0, 1 - similarity)
 
 	@property
 	def name(self):
@@ -148,8 +164,11 @@ class Bias(UnaryTokenSimilarityModifier):
 		super().__init__(operand)
 		self._bias = bias
 
-	def _compute(self, similarity):
-		return similarity + self._bias
+	def rewrite(self, operand):
+		return Bias(operand, self._bias)
+
+	def _compute(self, similarity, out):
+		out[:, :] = similarity + self._bias
 
 	@property
 	def name(self):
@@ -161,8 +180,11 @@ class Scale(UnaryTokenSimilarityModifier):
 		super().__init__(operand)
 		self._scale = scale
 
-	def _compute(self, similarity):
-		return similarity * self._scale
+	def rewrite(self, operand):
+		return Scale(operand, self._scale)
+
+	def _compute(self, similarity, out):
+		out[:, :] = similarity * self._scale
 
 	@property
 	def name(self):
@@ -191,7 +213,7 @@ class MixedTokenSimilarity(TokenSimilarityModifier):
 		terms = []
 		for m, w in zip(self._metrics, self._weights):
 			terms.append(f'{w / total} * {m.name}')
-		return '(' + ' + '.join(terms) + ')'
+		return f'({" + ".join(terms)})'
 
 
 class ExtremumTokenSimilarity(TokenSimilarityModifier):
