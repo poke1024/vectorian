@@ -30,31 +30,36 @@ class CosineSimilarity(VectorSpaceMetric):
 		return "cosine"
 
 
-class SqrtCosineSimilarity(VectorSpaceMetric):
-	def __call__(self, a, b, out):
-		'''
-		const float num = xt::sum(xt::sqrt(p_s * p_t))();
-		const float denom = xt::sum(p_s)() * xt::sum(p_t)();
-		return num / denom;
-		'''
-
-	@property
-	def name(self):
-		return "sqrt-cosine"
-
-
 class ImprovedSqrtCosineSimilarity(VectorSpaceMetric):
 	"""
 	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”
 	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
 	"""
 
+	@staticmethod
+	def _to_non_negative(x):
+		t = np.repeat(x, 2, axis=-1)
+		t[:, 1::2] = -t[:, 1::2]
+		return np.maximum(0, t)
+
 	def __call__(self, a, b, out):
-		num = np.sum(np.sqrt(a.unmodified[:, np.newaxis] * b.unmodified[np.newaxis, :]), axis=-1)
-		x = np.sqrt(np.sum(a.unmodified, axis=-1))
-		y = np.sqrt(np.sum(b.unmodified, axis=-1))
+		# we assume embeddings that may be negative. however this distance
+		# assumes non-negative vectors so we apply a simple transformation
+		# to make all vectors non-negative.
+
+		a_pos = self._to_non_negative(a.unmodified)
+		b_pos = self._to_non_negative(b.unmodified)
+
+		num = np.sum(np.sqrt(a_pos[:, np.newaxis] * b_pos[np.newaxis, :]), axis=-1)
+
+		x = np.sqrt(np.sum(a_pos, axis=-1))
+		y = np.sqrt(np.sum(b_pos, axis=-1))
 		denom = x[:, np.newaxis] * y[np.newaxis, :]
+
+		old_err_settings = np.seterr(divide='ignore', invalid='ignore')
 		out[:, :] = num / denom
+		np.seterr(**old_err_settings)
+		np.nan_to_num(out, copy=False, nan=0)
 
 	@property
 	def name(self):
@@ -105,6 +110,9 @@ class TokenSimilarityModifier(AbstractTokenSimilarity):
 class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
 	def __init__(self, operand):
 		self._operand = operand
+
+	def rewrite(self, operand):
+		raise NotImplementedError()
 
 	def _compute(self, similarity):
 		raise NotImplementedError()
@@ -189,6 +197,40 @@ class Scale(UnaryTokenSimilarityModifier):
 	@property
 	def name(self):
 		return f'({self._operand.name} * {self._scale})'
+
+
+class Power(UnaryTokenSimilarityModifier):
+	def __init__(self, operand, exp):
+		super().__init__(operand)
+		self._exp = exp
+
+	def rewrite(self, operand):
+		return Power(operand, self._exp)
+
+	def _compute(self, similarity, out):
+		out[:, :] = np.power(np.maximum(similarity, 0), self._exp)
+
+	@property
+	def name(self):
+		return f'({self._operand.name} ** {self._exp})'
+
+
+class Threshold(UnaryTokenSimilarityModifier):
+	def __init__(self, operand, threshold):
+		super().__init__(operand)
+		self._threshold = threshold
+
+	def rewrite(self, operand):
+		return Threshold(operand, self._threshold)
+
+	def _compute(self, similarity, out):
+		x = np.maximum(0, similarity - self._threshold)
+		x[x > 0] += self._threshold
+		out[:, :] = x
+
+	@property
+	def name(self):
+		return f'threshold({self._operand.name}, {self._threshold})'
 
 
 class MixedTokenSimilarity(TokenSimilarityModifier):

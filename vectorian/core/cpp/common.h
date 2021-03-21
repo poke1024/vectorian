@@ -63,7 +63,6 @@ typedef std::unordered_map<int, float> POSWMap;
 
 struct MetricModifiers {
 	float pos_mismatch_penalty;
-	float similarity_falloff;
 	float similarity_threshold;
 	std::vector<float> t_pos_weights; // by index in t
 };

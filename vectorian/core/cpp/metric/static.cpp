@@ -182,11 +182,6 @@ void StaticEmbeddingMetricAtom::initialize(
 		p_query,
 		p_metric);
 
-	if (m_sent_metric_def.contains("similarity_falloff")) {
-		const float similarity_falloff = m_sent_metric_def["similarity_falloff"].cast<float>();
-		m_similarity = xt::pow(m_similarity, similarity_falloff);
-	}
-
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
 	if (p_query->debug_hook().has_value()) {
 		auto gen_rows = py::cpp_function([&] () {
