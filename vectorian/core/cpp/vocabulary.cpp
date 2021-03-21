@@ -111,7 +111,7 @@ MetricRef QueryVocabulary::create_metric(
 	const py::dict &p_sentence_metric,
 	const py::object &p_token_metric) {
 
-	if (p_token_metric.attr("is_interpolator").cast<bool>()) {
+	if (p_token_metric.attr("is_modifier").cast<bool>()) {
 
 		std::vector<StaticEmbeddingMetricRef> metrics;
 

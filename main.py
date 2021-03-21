@@ -2,7 +2,7 @@
 
 import vectorian.utils as utils
 
-from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, MixedTokenSimilarityMeasure, AlignmentSentenceMetric
+from vectorian.metrics import CosineSimilarity, TokenSimilarity, MixedTokenSimilarity, AlignmentSentenceSimilarity
 from vectorian.alignment import WordMoversDistance, WordRotatorsDistance
 from vectorian.importers import NovelImporter
 from vectorian.embeddings import PretrainedFastText, CompressedFastTextVectors, PretrainedGloVe
@@ -90,22 +90,22 @@ if __name__ == '__main__':
                 f.write("\n")
 
             if True:
-                metric = MixedTokenSimilarityMeasure(
+                metric = MixedTokenSimilarity(
                     [
-                        TokenSimilarityMeasure(fasttext, CosineMetric()),
-                        TokenSimilarityMeasure(glove, CosineMetric())
+                        TokenSimilarity(fasttext, CosineSimilarity()),
+                        TokenSimilarity(glove, CosineSimilarity())
                     ],
                     [1, 1]
                 )
 
                 #metric = TokenSimilarityMeasure(fasttext, CosineMetric())
 
-                index = session.partition("sentence").index(AlignmentSentenceMetric(
+                index = session.partition("sentence").index(AlignmentSentenceSimilarity(
                     token_metric=metric,
                     alignment=WordMoversDistance.wmd('kusner')), nlp=nlp)
             else:
                 index = session.partition("sentence").index(AlignmentSentenceMetric(
-                    token_metric=TokenSimilarityMetric(fasttext, CosineMetric()),
+                    token_metric=TokenSimilarityMetric(fasttext, CosineSimilarity()),
                     alignment=WordRotatorsDistance()), nlp=nlp)
 
             #matches = index.find("write female", n=3, debug=debug)

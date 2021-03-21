@@ -63,6 +63,32 @@ def rewrite(rules):
 	return f
 
 
-def to_mapper(self, mode):
-	elements = [x for x in self._mappings if getattr(x, mode)]
+def filter_punct(t):
+	return None if t["pos"] == "PUNCT" else t
 
+
+def default_token_mappings():
+	# Vectorian's default token mappings. You might want
+	# to adjust this by adding lowercase mapping and/or
+	# other pos tag mappings.
+
+	return {
+		"tokenizer": [
+			erase("W"),  # remove any non-word characters
+			alpha()  # ignore any tokens that are empty
+		],
+		"tagger": [
+			filter_punct,  # ignore punctuation tokens
+			rewrite({
+				# rewrite PROPN as NOUN to fix accuracy
+
+				'pos': {
+					'PROPN': 'NOUN'
+				},
+				'tag': {
+					'NNP': 'NN',
+					'NNPS': 'NNS',
+				}
+			})
+		]
+	}

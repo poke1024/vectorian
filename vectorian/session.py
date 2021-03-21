@@ -7,7 +7,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineMetric, TokenSimilarityMeasure, AlignmentSentenceMetric, SentenceSimilarityMetric
+from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSentenceSimilarity, SentenceSimilarity
 from vectorian.embeddings import StaticEmbedding
 
 
@@ -111,7 +111,7 @@ class Partition:
 		return self._session.max_len(self._level, self._window_size)
 
 	def index(self, metric, nlp=None, **kwargs):
-		if not isinstance(metric, SentenceSimilarityMetric):
+		if not isinstance(metric, SentenceSimilarity):
 			raise TypeError(metric)
 
 		if nlp:
@@ -123,6 +123,9 @@ class Partition:
 
 class Session:
 	def __init__(self, docs, static_embeddings=None, token_mappings=None):
+		if token_mappings == "default":
+			token_mappings = utils.default_token_mappings()
+
 		self._vocab = core.Vocabulary()
 
 		if static_embeddings and not token_mappings:
@@ -156,9 +159,9 @@ class Session:
 
 	def default_metric(self):
 		embedding = list(self._embeddings.values())[0]
-		return AlignmentSentenceMetric(
-			TokenSimilarityMetric(
-				embedding, CosineMetric()))
+		return AlignmentSentenceSimilarity(
+			TokenSimilarity(
+				embedding, CosineSimilarity()))
 
 	@cached_property
 	def documents(self):
