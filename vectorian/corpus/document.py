@@ -130,8 +130,12 @@ def xspan(idxs, lens, i0, window_size, window_step):
 
 
 class Document:
-	def __init__(self, json):
+	def __init__(self, json, contextual_embeddings=None):
 		self._json = json
+		self._contextual_embeddings = contextual_embeddings or {}
+
+	def embeddings(self, name):
+		return self._contextual_embeddings[name]
 
 	@staticmethod
 	def load(path):

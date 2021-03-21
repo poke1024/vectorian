@@ -426,8 +426,36 @@ class ContextualEmbedding:
 	def encode(self, doc):
 		raise NotImplementedError()
 
+	@property
+	def unique_name(self):
+		raise NotImplementedError()
 
-class TransformerEmbedding(ContextualEmbedding):
+
+class SpacyTransformerEmbedding(ContextualEmbedding):
+	def __init__(self, nlp):
+		self._nlp = nlp
+
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
 		return doc._.trf_data.tensors[-1]
+
+	@cached_property
+	def unique_name(self):
+		return self._nlp.meta['name'], self._nlp.meta['version']
+
+
+class VectorsCache:
+	pass
+
+
+class VectorsRef:
+	def open(self):
+		raise NotImplementedError()
+
+
+class InMemoryVectorsRef(VectorsRef):
+	def __init__(self, vectors):
+		self._vectors = vectors
+
+	def open(self):
+		return Vectors(self._vectors)

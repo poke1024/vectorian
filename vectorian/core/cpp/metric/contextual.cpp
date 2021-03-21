@@ -29,13 +29,24 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 			matcher_options,
 			[p_query, metric] (const DocumentRef &p_document, const auto &p_matcher_options) {
 
-				const ContextualEmbeddingVectorsRef t_vectors = p_query->get_contextual_embedding_vectors(
-					m_embedding->name());
-				const ContextualEmbeddingVectorsRef s_vectors = p_document->get_contextual_embedding_vectors(
-					m_embedding->name());
+				py::gil_scoped_acquire acquire;
+
+				const py::object t_vectors = p_query->open_contextual_embedding_vectors(
+					p_query->session(), m_embedding->name());
+				const py::object s_vectors = p_document->open_contextual_embedding_vectors(
+					p_query->session(), m_embedding->name());
 
 				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
 				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
+
+				// we need the similarity matrix code from StaticEmbeddingMetricAtom::build_similarity_matrix here.
+
+				/*
+				p_metric.vector_metric(
+					vectors,
+					needle_vectors,
+					xt::strided_view(m_similarity, {xt::range(offset, offset + size), xt::all()}));
+				*/
 
 				const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
 				matrix->matrix.resize({s_vectors->size(), t_vectors->size()});

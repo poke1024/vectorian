@@ -1,12 +1,13 @@
 import re
 import logging
 import datetime
+import numpy as np
 
 from tqdm import tqdm
 from pathlib import Path
 from collections import namedtuple
 
-from vectorian.embeddings import ContextualEmbedding
+from vectorian.embeddings import ContextualEmbedding, InMemoryVectorsRef
 
 
 def normalize_dashes(s):
@@ -51,7 +52,10 @@ class Importer:
 	def _make_doc(self, md, partitions, loc_keys, locations):
 		pipe = self._nlp.pipe(
 			partitions,
-			batch_size=self._batch_size)
+			batch_size=self._batch_size,
+			disable=['ner', 'lemmatizer'])  # check nlp.pipe_names
+
+		contextual_vectors = dict((e.unique_name, []) for e in self._embeddings)
 
 		json_partitions = []
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=f'Importing {md.origin}'):
@@ -59,9 +63,8 @@ class Importer:
 			doc_json['loc'] = location
 			json_partitions.append(doc_json)
 
-			for embedding in self._embeddings:
-				v = embedding.encode(doc)
-				print('??', v.shape, len(doc))
+			for e in self._embeddings:
+				contextual_vectors[e.unique_name].append(e.encode(doc))
 
 		json = {
 			'metadata': md._asdict(),
@@ -71,7 +74,10 @@ class Importer:
 
 		from vectorian.corpus import Document
 
-		return Document(json)
+		contextual_embeddings = dict(
+			(k, InMemoryVectorsRef(np.vstack(v))) for k, v in contextual_vectors.items())
+
+		return Document(json, contextual_embeddings)
 
 
 class TextImporter(Importer):
