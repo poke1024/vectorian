@@ -143,21 +143,16 @@ MetricRef QueryVocabulary::create_metric(
 			token_metric_def["embedding"].cast<py::str>(),
 			token_metric_def["metric"].cast<py::object>()};
 
-		const auto it = m_vocab->m_embeddings_by_name.find(metric_def.embedding);
-		if (it == m_vocab->m_embeddings_by_name.end()) {
-			std::ostringstream err;
-			err << "unknown embedding \"" << metric_def.embedding << "\" referenced in metric \"" <<
-				metric_def.name << "\". did you miss to add it to your session?";
-			throw std::runtime_error(err.str());
-		}
-		const auto embedding_index = it->second;
-
-		std::vector<EmbeddingRef> embeddings = {
-			m_vocab->m_embeddings[embedding_index].compiled,
-			m_embeddings[embedding_index].compiled
+		const auto embedding_index = m_embedding_manager->to_index(metric_def.embedding);
+		const std::vector<EmbeddingRef> embeddings = {
+			m_vocab->embedding_manager()->get_compiled(embedding_index),
+			embedding_manager()->get_compiled(embedding_index)
 		};
 
-		return m_embeddings[embedding_index].compiled->create_metric(
+		// since embeddings[0] and embeddings[1] have the same class (type), and
+		// we only want the vcall, it does not matter which one we choose here.
+
+		return embeddings[0]->create_metric(
 			p_query,
 			metric_def,
 			p_sentence_metric,

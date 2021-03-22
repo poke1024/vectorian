@@ -7,6 +7,7 @@ from cached_property import cached_property
 import numpy as np
 import json
 import os
+import sys
 import download
 import compress_fasttext
 
@@ -108,6 +109,11 @@ class Vectors:  # future: CudaVectors
 		self._unmodified = unmodified
 
 	@property
+	def memory_usage(self):
+		print(sys.getsizeof(self))
+		return sys.getsizeof(self._unmodified)
+
+	@property
 	def size(self):
 		return self._unmodified.shape[0]
 
@@ -165,12 +171,22 @@ class StackedVectors:
 		return [s.magnitudes[i] for s, i in zip(self._sources, self._indices)]
 
 
+class StaticEmbeddingInstance:
+	@property
+	def is_static(self):
+		return True
+
+
 class CachedWordEmbedding(StaticEmbedding):
-	class Instance:
+	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, tokens, vectors):
 			self._name = name
 			self._token2id = dict((t, i) for i, t in enumerate(tokens))
 			self._vectors = vectors
+
+		@property
+		def memory_usage(self):
+			return sys.getsizeof(self._token2id) + sys.getsizeof(self._vectors)
 
 		@property
 		def name(self):
@@ -255,7 +271,7 @@ class CachedWordEmbedding(StaticEmbedding):
 
 
 class GensimKeyedVectors(StaticEmbedding):
-	class Instance:
+	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, wv):
 			self._name = name
 			self._wv = wv
@@ -312,7 +328,7 @@ class CompressedFastTextVectors(StaticEmbedding):
 
 
 class PretrainedFastText(StaticEmbedding):
-	class Instance:
+	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, ft):
 			self._name = name
 			self._ft = ft
@@ -399,7 +415,7 @@ class PretrainedGloVe(CachedWordEmbedding):
 
 
 class StackedEmbedding:
-	class Instance:
+	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, embeddings):
 			self._name = name
 			self._embeddings = embeddings
@@ -448,6 +464,13 @@ class ContextualEmbedding(Embedding):
 	def encode(self, doc):
 		raise NotImplementedError()
 
+	def to_core(self):
+		return core.ContextualEmbedding(self.name)
+
+	@property
+	def name(self):
+		raise NotImplementedError()
+
 
 class SpacyTransformerEmbedding(ContextualEmbedding):
 	def __init__(self, nlp):
@@ -459,7 +482,7 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 	@cached_property
 	def name(self):
-		return self._nlp.meta['name'], self._nlp.meta['version']
+		return '/'.join('spacy', self._nlp.meta['name'], self._nlp.meta['version'])
 
 
 class VectorsCache:

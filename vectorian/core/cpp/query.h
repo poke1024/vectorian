@@ -214,6 +214,12 @@ public:
 		if (p_kwargs && p_kwargs.contains("metric")) {
 			const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
+			// const auto it = m_contextual_embeddings.find(metric_def.embedding);
+			// embedding->create_metric(shared_from_this(),
+			//	const QueryRef &p_query,
+			//	const WordMetricDef &p_word_metric,
+			//	const py::dict &p_sent_metric_def,
+
 			m_metrics.push_back(m_vocab->create_metric(
 				shared_from_this(),
 				metric_def_dict,

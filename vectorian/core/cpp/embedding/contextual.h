@@ -6,15 +6,11 @@
 #include "metric/contextual.h"
 
 class ContextualEmbedding : public Embedding {
-	const py::object m_compute_embedding_callback;
-
 public:
 	ContextualEmbedding(
-		const std::string &p_name,
-		py::object p_compute) :
+		const std::string &p_name) :
 
-		Embedding(p_name),
-		m_compute_embedding_callback(p_compute) {
+		Embedding(p_name) {
 	}
 
 	virtual MetricRef create_metric(
@@ -30,10 +26,6 @@ public:
 		metric->initialize(p_query, p_word_metric);
 
 		return metric;
-	}
-
-	inline const py::object &compute_embedding_callback() const {
-		return m_compute_embedding_callback;
 	}
 };
 

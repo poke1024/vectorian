@@ -167,26 +167,105 @@ IncrementalLexiconRef<T> make_incremental(const LexiconRef<T> &p_lexicon) {
 
 class QueryVocabulary;
 
+class EmbeddingManager;
+typedef std::shared_ptr<EmbeddingManager> EmbeddingManagerRef;
+
+class EmbeddingManager {
+	struct Embedding {
+		py::object embedding; // py embedding session instance
+		bool is_static;
+		py::object to_core;
+		EmbeddingRef compiled;
+	};
+
+	std::unordered_map<std::string, size_t> m_embeddings_by_name;
+	std::vector<Embedding> m_embeddings;
+	bool m_is_compiled;
+
+public:
+	EmbeddingManager() : m_is_compiled(false) {
+	}
+
+	EmbeddingManager(const EmbeddingManager &p_other) :
+		m_embeddings_by_name(p_other.m_embeddings_by_name),
+		m_embeddings(p_other.m_embeddings),
+		m_is_compiled(false) {
+
+		for (auto &e : m_embeddings) {
+			e.compiled.reset();
+		}
+	}
+
+	EmbeddingManagerRef clone() const {
+		return std::make_shared<EmbeddingManager>(*this);
+	}
+
+	size_t to_index(const std::string &p_name) const {
+		const auto it = m_embeddings_by_name.find(p_name);
+		if (it == m_embeddings_by_name.end()) {
+			std::ostringstream err;
+			err << "unknown embedding \"" << p_name << "\". did you miss to add it to your session?";
+			throw std::runtime_error(err.str());
+		}
+		return it->second;
+	}
+
+	int add_embedding(py::object p_embedding) {
+
+		if (m_is_compiled) {
+			throw std::runtime_error("EmbeddingManager cannot add new embeddings after compilation");
+		}
+
+		const size_t next_id = m_embeddings.size();
+		m_embeddings_by_name[p_embedding.attr("name").cast<std::string>()] = next_id;
+
+		Embedding e;
+		e.embedding = p_embedding;
+		e.is_static = p_embedding.attr("is_static").cast<bool>();
+		e.to_core = p_embedding.attr("to_core");
+		m_embeddings.push_back(e);
+
+		return next_id;
+	}
+
+	void compile_static(const py::list &p_tokens) {
+		for (auto &e : m_embeddings) {
+			if (e.is_static) {
+				e.compiled = e.to_core(p_tokens).template cast<EmbeddingRef>();
+			}
+		}
+		m_is_compiled = true;
+	}
+
+	void compile_contextual() {
+		for (auto &e : m_embeddings) {
+			if (!e.is_static) {
+				e.compiled = e.to_core().template cast<EmbeddingRef>();
+			}
+		}
+		m_is_compiled = true;
+	}
+
+	const EmbeddingRef &get_compiled(const size_t p_index) const {
+		return m_embeddings.at(p_index).compiled;
+	}
+};
+
+
 class Vocabulary {
 protected:
 	friend class QueryVocabulary;
+
+	const EmbeddingManagerRef m_embedding_manager;
 
 	const LexiconRef<token_t> m_tokens;
 	const LexiconRef<int8_t> m_pos;
 	const LexiconRef<int8_t> m_tag;
 
-	struct Embedding {
-		py::object embedding; // py embedding session instance
-		EmbeddingRef compiled;
-	};
-
 	struct EmbeddingTokenRef {
 		int16_t embedding;
 		token_t token;
 	};
-
-	std::unordered_map<std::string, size_t> m_embeddings_by_name;
-	std::vector<Embedding> m_embeddings;
 
 	/*void init_with_embedding_tokens() {
 		PPK_ASSERT(m_tokens.size() == 0);
@@ -259,7 +338,8 @@ public:
 
 	std::recursive_mutex m_mutex;
 
-	Vocabulary() :
+	Vocabulary(const EmbeddingManagerRef &p_embedding_manager) :
+		m_embedding_manager(p_embedding_manager),
 		m_tokens(std::make_shared<Lexicon<token_t>>()),
 		m_pos(std::make_shared<Lexicon<int8_t>>()),
 		m_tag(std::make_shared<Lexicon<int8_t>>()) {
@@ -275,22 +355,6 @@ public:
 		return m_tokens->size();
 	}
 
-	int add_embedding(py::object p_embedding) {
-		if (m_tokens->size() > 0) {
-			throw std::runtime_error(
-				"cannot add embeddings after tokens were added.");
-		}
-
-		const size_t next_id = m_embeddings.size();
-		m_embeddings_by_name[p_embedding.attr("name").cast<std::string>()] = next_id;
-
-		Embedding e;
-		e.embedding = p_embedding;
-		m_embeddings.push_back(e);
-
-		return next_id;
-	}
-
 	void compile_embeddings() {
 		py::list tokens;
 		for (const auto &s : m_tokens->inc_strings()) {
@@ -300,9 +364,7 @@ public:
 			throw std::runtime_error("no tokens in vocabulary");
 		}
 
-		for (auto &e : m_embeddings) {
-			e.compiled = e.embedding.attr("to_core")(tokens).cast<EmbeddingRef>();
-		}
+		m_embedding_manager->compile_static(tokens);
 	}
 
 	inline int add_pos(const std::string &p_name) {
@@ -347,34 +409,29 @@ public:
 	inline const std::string &tag_str(int8_t p_tag_id) {
 		return m_tag->to_str(p_tag_id);
 	}
+
+	inline const EmbeddingManagerRef &embedding_manager() const {
+		return m_embedding_manager;
+	}
 };
 
 typedef std::shared_ptr<Vocabulary> VocabularyRef;
 
 class QueryVocabulary {
 	const VocabularyRef m_vocab;
+	const EmbeddingManagerRef m_embedding_manager;
 
 	const IncrementalLexiconRef<token_t> m_tokens;
 	const IncrementalLexiconRef<int8_t> m_pos;
 	const IncrementalLexiconRef<int8_t> m_tag;
 
-	struct Embedding {
-		py::object embedding; // py embedding session instance
-		EmbeddingRef compiled;
-	};
-
-	std::vector<Embedding> m_embeddings;
-
 public:
 	QueryVocabulary(const VocabularyRef &p_vocab) :
 		m_vocab(p_vocab),
+		m_embedding_manager(p_vocab->embedding_manager()->clone()),
 		m_tokens(make_incremental(m_vocab->m_tokens)),
 		m_pos(make_incremental(m_vocab->m_pos)),
 		m_tag(make_incremental(m_vocab->m_tag)) {
-
-		for (const auto &e : m_vocab->m_embeddings) {
-			m_embeddings.push_back(Embedding{e.embedding});
-		}
 
 		//std::cout << "creating query vocabulary at " << this << "\n";
 	}
@@ -405,9 +462,7 @@ public:
 			tokens.append(py::str(s));
 		}
 
-		for (auto &e : m_embeddings) {
-			e.compiled = e.embedding.attr("to_core")(tokens).cast<EmbeddingRef>();
-		}
+		m_embedding_manager->compile_static(tokens);
 	}
 
 	/*const std::vector<token_t> &get_embedding_map(const int p_emb_idx) {
@@ -453,6 +508,10 @@ public:
 			}
 		}
 		return pos_weights;
+	}
+
+	inline const EmbeddingManagerRef &embedding_manager() const {
+		return m_embedding_manager;
 	}
 };
 

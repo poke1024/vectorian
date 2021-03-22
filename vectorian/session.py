@@ -129,7 +129,7 @@ class Session:
 		if token_mappings == "default":
 			token_mappings = utils.default_token_mappings()
 
-		self._vocab = core.Vocabulary()
+		self._embedding_manager = core.EmbeddingManager()
 
 		if any(e.is_static for e in embeddings) and not token_mappings:
 			logging.warning("got static embeddings but not token mappings.")
@@ -152,13 +152,15 @@ class Session:
 			if embedding.is_static:
 				instance = embedding.create_instance(self)
 				self._embedding_instances[instance.name] = instance
-				self._vocab.add_embedding(instance)
+				self._embedding_manager.add_embedding(instance)
 
 		for embedding in self._embeddings:
 			if embedding.is_contextual:
 				for doc in docs:
 					if not doc.has_contextual_embedding(embedding.name):
 						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
+
+		self._vocab = core.Vocabulary(self._embedding_manager)
 
 		self._collection = Collection(
 			self, self._vocab, docs)

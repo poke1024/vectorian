@@ -7,6 +7,7 @@
 #include "match/match_impl.h"
 #include "embedding/embedding.h"
 #include "embedding/static.h"
+#include "embedding/contextual.h"
 #include "vocabulary.h"
 #include "query.h"
 #include "document.h"
@@ -67,23 +68,26 @@ PYBIND11_MODULE(core, m) {
 	match.def("regions", &Match::regions);
 	match.def_property_readonly("omitted", &Match::omitted);
 
+	py::class_<EmbeddingManager, EmbeddingManagerRef> embedding_manager(m, "EmbeddingManager");
+	embedding_manager.def(py::init<>());
+	embedding_manager.def("add_embedding", &EmbeddingManager::add_embedding);
+	embedding_manager.def("to_index", &EmbeddingManager::to_index);
+
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
 
-	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> fast_embedding(m, "StaticEmbedding");
-	fast_embedding.def(py::init<py::object, py::list>());
-	//fast_embedding.def("token_to_id", &StaticEmbedding::token_to_id);
-	fast_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
-	//fast_embedding.def("cosine_similarity", &StaticEmbedding::cosine_similarity);
-	//fast_embedding.def("similarity_matrix", &StaticEmbedding::similarity_matrix);
-	fast_embedding.def_property_readonly("size", &StaticEmbedding::size);
-	//fast_embedding.def_property_readonly("measures", &StaticEmbedding::measures);
+	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> static_embedding(m, "StaticEmbedding");
+	static_embedding.def(py::init<py::object, py::list>());
+	static_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
+	static_embedding.def_property_readonly("size", &StaticEmbedding::size);
+
+	py::class_<ContextualEmbedding, Embedding, ContextualEmbeddingRef> contextual_embedding(m, "ContextualEmbedding");
+	contextual_embedding.def(py::init<const std::string&>());
 
 	py::class_<Vocabulary, VocabularyRef> vocabulary(m, "Vocabulary");
-	vocabulary.def(py::init());
+	vocabulary.def(py::init<const EmbeddingManagerRef&>());
 	vocabulary.def_property_readonly("size", &Vocabulary::size);
 	vocabulary.def("token_to_id", &Vocabulary::token_to_id);
 	vocabulary.def("id_to_token", &Vocabulary::id_to_token);
-	vocabulary.def("add_embedding", &Vocabulary::add_embedding);
 	vocabulary.def("compile_embeddings", &Vocabulary::compile_embeddings);
 
 	py::class_<Query, QueryRef> query(m, "Query");
