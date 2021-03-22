@@ -1,3 +1,5 @@
+#include "match/matcher_impl.h"
+
 template<typename SliceFactory, typename Aligner, typename Finalizer>
 MatcherRef make_matcher(
 	const QueryRef &p_query,

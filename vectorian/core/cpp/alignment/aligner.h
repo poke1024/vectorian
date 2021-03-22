@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_ALIGNER__
+#define __VECTORIAN_ALIGNER__
+
 // Author: Bernhard Liebl, 2020
 // Released under a MIT license.
 
@@ -409,3 +412,5 @@ public:
 		reconstruct_local_alignment(flow, len_t, len_s, zero_similarity);
 	}
 };
+
+#endif // __VECTORIAN_ALIGNER__

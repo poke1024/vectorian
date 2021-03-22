@@ -9,13 +9,16 @@ typedef std::shared_ptr<ContextualEmbedding> ContextualEmbeddingRef;
 class ContextualEmbeddingMetric : public Metric {
 protected:
 	const ContextualEmbeddingRef m_embedding;
-	const py::dict m_options;
-	const py::dict m_alignment_def;
+	const py::dict m_sent_metric_def;
 	MatcherFactoryRef m_matcher_factory;
 
 	MatcherFactoryRef create_matcher_factory(
 		const QueryRef &p_query,
 		const WordMetricDef &p_word_metric);
+
+	inline py::dict alignment_def() const {
+		return m_sent_metric_def["alignment"].cast<py::dict>();
+	}
 
 public:
 	ContextualEmbeddingMetric(
@@ -23,9 +26,7 @@ public:
 		const py::dict &p_sent_metric_def) :
 
 		m_embedding(std::dynamic_pointer_cast<ContextualEmbedding>(p_embedding)),
-		m_options(p_sent_metric_def),
-		m_alignment_def(m_options["alignment"].cast<py::dict>()) {
-
+		m_sent_metric_def(p_sent_metric_def) {
 	}
 
 	void initialize(
@@ -33,10 +34,6 @@ public:
 		const WordMetricDef &p_word_metric) {
 
 		m_matcher_factory = create_matcher_factory(p_query, p_word_metric);
-	}
-
-	inline const py::dict &options() const {
-		return m_options;
 	}
 
 	virtual MatcherFactoryRef matcher_factory() const {

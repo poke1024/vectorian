@@ -1,4 +1,5 @@
 #include "common.h"
+#include "alignment/aligner.h"
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 

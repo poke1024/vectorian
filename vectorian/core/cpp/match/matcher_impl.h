@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_MATCHER_IMPL__
+#define __VECTORIAN_ALIGNER__
+
 #include "common.h"
 #include "match/matcher.h"
 #include "match/match.h"
@@ -173,3 +176,5 @@ public:
 		});
 	}
 };
+
+#endif // __VECTORIAN_ALIGNER__

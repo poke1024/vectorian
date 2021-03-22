@@ -1,16 +1,19 @@
-#include "slice/encoder.h"
+#ifndef __VECTORIAN_CONTEXTUAL_EMBEDDING_SLICE_H__
+#define __VECTORIAN_CONTEXTUAL_EMBEDDING_SLICE_H__
 
-template<typename VectorSimilarity>
+#include "slice/encoder.h"
+#include "embedding/vectors.h"
+
 class ContextualEmbeddingSlice {
-	const SimilarityMatrix &m_matrix;
+	const xt::pytensor<float, 2> &m_matrix;
 	const size_t m_slice_id;
 	const TokenSpan m_s;
 	const TokenSpan m_t;
-	const TokenIdEncoder m_encoder;
+	const TokenIdEncoder m_encoder; // FIXME should be a ContextualTokenIdEncoder
 
 public:
 	inline ContextualEmbeddingSlice(
-		const SimilarityMatrix &matrix,
+		const xt::pytensor<float, 2> &matrix,
 		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
@@ -50,15 +53,14 @@ public:
 	}
 
 	inline float magnitude_s(int i) const {
-		return m_s_vectors.magnitude(m_s.offset + i);
+		return 1.0f; // FIXME m_magnitudes_s(i);
 	}
 
 	inline float magnitude_t(int i) const {
-		return m_t_vectors.magnitude(m_t.offset + i);
+		return 1.0f; // FIXME m_magnitudes_t(i);
 	}
 
 	inline void assert_has_magnitudes() const {
-		return true;
 	}
 
 	inline float max_similarity_for_t(int i) const {
@@ -77,3 +79,5 @@ public:
 		return similarity(i, j);
 	}
 };
+
+#endif // __VECTORIAN_CONTEXTUAL_EMBEDDING_SLICE_H__

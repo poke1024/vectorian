@@ -1,7 +1,11 @@
+#include "result_set.h"
 #include "metric/contextual.h"
+#include "metric/alignment.h"
 #include "embedding/contextual.h"
 #include "query.h"
 #include "document.h"
+#include "metric/factory.h"
+#include "slice/contextual.h"
 
 MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 	const QueryRef &p_query,
@@ -16,56 +20,55 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 		shared_from_this());
 
 	const std::string sentence_metric_kind =
-		m_options["metric"].cast<py::str>();
+		m_sent_metric_def["metric"].cast<py::str>();
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
-#if 0
+		bool needs_magnitudes = false;
 		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
 		if (matcher_options.needs_magnitudes) {
-			m_needs_magnitudes = true;
+			needs_magnitudes = true;
 		}
+
+		const py::object vector_metric = p_word_metric.vector_metric;
 
 		return MatcherFactory::create(
 			matcher_options,
-			[p_query, metric] (const DocumentRef &p_document, const auto &p_matcher_options) {
+			[p_query, metric, vector_metric] (
+				const DocumentRef &p_document, const auto &p_matcher_options) {
 
 				py::gil_scoped_acquire acquire;
 
 				const HandleRef t_vectors = p_query->vectors_cache().open(
-					p_document->get_contextual_embedding_vectors(m_embedding->name())
+					p_document->get_contextual_embedding_vectors(metric->name())
 				);
 				const HandleRef s_vectors = p_query->vectors_cache().open(
-					p_query->get_contextual_embedding_vectors(m_embedding->name())
+					p_query->get_contextual_embedding_vectors(metric->name())
 				);
 
 				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
 				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
 
-				// we need the similarity matrix code from StaticEmbeddingMetricAtom::build_similarity_matrix here.
-
 				const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
 
-				xt::pytensor<float, 2> similarity;
-				similarity.resize({
-					s_vectors->attr("size").cast<ssize_t>(),
-					t_vectors->attr("size").cast<ssize_t>()});
+				sim_matrix->matrix.resize({
+					s_vectors->get().attr("size").cast<ssize_t>(),
+					t_vectors->get().attr("size").cast<ssize_t>()});
 
-				p_word_metric.vector_metric(*s_vectors, *t_vectors, similarity);
+				vector_metric(*s_vectors, *t_vectors, sim_matrix->matrix);
 
 				const SliceFactoryFactory gen_slices([sim_matrix] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return ContextualEmbeddingSlice(sim_matrix, slice_id, s, t);
+			        return ContextualEmbeddingSlice(sim_matrix->matrix, slice_id, s, t);
 				});
 
 				return create_alignment_matcher<int16_t>(
 					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
 					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
-#endif
 
 	} /*else if (sentence_metric_kind == "alignment-tag-weighted") {
 
@@ -100,8 +103,6 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 		err << "unknown sentence metric type " << sentence_metric_kind;
 		throw std::runtime_error(err.str());
 	}
-
-	throw std::runtime_error("not implemented");
 }
 
 const std::string &ContextualEmbeddingMetric::name() const {

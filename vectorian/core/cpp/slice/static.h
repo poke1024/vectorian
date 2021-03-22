@@ -1,5 +1,5 @@
-#ifndef __VECTORIAN_FAST_SCORES_H__
-#define __VECTORIAN_FAST_SCORES_H__
+#ifndef __VECTORIAN_STATIC_EMBEDDING_SLICE_H__
+#define __VECTORIAN_STATIC_EMBEDDING_SLICE_H__
 
 #include "common.h"
 #include "document.h"
@@ -198,7 +198,7 @@ public:
 
 };
 
-template<typename Slice>
+/*template<typename Slice>
 class ReversedSlice {
 	const Slice &m_slice;
 
@@ -271,7 +271,7 @@ public:
 		const auto len_t = m_slice.len_t();
 		return m_slice.unmodified_similarity(len_s - 1 - u, len_t - 1 - v);
 	}
-};
+};*/
 
 template<typename Delegate>
 class FilteredSliceFactory {
@@ -352,4 +352,4 @@ public:
 	}
 };
 
-#endif // __VECTORIAN_FAST_SCORES_H__
+#endif // __VECTORIAN_STATIC_EMBEDDING_SLICE_H__
