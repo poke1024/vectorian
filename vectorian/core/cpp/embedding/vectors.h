@@ -3,12 +3,6 @@
 
 #include "common.h"
 
-struct ContextualSimilarityMatrix {
-	xt::pytensor<float, 2> matrix;
-};
-
-typedef std::shared_ptr<ContextualSimilarityMatrix> ContextualSimilarityMatrixRef;
-
 class ContextualVectorsContainer {
 protected:
 	std::unordered_map<std::string, py::object> m_contextual_vectors;

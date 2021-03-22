@@ -53,20 +53,20 @@ MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
 				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
 
-				const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
+				const auto sim_matrix = std::make_shared<SimilarityMatrix>();
 
-				sim_matrix->matrix.resize({
+				sim_matrix->m_similarity.resize({
 					s_vectors->get().attr("size").cast<ssize_t>(),
 					t_vectors->get().attr("size").cast<ssize_t>()});
 
-				vector_metric(*s_vectors, *t_vectors, sim_matrix->matrix);
+				vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
 
 				const SliceFactoryFactory gen_slices([sim_matrix] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return ContextualEmbeddingSlice(sim_matrix->matrix, slice_id, s, t);
+			        return ContextualEmbeddingSlice(sim_matrix->m_similarity, slice_id, s, t);
 				});
 
 				return create_alignment_matcher<int16_t>(
