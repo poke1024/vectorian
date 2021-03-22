@@ -72,6 +72,8 @@ PYBIND11_MODULE(core, m) {
 	embedding_manager.def(py::init<>());
 	embedding_manager.def("add_embedding", &EmbeddingManager::add_embedding);
 	embedding_manager.def("to_index", &EmbeddingManager::to_index);
+	embedding_manager.def("compile_static", &EmbeddingManager::compile_static);
+	embedding_manager.def("compile_contextual", &EmbeddingManager::compile_contextual);
 
 	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
 

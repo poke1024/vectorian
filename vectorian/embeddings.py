@@ -90,6 +90,9 @@ class Embedding:
 	def is_contextual(self):
 		return False
 
+	def create_instance(self):
+		raise NotImplementedError()
+
 	@property
 	def name(self):
 		raise NotImplementedError()
@@ -463,6 +466,10 @@ class ContextualEmbedding(Embedding):
 
 	def encode(self, doc):
 		raise NotImplementedError()
+
+	def create_instance(self):
+		# ContextualEmbeddings are their own instance
+		return self
 
 	def to_core(self):
 		return core.ContextualEmbedding(self.name)

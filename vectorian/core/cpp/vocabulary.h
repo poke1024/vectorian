@@ -210,7 +210,7 @@ public:
 		return it->second;
 	}
 
-	int add_embedding(py::object p_embedding) {
+	size_t add_embedding(py::object p_embedding) {
 
 		if (m_is_compiled) {
 			throw std::runtime_error("EmbeddingManager cannot add new embeddings after compilation");

@@ -143,22 +143,17 @@ class Session:
 
 		self._embeddings = tuple(embeddings)
 
-		self._emb2idx = dict()
-		for i, embedding in enumerate(self._embeddings):
-			self._emb2idx[embedding.name] = i
-
-		self._embedding_instances = {}
-		for embedding in self._embeddings:
-			if embedding.is_static:
-				instance = embedding.create_instance(self)
-				self._embedding_instances[instance.name] = instance
-				self._embedding_manager.add_embedding(instance)
-
 		for embedding in self._embeddings:
 			if embedding.is_contextual:
 				for doc in docs:
 					if not doc.has_contextual_embedding(embedding.name):
 						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
+
+		self._embedding_instances = {}
+		for embedding in self._embeddings:
+			instance = embedding.create_instance(self)
+			self._embedding_instances[instance.name] = instance
+			self._embedding_manager.add_embedding(instance)
 
 		self._vocab = core.Vocabulary(self._embedding_manager)
 
@@ -170,6 +165,7 @@ class Session:
 		self.c_documents
 
 		self._vocab.compile_embeddings()  # i.e. static embeddings
+		self._embedding_manager.compile_contextual()
 
 		self._vectors_cache = VectorsCache()
 
