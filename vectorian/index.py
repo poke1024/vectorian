@@ -397,6 +397,10 @@ class BruteForceIndex(Index):
 
 	def _find(self, query, n_threads=None, progress=None):
 		p_query = query.prepare(self._nlp)
+
+		if len(p_query) == 0:
+			return []
+
 		c_query = p_query.to_core()
 
 		def find_in_doc(x):
