@@ -108,48 +108,6 @@ TokenVectorRef unpack_tokens(
 	return _unpack_tokens(p_vocab, p_table, p_token_strings);
 }
 
-Strategy QueryVocabulary::create_strategy(
-	const QueryRef &p_query,
-	const MatcherFactoryRef &p_matcher_factory,
-	const py::object &p_token_metric) {
-
-	if (p_token_metric.attr("is_modifier").cast<bool>()) {
-
-		std::vector<SimilarityMatrixFactoryRef> operands;
-
-		for (const auto &operand : p_token_metric.attr("operands").cast<py::list>()) {
-			auto strategy = create_strategy(
-				p_query, p_matcher_factory, operand.cast<py::object>());
-			operands.push_back(strategy.matrix_factory);
-		}
-
-		return Strategy{
-			p_token_metric.attr("name").cast<py::str>(),
-			std::make_shared<ModifiedSimilarityMatrixFactory>(
-				p_token_metric, operands)
-		};
-
-	} else {
-
-		const py::dict token_metric_def =
-			p_token_metric.attr("to_args")(p_query->index()).cast<py::dict>();
-
-		const WordMetricDef metric_def{
-			token_metric_def["name"].cast<py::str>(),
-			token_metric_def["embedding"].cast<py::str>(),
-			token_metric_def["metric"].cast<py::object>()};
-
-		const auto embedding_index = m_embedding_manager->to_index(metric_def.embedding);
-
-		const auto sim_factory = std::make_shared<StaticEmbeddingSimilarityMatrixFactory>(
-			p_query, metric_def, p_matcher_factory, embedding_index);
-
-		return Strategy{
-			metric_def.name,
-			sim_factory};
-	}
-}
-
 std::vector<StaticEmbeddingRef> QueryVocabulary::get_compiled_embeddings(const size_t p_embedding_index) const {
 	const std::vector<EmbeddingRef> embeddings = {
 		m_vocab->embedding_manager()->get_compiled(p_embedding_index),

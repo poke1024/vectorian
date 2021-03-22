@@ -92,10 +92,11 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'query.cpp',
+	'metric/contextual.cpp',
 	'vocabulary.cpp',
 	'metric/static.cpp',
 	'embedding/static.cpp',
-	'metric/contextual.cpp',
 	'metric/modifier.cpp',
 	'module.cpp',
 	'match/flow.cpp',
@@ -104,7 +105,6 @@ cfg['sources'] = [
 	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',
-	'query.cpp',
 	'../../../lib/ppk_assert/src/ppk_assert.cpp']
 
 if platform.system() == 'Darwin':  # >= macOS 10.14.6

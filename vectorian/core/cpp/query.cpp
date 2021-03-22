@@ -3,6 +3,8 @@
 #include "match/matcher.h"
 #include "result_set.h"
 #include "metric/static.h"
+#include "metric/contextual.h"
+#include "metric/modifier.h"
 
 ResultSetRef Query::match(
 	const DocumentRef &p_document) {
@@ -122,34 +124,91 @@ void Query::initialize(
 	if (p_kwargs && p_kwargs.contains("metric")) {
 		const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
-		/*const py::dict token_metric_def =
-			p_token_metric.attr("to_args")(p_query->index()).cast<py::dict>();
+		// FIXME need to abstract this for contextual embeddings
+		StaticEmbeddingMatcherFactoryFactory matcher_ff(metric_def_dict);
+		const auto matcher_factory = matcher_ff.create_matcher_factory(shared_from_this());
+
+		auto strategy = create_strategy(
+			matcher_factory,
+			metric_def_dict["token_metric"].cast<py::object>());
+
+		if (strategy.is_static) {
+			auto m = std::make_shared<StaticEmbeddingMetric>(
+				strategy.name,
+				strategy.matrix_factory->create(DocumentRef()),
+				matcher_factory
+			);
+
+			m_metrics.push_back(m);
+		} else {
+
+			/*
+			auto m = std::make_shared<ContextualEmbeddingMetric>(
+				strategy.name,
+				strategy.matrix_factory,
+				matcher_factory // FIXME
+			);
+
+			*/
+
+			PPK_ASSERT(false);
+		}
+	}
+}
+
+Query::Strategy Query::create_strategy(
+	const MatcherFactoryRef &p_matcher_factory,
+	const py::object &p_token_metric) {
+
+	if (p_token_metric.attr("is_modifier").cast<bool>()) {
+
+		std::vector<SimilarityMatrixFactoryRef> operands;
+		bool is_static;
+
+		for (const auto &operand : p_token_metric.attr("operands").cast<py::list>()) {
+			auto strategy = create_strategy(
+				p_matcher_factory, operand.cast<py::object>());
+			is_static = strategy.is_static; // FIXME
+			operands.push_back(strategy.matrix_factory);
+		}
+
+		return Strategy{
+			is_static,
+			p_token_metric.attr("name").cast<py::str>(),
+			std::make_shared<ModifiedSimilarityMatrixFactory>(
+				p_token_metric, operands)
+		};
+
+	} else {
+
+		const py::dict token_metric_def =
+			p_token_metric.attr("to_args")(index()).cast<py::dict>();
 
 		const WordMetricDef metric_def{
 			token_metric_def["name"].cast<py::str>(),
 			token_metric_def["embedding"].cast<py::str>(),
-			token_metric_def["metric"].cast<py::object>()};*/
+			token_metric_def["metric"].cast<py::object>()};
 
-		// const auto it = m_contextual_embeddings.find(metric_def.embedding);
-		// embedding->create_metric(shared_from_this(),
-		//	const QueryRef &p_query,
-		//	const WordMetricDef &p_word_metric,
-		//	const py::dict &p_sent_metric_def,
+		const auto embedding_manager = m_vocab->embedding_manager();
+		const auto embedding_index = embedding_manager->to_index(metric_def.embedding);
 
-		StaticEmbeddingMatcherFactoryFactory matcher_ff(metric_def_dict);
-		const auto matcher_factory = matcher_ff.create_matcher_factory(shared_from_this());
+		if (embedding_manager->is_static(embedding_index)) {
+			const auto sim_factory = std::make_shared<StaticEmbeddingSimilarityMatrixFactory>(
+				shared_from_this(), metric_def, p_matcher_factory, embedding_index);
 
-		auto strategy = m_vocab->create_strategy(
-			shared_from_this(),
-			matcher_factory,
-			metric_def_dict["token_metric"].cast<py::object>());
+			return Strategy{
+				true,
+				metric_def.name,
+				sim_factory};
+		} else {
 
-		auto m = std::make_shared<StaticEmbeddingMetric>(
-			strategy.name,
-			strategy.matrix_factory->create(DocumentRef()),
-			matcher_factory
-		);
+			const auto sim_factory = std::make_shared<ContextualEmbeddingSimilarityMatrixFactory>(
+				shared_from_this(), metric_def, p_matcher_factory, embedding_index);
 
-		m_metrics.push_back(m);
+			return Strategy{
+				true,
+				metric_def.name,
+				sim_factory};
+		}
 	}
 }

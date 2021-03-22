@@ -172,6 +172,7 @@ typedef std::shared_ptr<EmbeddingManager> EmbeddingManagerRef;
 class EmbeddingManager {
 	struct Embedding {
 		py::object embedding; // py embedding session instance
+		py::str py_name;
 		bool is_static;
 		py::object to_core;
 		EmbeddingRef compiled;
@@ -209,6 +210,14 @@ public:
 		return it->second;
 	}
 
+	inline bool is_static(const size_t p_index) const {
+		return m_embeddings.at(p_index).is_static;
+	}
+
+	inline py::str get_py_name(const size_t p_index) const {
+		return m_embeddings.at(p_index).py_name;
+	}
+
 	size_t add_embedding(py::object p_embedding) {
 
 		if (m_is_compiled) {
@@ -220,6 +229,7 @@ public:
 
 		Embedding e;
 		e.embedding = p_embedding;
+		e.py_name = p_embedding.attr("name").cast<py::str>();
 		e.is_static = p_embedding.attr("is_static").cast<bool>();
 		e.to_core = p_embedding.attr("to_core");
 		m_embeddings.push_back(e);
@@ -417,11 +427,6 @@ public:
 typedef std::shared_ptr<Vocabulary> VocabularyRef;
 
 
-struct Strategy {
-	std::string name;
-	SimilarityMatrixFactoryRef matrix_factory;
-};
-
 class QueryVocabulary {
 	const VocabularyRef m_vocab;
 	const EmbeddingManagerRef m_embedding_manager;
@@ -492,11 +497,6 @@ public:
 	inline const std::string &tag_str(int8_t p_tag_id) {
 		return m_tag->to_str(p_tag_id);
 	}
-
-	Strategy create_strategy(
-		const QueryRef &p_query,
-		const MatcherFactoryRef &p_matcher_factory,
-		const py::object &p_token_metric);
 
 	POSWMap mapped_pos_weights(
 		const std::map<std::string, float> &p_pos_weights) const {

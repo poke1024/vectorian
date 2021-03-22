@@ -53,4 +53,37 @@ public:
 		const WordMetricDef &p_metric);
 };
 
+
+class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
+	const QueryRef m_query;
+	const WordMetricDef m_metric;
+	const MatcherFactoryRef m_matcher_factory;
+	const size_t m_embedding_index;
+
+	SimilarityMatrixRef build_similarity_matrix(
+		const std::vector<StaticEmbeddingRef> &p_embeddings);
+
+	void compute_magnitudes(
+		const std::vector<StaticEmbeddingRef> &p_embeddings,
+		const SimilarityMatrixRef &p_matrix);
+
+public:
+	ContextualEmbeddingSimilarityMatrixFactory(
+		const QueryRef &p_query,
+		const WordMetricDef &p_metric,
+		const MatcherFactoryRef &p_matcher_factory,
+		const size_t p_embedding_index) :
+
+		m_query(p_query),
+		m_metric(p_metric),
+		m_matcher_factory(p_matcher_factory),
+		m_embedding_index(p_embedding_index) {
+	}
+
+	virtual SimilarityMatrixRef create(
+		const DocumentRef &p_document);
+};
+
+typedef std::shared_ptr<StaticEmbeddingSimilarityMatrixFactory> StaticEmbeddingSimilarityMatrixFactoryRef;
+
 #endif // __VECTORIAN_CONTEXTUAL_EMBEDDING_METRIC_H__

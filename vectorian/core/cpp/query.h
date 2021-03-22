@@ -100,6 +100,16 @@ class Query :
 	SliceStrategy m_slice_strategy;
 	std::optional<py::object> m_debug_hook;
 
+	struct Strategy {
+		bool is_static;
+		std::string name;
+		SimilarityMatrixFactoryRef matrix_factory;
+	};
+
+	Strategy create_strategy(
+		const MatcherFactoryRef &p_matcher_factory,
+		const py::object &p_token_metric);
+
 public:
 	Query(
 		const py::object &p_index,
