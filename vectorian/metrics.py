@@ -95,25 +95,101 @@ class DirectionalDistance(VectorSpaceMetric):
 		np.linalg.multi_dot([d, self._dir.T], out=out)
 
 
-class UnaryModifier(VectorSpaceMetric):
-	def __init__(self, operand):
-		self._operand = operand
-
-	def _compute(self, similarity):
+class UnaryOperator:
+	def kernel(self, data):
 		raise NotImplementedError()
 
+	def name(self, operand):
+		raise NotImplementedError()
+
+
+class Kernel:
+	def __init__(self, operators):
+		self._operators = operators
+
+		# might JIT in the future.
+		def chain(data):
+			for x in operators:
+				x.kernel(data)
+
+		self._kernel = chain
+
+	def __call__(self, data):
+		self._kernel(data)
+
+	def name(self, operand):
+		name = operand
+		for x in self._operators:
+			name = x.name(name)
+		return name
+
+
+class MetricModifier(VectorSpaceMetric):
+	def __init__(self, source, operators):
+		self._source = source
+		self._kernel = Kernel(operators)
+
 	def __call__(self, a, b, out):
-		return self._compute(self._operand(a, b))
-
-
-class DistanceToSimilarity2(UnaryModifier):
-	def _compute(self, similarity):
-		return np.maximum(0, 1 - similarity)
+		self._source(a, b, out)
+		self._kernel(out)
 
 	@property
 	def name(self):
-		return f'(1 - {self._operand.name})'
+		return self._kernel.name(self._source.name)
 
+
+class DistanceToSimilarity(UnaryOperator):
+	def kernel(self, data):
+		data[:, :] = np.maximum(0, 1 - data)
+
+	def name(self, operand):
+		return f'(1 - {operand})'
+
+
+class Bias(UnaryOperator):
+	def __init__(self, bias):
+		self._bias = bias
+
+	def kernel(self, data):
+		data += self._bias
+
+	def name(self, operand):
+		return f'({operand} + {self._bias})'
+
+
+class Scale(UnaryOperator):
+	def __init__(self, scale):
+		self._scale = scale
+
+	def kernel(self, data):
+		data *= self._scale
+
+	def name(self, operand):
+		return f'({operand} * {self._scale})'
+
+
+class Power(UnaryOperator):
+	def __init__(self, exp):
+		self._exp = exp
+
+	def kernel(self, data):
+		data[:, :] = np.power(np.maximum(data, 0), self._exp)
+
+	def name(self, operand):
+		return f'({operand} ** {self._exp})'
+
+
+class Threshold(UnaryOperator):
+	def __init__(self, threshold):
+		self._threshold = threshold
+
+	def kernel(self, data):
+		x = np.maximum(0, data - self._threshold)
+		x[x > 0] += self._threshold
+		data[:, :] = x
+
+	def name(self, operand):
+		return f'threshold({operand}, {self._threshold})'
 
 
 class AbstractTokenSimilarity:
@@ -129,18 +205,16 @@ class TokenSimilarityModifier(AbstractTokenSimilarity):
 
 
 class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
-	def __init__(self, operand):
+	def __init__(self, operand, operators):
 		self._operand = operand
-
-	def rewrite(self, operand):
-		raise NotImplementedError()
-
-	def _compute(self, similarity):
-		raise NotImplementedError()
+		self._kernel = Kernel(operators)
 
 	def __call__(self, operands, out):
 		data = operands[0]
-		self._compute(data["similarity"], out=out["similarity"])
+
+		out["similarity"][:] = data["similarity"]
+		self._kernel(out["similarity"])
+
 		for k in data.keys():
 			if k != "similarity":
 				out[k][:] = data[k]
@@ -149,24 +223,15 @@ class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
 	def operands(self):
 		return [self._operand]
 
+	@property
+	def name(self):
+		return self._kernel.name(self._operand.name)
+
 
 class TokenSimilarity(AbstractTokenSimilarity):
 	def __init__(self, embedding, metric: VectorSpaceMetric):
 		self._embedding = embedding
 		self._metric = metric
-
-	@staticmethod
-	def make_with_modifiers(embedding, general_metric):
-		# it's convenient to build Bias(CosineSimilarity(), 0.5) even if
-		# this is not supported in the core. rewrite expressions like
-		# this as Bias(TokenSimilarity(x, CosineSimilarity()), 0.5).
-
-		if isinstance(general_metric, UnaryTokenSimilarityModifier):
-			new_operand = TokenSimilarity.make_with_modifiers(
-				embedding, general_metric.operands[0])
-			return general_metric.rewrite(new_operand)
-		else:
-			return TokenSimilarity(embedding, general_metric)
 
 	def to_args(self, index):
 		return {
@@ -174,84 +239,6 @@ class TokenSimilarity(AbstractTokenSimilarity):
 			'embedding': self._embedding.name,
 			'metric': self._metric
 		}
-
-
-class DistanceToSimilarity(UnaryTokenSimilarityModifier):
-	def rewrite(self, operand):
-		return DistanceToSimilarity(operand)
-
-	def _compute(self, similarity, out):
-		out[:, :] = np.maximum(0, 1 - similarity)
-
-	@property
-	def name(self):
-		return f'(1 - {self._operand.name})'
-
-
-class Bias(UnaryTokenSimilarityModifier):
-	def __init__(self, operand, bias):
-		super().__init__(operand)
-		self._bias = bias
-
-	def rewrite(self, operand):
-		return Bias(operand, self._bias)
-
-	def _compute(self, similarity, out):
-		out[:, :] = similarity + self._bias
-
-	@property
-	def name(self):
-		return f'({self._operand.name} + {self._bias})'
-
-
-class Scale(UnaryTokenSimilarityModifier):
-	def __init__(self, operand, scale):
-		super().__init__(operand)
-		self._scale = scale
-
-	def rewrite(self, operand):
-		return Scale(operand, self._scale)
-
-	def _compute(self, similarity, out):
-		out[:, :] = similarity * self._scale
-
-	@property
-	def name(self):
-		return f'({self._operand.name} * {self._scale})'
-
-
-class Power(UnaryTokenSimilarityModifier):
-	def __init__(self, operand, exp):
-		super().__init__(operand)
-		self._exp = exp
-
-	def rewrite(self, operand):
-		return Power(operand, self._exp)
-
-	def _compute(self, similarity, out):
-		out[:, :] = np.power(np.maximum(similarity, 0), self._exp)
-
-	@property
-	def name(self):
-		return f'({self._operand.name} ** {self._exp})'
-
-
-class Threshold(UnaryTokenSimilarityModifier):
-	def __init__(self, operand, threshold):
-		super().__init__(operand)
-		self._threshold = threshold
-
-	def rewrite(self, operand):
-		return Threshold(operand, self._threshold)
-
-	def _compute(self, similarity, out):
-		x = np.maximum(0, similarity - self._threshold)
-		x[x > 0] += self._threshold
-		out[:, :] = x
-
-	@property
-	def name(self):
-		return f'threshold({self._operand.name}, {self._threshold})'
 
 
 class MixedTokenSimilarity(TokenSimilarityModifier):

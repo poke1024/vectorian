@@ -1,5 +1,7 @@
 python >= 3.7
 
+OPENBLAS="$(brew --prefix openblas)" jupyter lab
+
 conda install -c conda-forge xtl
 conda install -c conda-forge xtensor
 conda install -c conda-forge xsimd
