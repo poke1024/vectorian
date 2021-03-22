@@ -3,24 +3,29 @@
 #include "metric/metric.h"
 #include "metric/modifier.h"
 
-MetricRef ModifiedMetricFactory::create(
-	const QueryRef &p_query) {
+SimilarityMatrixRef ModifiedSimilarityMatrixFactory::create(
+	const DocumentRef &p_document) {
 
 	py::list args;
 	bool has_magnitudes = false;
 
-	PPK_ASSERT(m_operands.size() > 0);
-	const size_t num_rows = m_operands[0]->matrix()->similarity().shape(0);
-	const size_t num_cols = m_operands[0]->matrix()->similarity().shape(1);
+	std::vector<SimilarityMatrixRef> operands;
+	for (const auto &factory : m_operands) {
+		operands.push_back(factory->create(p_document));
+	}
 
-	for (const auto &operand : m_operands) {
+	PPK_ASSERT(m_operands.size() > 0);
+	const size_t num_rows = operands[0]->similarity().shape(0);
+	const size_t num_cols = operands[0]->similarity().shape(1);
+
+	for (const auto &operand : operands) {
 		py::dict data;
-		data["similarity"] = operand->matrix()->similarity();
-		PPK_ASSERT(operand->matrix()->similarity().shape(0) == num_rows);
-		PPK_ASSERT(operand->matrix()->similarity().shape(1) == num_cols);
-		if (operand->matrix()->magnitudes().shape(0) > 0) {
-			data["magnitudes"] = operand->matrix()->magnitudes();
-			PPK_ASSERT(operand->matrix()->magnitudes().shape(0) == num_rows);
+		data["similarity"] = operand->similarity();
+		PPK_ASSERT(operand->similarity().shape(0) == num_rows);
+		PPK_ASSERT(operand->similarity().shape(1) == num_cols);
+		if (operand->magnitudes().shape(0) > 0) {
+			data["magnitudes"] = operand->magnitudes();
+			PPK_ASSERT(operand->magnitudes().shape(0) == num_rows);
 			has_magnitudes = true;
 		}
 		args.append(data);
@@ -46,5 +51,5 @@ MetricRef ModifiedMetricFactory::create(
 		PPK_ASSERT(matrix->m_magnitudes.shape(0) == num_rows);
 	}
 
-	return m_operands[0]->clone(matrix);
+	return matrix;
 }

@@ -124,16 +124,15 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 
 // --------------------------------------------------------------------------------
 
-SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::build_similarity_matrix(
-	const QueryRef &p_query,
-	const WordMetricDef &p_metric) {
+SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_similarity_matrix(
+	const std::vector<StaticEmbeddingRef> &p_embeddings) {
 
-	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
-	const Needle needle(p_query);
+	const QueryVocabularyRef vocab = m_query->vocabulary();
+	const Needle needle(m_query);
 
 	const auto matrix = std::make_shared<SimilarityMatrix>();
 
-	const size_t vocab_size = p_vocabulary->size();
+	const size_t vocab_size = vocab->size();
 	const size_t needle_size = static_cast<size_t>(needle.size());
 	matrix->m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
 
@@ -145,7 +144,7 @@ SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::build_similarity_matrix(
 	for (size_t j = 0; j < needle_size; j++) { // for each token in needle
 		const auto t = needle_tokens[j];
 		size_t t_rel;
-		const auto &t_vectors = pick_vectors(m_embeddings, t, t_rel);
+		const auto &t_vectors = pick_vectors(p_embeddings, t, t_rel);
 		sources.append(t_vectors);
 		mutable_indices[j] = t_rel;
 	}
@@ -154,11 +153,11 @@ SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::build_similarity_matrix(
 	const auto needle_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
 
 	size_t offset = 0;
-	for (const auto &embedding : m_embeddings) {
+	for (const auto &embedding : p_embeddings) {
 		const auto &vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
-		p_metric.vector_metric(
+		m_metric.vector_metric(
 			vectors,
 			needle_vectors,
 			xt::strided_view(matrix->m_similarity, {xt::range(offset, offset + size), xt::all()}));
@@ -183,14 +182,34 @@ SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::build_similarity_matrix(
 	return matrix;
 }
 
-SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::create(
-	const QueryRef &p_query,
-	const WordMetricDef &p_metric,
-	const MatcherFactoryRef &p_matcher_factory) {
+void StaticEmbeddingSimilarityMatrixFactory::compute_magnitudes(
+	const std::vector<StaticEmbeddingRef> &p_embeddings,
+	const SimilarityMatrixRef &p_matrix) {
 
-	const auto matrix = build_similarity_matrix(
-		p_query,
-		p_metric);
+	const QueryVocabularyRef vocab = m_query->vocabulary();
+	const Needle needle(m_query);
+
+	p_matrix->m_magnitudes.resize({static_cast<ssize_t>(vocab->size())});
+	size_t offset = 0;
+	for (const auto &embedding : p_embeddings) {
+		const auto &vectors = embedding->vectors();
+		const size_t size = embedding->size();
+
+		const auto magnitudes = vectors.attr("magnitudes").cast<xt::pytensor<float, 1>>();
+		xt::strided_view(p_matrix->m_magnitudes, {xt::range(offset, offset + size)}) = magnitudes;
+
+		offset += size;
+	}
+	PPK_ASSERT(offset == vocab->size());
+}
+
+SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
+	const DocumentRef&) {
+
+	const QueryVocabularyRef vocab = m_query->vocabulary();
+	const auto embeddings = vocab->get_compiled_embeddings(m_embedding_index);
+
+	const auto matrix = build_similarity_matrix(embeddings);
 
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
 	/*if (p_query->debug_hook().has_value()) {
@@ -223,13 +242,10 @@ SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::create(
 		(*p_query->debug_hook())("similarity_matrix", data);
 	}*/
 
-	if (p_matcher_factory->needs_magnitudes()) {
-		const Needle needle(p_query);
-
+	if (m_matcher_factory->needs_magnitudes()) {
 		compute_magnitudes(
-			matrix,
-			p_query->vocabulary(),
-			needle);
+			embeddings,
+			matrix);
 	}
 
 	return matrix;

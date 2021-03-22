@@ -33,6 +33,17 @@ public:
 typedef std::shared_ptr<SimilarityMatrix> SimilarityMatrixRef;
 
 
+class SimilarityMatrixFactory {
+public:
+	virtual ~SimilarityMatrixFactory() {
+	}
+
+	virtual SimilarityMatrixRef create(const DocumentRef &p_document) = 0;
+};
+
+typedef std::shared_ptr<SimilarityMatrixFactory> SimilarityMatrixFactoryRef;
+
+
 class Metric : public std::enable_shared_from_this<Metric> {
 protected:
 	const std::string m_name;

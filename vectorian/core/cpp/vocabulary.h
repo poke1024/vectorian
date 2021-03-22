@@ -416,6 +416,12 @@ public:
 
 typedef std::shared_ptr<Vocabulary> VocabularyRef;
 
+
+struct Strategy {
+	std::string name;
+	SimilarityMatrixFactoryRef matrix_factory;
+};
+
 class QueryVocabulary {
 	const VocabularyRef m_vocab;
 	const EmbeddingManagerRef m_embedding_manager;
@@ -487,9 +493,9 @@ public:
 		return m_tag->to_str(p_tag_id);
 	}
 
-	MetricRef create_metric(
+	Strategy create_strategy(
 		const QueryRef &p_query,
-		const py::dict &p_sentence_metric,
+		const MatcherFactoryRef &p_matcher_factory,
 		const py::object &p_token_metric);
 
 	POSWMap mapped_pos_weights(
@@ -512,6 +518,8 @@ public:
 	inline const EmbeddingManagerRef &embedding_manager() const {
 		return m_embedding_manager;
 	}
+
+	std::vector<StaticEmbeddingRef> get_compiled_embeddings(const size_t p_embedding_index) const;
 };
 
 typedef std::shared_ptr<QueryVocabulary> QueryVocabularyRef;

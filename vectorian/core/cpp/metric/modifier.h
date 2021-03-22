@@ -1,16 +1,16 @@
-class ModifiedMetricFactory {
+class ModifiedSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const py::object m_operator;
-	const std::vector<MetricRef> m_operands;
+	const std::vector<SimilarityMatrixFactoryRef> m_operands;
 
 public:
-	ModifiedMetricFactory(
+	ModifiedSimilarityMatrixFactory(
 		const py::object &p_operator,
-		const std::vector<MetricRef> &p_operands) :
+		const std::vector<SimilarityMatrixFactoryRef> &p_operands) :
 
 		m_operator(p_operator),
 		m_operands(p_operands) {
 	}
 
-	MetricRef create(
-		const QueryRef &p_query);
+	virtual SimilarityMatrixRef create(
+		const DocumentRef &p_document);
 };

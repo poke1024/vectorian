@@ -108,26 +108,26 @@ TokenVectorRef unpack_tokens(
 	return _unpack_tokens(p_vocab, p_table, p_token_strings);
 }
 
-MetricRef QueryVocabulary::create_metric(
+Strategy QueryVocabulary::create_strategy(
 	const QueryRef &p_query,
-	const py::dict &p_sentence_metric,
+	const MatcherFactoryRef &p_matcher_factory,
 	const py::object &p_token_metric) {
 
 	if (p_token_metric.attr("is_modifier").cast<bool>()) {
 
-		std::vector<MetricRef> operand_metrics;
+		std::vector<SimilarityMatrixFactoryRef> operands;
 
-		const auto operands = p_token_metric.attr("operands").cast<py::list>();
-		for (const auto &operand : operands) {
-			auto metric = create_metric(
-				p_query, p_sentence_metric, operand.cast<py::object>());
-			operand_metrics.push_back(metric);
+		for (const auto &operand : p_token_metric.attr("operands").cast<py::list>()) {
+			auto strategy = create_strategy(
+				p_query, p_matcher_factory, operand.cast<py::object>());
+			operands.push_back(strategy.matrix_factory);
 		}
 
-		// std::make_shared<ModifiedMetricFactory>
-
-		ModifiedMetricFactory factory(p_token_metric, operand_metrics);
-		return factory.create(p_query);
+		return Strategy{
+			p_token_metric.attr("name").cast<py::str>(),
+			std::make_shared<ModifiedSimilarityMatrixFactory>(
+				p_token_metric, operands)
+		};
 
 	} else {
 
@@ -141,24 +141,26 @@ MetricRef QueryVocabulary::create_metric(
 
 		const auto embedding_index = m_embedding_manager->to_index(metric_def.embedding);
 
-		const std::vector<EmbeddingRef> embeddings = {
-			m_vocab->embedding_manager()->get_compiled(embedding_index),
-			embedding_manager()->get_compiled(embedding_index)
-		};
+		const auto sim_factory = std::make_shared<StaticEmbeddingSimilarityMatrixFactory>(
+			p_query, metric_def, p_matcher_factory, embedding_index);
 
-		std::vector<StaticEmbeddingRef> static_embeddings;
-		static_embeddings.resize(embeddings.size());
-		std::transform(embeddings.begin(), embeddings.end(), static_embeddings.begin(), [] (auto x) {
-			return std::static_pointer_cast<StaticEmbedding>(x);
-		});
-
-		StaticEmbeddingMatcherFactoryFactory matcher_ff(p_sentence_metric);
-		const auto matcher_factory = matcher_ff.create_matcher_factory(p_query);
-
-		StaticEmbeddingSimilarityBuilder builder(static_embeddings);
-		const auto matrix = builder.create(p_query, metric_def, matcher_factory);
-
-		return std::make_shared<StaticEmbeddingMetric>(
-			static_embeddings[0]->name(), matrix, matcher_factory);
+		return Strategy{
+			metric_def.name,
+			sim_factory};
 	}
+}
+
+std::vector<StaticEmbeddingRef> QueryVocabulary::get_compiled_embeddings(const size_t p_embedding_index) const {
+	const std::vector<EmbeddingRef> embeddings = {
+		m_vocab->embedding_manager()->get_compiled(p_embedding_index),
+		embedding_manager()->get_compiled(p_embedding_index)
+	};
+
+	std::vector<StaticEmbeddingRef> static_embeddings;
+	static_embeddings.resize(embeddings.size());
+	std::transform(embeddings.begin(), embeddings.end(), static_embeddings.begin(), [] (auto x) {
+		return std::static_pointer_cast<StaticEmbedding>(x);
+	});
+
+	return static_embeddings;
 }

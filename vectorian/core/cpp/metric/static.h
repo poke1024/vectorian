@@ -48,43 +48,36 @@ public:
 };
 
 
-class StaticEmbeddingSimilarityBuilder {
-	const std::vector<StaticEmbeddingRef> m_embeddings;
+class StaticEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
+	const QueryRef m_query;
+	const WordMetricDef m_metric;
+	const MatcherFactoryRef m_matcher_factory;
+	const size_t m_embedding_index;
 
 	SimilarityMatrixRef build_similarity_matrix(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric);
+		const std::vector<StaticEmbeddingRef> &p_embeddings);
 
 	void compute_magnitudes(
-		const SimilarityMatrixRef &p_matrix,
-		const QueryVocabularyRef &p_vocabulary,
-		const Needle &p_needle) {
-
-		p_matrix->m_magnitudes.resize({static_cast<ssize_t>(p_vocabulary->size())});
-		size_t offset = 0;
-		for (const auto &embedding : m_embeddings) {
-			const auto &vectors = embedding->vectors();
-			const size_t size = embedding->size();
-
-			const auto magnitudes = vectors.attr("magnitudes").cast<xt::pytensor<float, 1>>();
-			xt::strided_view(p_matrix->m_magnitudes, {xt::range(offset, offset + size)}) = magnitudes;
-
-			offset += size;
-		}
-		PPK_ASSERT(offset == p_vocabulary->size());
-	}
+		const std::vector<StaticEmbeddingRef> &p_embeddings,
+		const SimilarityMatrixRef &p_matrix);
 
 public:
-	StaticEmbeddingSimilarityBuilder(
-		const std::vector<StaticEmbeddingRef> &p_embeddings) :
-
-		m_embeddings(p_embeddings) {
-	}
-
-	SimilarityMatrixRef create(
+	StaticEmbeddingSimilarityMatrixFactory(
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
-		const MatcherFactoryRef &p_matcher_factory);
+		const MatcherFactoryRef &p_matcher_factory,
+		const size_t p_embedding_index) :
+
+		m_query(p_query),
+		m_metric(p_metric),
+		m_matcher_factory(p_matcher_factory),
+		m_embedding_index(p_embedding_index) {
+	}
+
+	virtual SimilarityMatrixRef create(
+		const DocumentRef &p_document);
 };
+
+typedef std::shared_ptr<StaticEmbeddingSimilarityMatrixFactory> StaticEmbeddingSimilarityMatrixFactoryRef;
 
 #endif // __VECTORIAN_FAST_METRIC_H__
