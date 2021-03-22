@@ -54,8 +54,13 @@ class PreparedQuery:
 				self._contextual_embeddings[e.name].append(e.encode(doc))
 
 		tokens = doc.to_json()["tokens"]
-		tokens = self._filter(tokens, 'pos_filter', 'pos')
-		tokens = self._filter(tokens, 'tag_filter', 'tag')
+
+		for token_attr in ('pos', 'tag'):
+			mask = self._mask(tokens, f'{token_attr}_filter', 'pos')
+			if mask is not None:
+				tokens = [t for t, m in zip(tokens, mask) if m]
+				self._contextual_embeddings = dict(
+					(k, v[mask, :]) for k, v in self._contextual_embeddings.items())
 
 		token_table = TokenTable(self.index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
@@ -90,13 +95,13 @@ class PreparedQuery:
 	def __len__(self):
 		return len(self.span)
 
-	def _filter(self, tokens, name, k):
+	def _mask(self, tokens, name, k):
 		f = self._query.options.get(name, None)
 		if f:
 			s = set(f)
-			return [t for t in tokens if t[k] not in s]
+			return np.array([t[k] not in s for t in tokens], dtype=np.bool)
 		else:
-			return tokens
+			return None
 
 	def to_core(self):
 		query = core.Query(

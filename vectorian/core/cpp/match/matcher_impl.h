@@ -1,5 +1,5 @@
 #ifndef __VECTORIAN_MATCHER_IMPL__
-#define __VECTORIAN_ALIGNER__
+#define __VECTORIAN_MATCHER_IMPL__
 
 #include "common.h"
 #include "match/matcher.h"
@@ -46,7 +46,7 @@ public:
 	}
 };
 
-void reverse_alignment(std::vector<int16_t> &match, int len_s) {
+inline void reverse_alignment(std::vector<int16_t> &match, int len_s) {
 	for (size_t i = 0; i < match.size(); i++) {
 		int16_t u = match[i];
 		if (u >= 0) {

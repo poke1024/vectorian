@@ -92,6 +92,7 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'alignment/pyemd.cpp',
 	'metric/contextual.cpp',
 	'metric/static.cpp',
 	'vocabulary.cpp',

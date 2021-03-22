@@ -7,10 +7,7 @@ enum EMDBackend {
 
 #if 1
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-compare"
-#include "emd_hat.hpp"
-#pragma clang diagnostic pop
+#include "pyemd.h"
 
 class OptimalTransport {
 	typedef double scalar_t;
