@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "embedding/static.h"
 #include "metric/composite.h"
+#include "query.h"
 
 template<typename VocabularyRef>
 TokenVectorRef _unpack_tokens(
@@ -135,7 +136,7 @@ MetricRef QueryVocabulary::create_metric(
 	} else {
 
 		const py::dict token_metric_def =
-			p_token_metric.attr("to_args")().cast<py::dict>();
+			p_token_metric.attr("to_args")(p_query->index()).cast<py::dict>();
 
 		const WordMetricDef metric_def{
 			token_metric_def["name"].cast<py::str>(),

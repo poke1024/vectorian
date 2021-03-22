@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "metric/composite.h"
 #include "vocabulary.h"
+#include "embedding/vectors.h"
 
 struct TokenFilter {
 	uint64_t pos;
@@ -79,8 +80,11 @@ public:
 	}
 };
 
-class Query : public std::enable_shared_from_this<Query> {
+class Query :
+	public std::enable_shared_from_this<Query>,
+	public ContextualVectorsContainer {
 
+	const py::object m_index;
 	const QueryVocabularyRef m_vocab;
 	const VectorsCache m_vectors_cache;
 	std::vector<MetricRef> m_metrics;
@@ -98,11 +102,19 @@ class Query : public std::enable_shared_from_this<Query> {
 	std::optional<py::object> m_debug_hook;
 
 public:
-	Query(const py::object &p_session, VocabularyRef p_vocab) :
+	Query(
+		const py::object &p_index,
+		VocabularyRef p_vocab,
+		const py::dict &p_contextual_embeddings) :
 
+		m_index(p_index),
 		m_vocab(std::make_shared<QueryVocabulary>(p_vocab)),
-		m_vectors_cache(p_session.attr("vectors_cache").cast<py::object>()),
+		m_vectors_cache(p_index.attr("session").attr("vectors_cache").cast<py::object>()),
 		m_aborted(false) {
+
+		for (auto item : p_contextual_embeddings) {
+			m_contextual_vectors[item.first.cast<py::str>()] = item.second.cast<py::object>();
+		}
 	}
 
 	void initialize(
@@ -304,6 +316,10 @@ public:
 		}, p_slice.len_t());
 
 		return data;
+	}
+
+	inline const py::object &index() const {
+		return m_index;
 	}
 
 	inline const VectorsCache &vectors_cache() const {

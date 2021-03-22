@@ -32,7 +32,9 @@ Document::Document(
 	m_vocab(p_vocab),
 	m_metadata(p_metadata) {
 
-	// FIXME p_contextual_embeddings
+	for (auto item : p_contextual_embeddings) {
+		m_contextual_vectors[item.first.cast<py::str>()] = item.second.cast<py::object>();
+	}
 
 	for (auto item : p_spans) {
 		const auto table = unwrap_table(item.second.cast<py::object>());

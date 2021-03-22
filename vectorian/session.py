@@ -141,18 +141,20 @@ class Session:
 		if any(k not in ("tokenizer", "tagger") for k in token_mappings):
 			raise ValueError(token_mappings)
 
-		self._embeddings = {}
-		for embedding in embeddings:
-			self._embeddings[embedding.name] = embedding
+		self._embeddings = tuple(embeddings)
+
+		self._emb2idx = dict()
+		for i, embedding in enumerate(self._embeddings):
+			self._emb2idx[embedding.name] = i
 
 		self._embedding_instances = {}
-		for embedding in embeddings:
+		for embedding in self._embeddings:
 			if embedding.is_static:
 				instance = embedding.create_instance(self)
 				self._embedding_instances[instance.name] = instance
 				self._vocab.add_embedding(instance)
 
-		for embedding in embeddings:
+		for embedding in self._embeddings:
 			if embedding.is_contextual:
 				for doc in docs:
 					if not doc.has_contextual_embedding(embedding.name):
@@ -170,7 +172,7 @@ class Session:
 		self._vectors_cache = VectorsCache()
 
 	def default_metric(self):
-		embedding = list(self._embeddings.values())[0]
+		embedding = self._embeddings[0]
 		return AlignmentSentenceSimilarity(
 			TokenSimilarity(
 				embedding, CosineSimilarity()))
@@ -185,7 +187,7 @@ class Session:
 
 	@property
 	def embeddings(self):
-		return list(self._embeddings.values())
+		return self._embeddings
 
 	def get_embedding_instance(self, embedding):
 		return self._embedding_instances[embedding.name]

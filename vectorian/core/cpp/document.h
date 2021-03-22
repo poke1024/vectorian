@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "vocabulary.h"
+#include "embedding/vectors.h"
 
 inline void add_dummy_token(std::vector<Token> &tokens) {
 	if (tokens.empty()) {
@@ -138,28 +139,9 @@ public:
 typedef std::shared_ptr<Spans> SpansRef;
 
 
-/*class ContextualVectorsContainer {
-	std::unordered_map<std::string, py::object> m_vectors;
-
-public:
-	void add_contextual_embedding_vectors(
-		const std::string &p_name,
-		const py::object &p_object) {
-
-		m_vectors[p_name] = p_vectors;
-	}
-
-	ContextualEmbeddingVectorsRef get_contextual_embedding_vectors(
-		const std::string &p_name) const {
-
-		return ContextualEmbeddingVectorsRef();
-	}
-
-};*/
-
 class Document :
-	public std::enable_shared_from_this<Document>/*,
-	public ContextualVectorsContainer*/ {
+	public std::enable_shared_from_this<Document>,
+	public ContextualVectorsContainer {
 
 private:
 	const int64_t m_id;

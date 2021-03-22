@@ -95,6 +95,27 @@ class DirectionalDistance(VectorSpaceMetric):
 		np.linalg.multi_dot([d, self._dir.T], out=out)
 
 
+class UnaryModifier(VectorSpaceMetric):
+	def __init__(self, operand):
+		self._operand = operand
+
+	def _compute(self, similarity):
+		raise NotImplementedError()
+
+	def __call__(self, a, b, out):
+		return self._compute(self._operand(a, b))
+
+
+class DistanceToSimilarity2(UnaryModifier):
+	def _compute(self, similarity):
+		return np.maximum(0, 1 - similarity)
+
+	@property
+	def name(self):
+		return f'(1 - {self._operand.name})'
+
+
+
 class AbstractTokenSimilarity:
 	@property
 	def is_modifier(self):
@@ -147,7 +168,7 @@ class TokenSimilarity(AbstractTokenSimilarity):
 		else:
 			return TokenSimilarity(embedding, general_metric)
 
-	def to_args(self):
+	def to_args(self, index):
 		return {
 			'name': self._embedding.name + "-" + self._metric.name,
 			'embedding': self._embedding.name,
@@ -299,7 +320,7 @@ class SentenceSimilarity:
 	def create_index(self, partition):
 		raise NotImplementedError()
 
-	def to_args(self, partition):
+	def to_args(self, index):
 		raise NotImplementedError()
 
 
@@ -328,11 +349,11 @@ class AlignmentSentenceSimilarity(SentenceSimilarity):
 	def create_index(self, partition, **kwargs):
 		return BruteForceIndex(partition, self, **kwargs)
 
-	def to_args(self, partition):
+	def to_args(self, index):
 		return {
 			'metric': 'alignment-isolated',
 			'token_metric': self._token_metric,
-			'alignment': self._alignment.to_args(partition)
+			'alignment': self._alignment.to_args(index.partition)
 		}
 
 
@@ -359,11 +380,11 @@ class TagWeightedSentenceSimilarity(SentenceSimilarity):
 	def create_index(self, partition, **kwargs):
 		return BruteForceIndex(partition, self, **kwargs)
 
-	def to_args(self, partition):
+	def to_args(self, index):
 		return {
 			'metric': 'alignment-tag-weighted',
 			'token_metric': self._token_metric,
-			'alignment': self._alignment.to_args(partition),
+			'alignment': self._alignment.to_args(index.partition),
 			'pos_mismatch_penalty': self._options.get('pos_mismatch_penalty', 0),
 			'similarity_threshold': self._options.get('similarity_threshold', 0),
 			'tag_weights': self._options.get('tag_weights', {})
@@ -395,7 +416,7 @@ class SentenceEmbeddingSimilarity(SentenceSimilarity):
 		return SentenceEmbeddingIndex.load(
 			session, self, self._encoder, path, **kwargs)
 
-	def to_args(self, partition):
+	def to_args(self, index):
 		return None
 
 	@property

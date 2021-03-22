@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+/*
 struct StaticEmbeddingVectors {
 	typedef xt::xtensor<float, 2, xt::layout_type::row_major> V;
 
@@ -80,7 +81,7 @@ struct StaticEmbeddingVectors {
 		d[py::str("normalized")] = xt::pyarray<float>(m_normalized);
 		return d;
 	}
-};
+};*/
 
 #if 0
 // ContextualEmbeddingVectors should be implemented in py?
@@ -144,5 +145,24 @@ public:
 
 typedef std::shared_ptr<ContextualSimilarityMatrix> ContextualSimilarityMatrixRef;
 #endif
+
+class ContextualVectorsContainer {
+protected:
+	std::unordered_map<std::string, py::object> m_contextual_vectors;
+
+public:
+	py::object get_contextual_embedding_vectors(
+		const std::string &p_name) const {
+
+		auto it = m_contextual_vectors.find(p_name);
+		if (it == m_contextual_vectors.end()) {
+			std::ostringstream err;
+			err << "could not find embedding " << p_name;
+			throw std::runtime_error(err.str());
+		}
+		return it->second;
+	}
+
+};
 
 #endif // __VECTORIAN_WORD_VECTORS_H__

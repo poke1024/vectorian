@@ -87,7 +87,7 @@ PYBIND11_MODULE(core, m) {
 	vocabulary.def("compile_embeddings", &Vocabulary::compile_embeddings);
 
 	py::class_<Query, QueryRef> query(m, "Query");
-	query.def(py::init<const py::object&, VocabularyRef>());
+	query.def(py::init<const py::object&, VocabularyRef, const py::dict&>());
 	query.def("initialize", &Query::initialize);
 
 	query.def_property_readonly("tokens", &Query::py_tokens);

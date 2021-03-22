@@ -99,8 +99,10 @@ class PreparedQuery:
 			return tokens
 
 	def to_core(self):
-		# FIXME self._contextual_embeddings
-		query = core.Query(self.index.session, self._vocab)
+		query = core.Query(
+			self.index,
+			self._vocab,
+			self._contextual_embeddings)
 		query.initialize(
 			self._token_table,
 			self._token_str,
@@ -344,7 +346,7 @@ class Index:
 	def describe(self):
 		data = {
 			'partition': self._partition.to_args(),
-			'metric': self._metric.to_args(self._partition)
+			'metric': self._metric.to_args(self)
 		}
 		print(yaml.dump(data))
 
@@ -362,7 +364,7 @@ class Index:
 			options["debug"] = debug
 		options["partition"] = self._partition.to_args()
 
-		metric_args = self._metric.to_args(self._partition)
+		metric_args = self._metric.to_args(self)
 		if metric_args:
 			options["metric"] = metric_args
 

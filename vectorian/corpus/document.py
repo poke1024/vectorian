@@ -183,8 +183,11 @@ class Document:
 		return self.metadata['title']
 
 	def prepare(self, session):
+		names = [e.name for e in session.embeddings if e.is_contextual]
+		contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
+
 		return PreparedDocument(
-			session, self._json, self._contextual_embeddings)
+			session, self._json, contextual_embeddings)
 
 
 class Token:
