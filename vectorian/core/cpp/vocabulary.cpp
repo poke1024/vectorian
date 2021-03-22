@@ -152,7 +152,13 @@ MetricRef QueryVocabulary::create_metric(
 			return std::static_pointer_cast<StaticEmbedding>(x);
 		});
 
-		StaticEmbeddingMetricFactory factory(static_embeddings, p_sentence_metric);
-		return factory.create(p_query, metric_def);
+		StaticEmbeddingMatcherFactoryFactory matcher_ff(p_sentence_metric);
+		const auto matcher_factory = matcher_ff.create_matcher_factory(p_query);
+
+		StaticEmbeddingSimilarityBuilder builder(static_embeddings);
+		const auto matrix = builder.create(p_query, metric_def, matcher_factory);
+
+		return std::make_shared<StaticEmbeddingMetric>(
+			static_embeddings[0]->name(), matrix, matcher_factory);
 	}
 }

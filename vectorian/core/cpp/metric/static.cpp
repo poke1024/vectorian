@@ -35,7 +35,7 @@ std::vector<float> parse_tag_weights(
 	return t_tokens_pos_weights;
 }
 
-MatcherFactoryRef StaticEmbeddingMetricFactory::create_matcher_factory(
+MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 	const QueryRef &p_query) {
 
 	py::gil_scoped_acquire acquire;
@@ -124,7 +124,7 @@ MatcherFactoryRef StaticEmbeddingMetricFactory::create_matcher_factory(
 
 // --------------------------------------------------------------------------------
 
-SimilarityMatrixRef StaticEmbeddingMetricFactory::build_similarity_matrix(
+SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::build_similarity_matrix(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
 
@@ -183,9 +183,10 @@ SimilarityMatrixRef StaticEmbeddingMetricFactory::build_similarity_matrix(
 	return matrix;
 }
 
-StaticEmbeddingMetricRef StaticEmbeddingMetricFactory::create(
+SimilarityMatrixRef StaticEmbeddingSimilarityBuilder::create(
 	const QueryRef &p_query,
-	const WordMetricDef &p_metric) {
+	const WordMetricDef &p_metric,
+	const MatcherFactoryRef &p_matcher_factory) {
 
 	const auto matrix = build_similarity_matrix(
 		p_query,
@@ -222,9 +223,7 @@ StaticEmbeddingMetricRef StaticEmbeddingMetricFactory::create(
 		(*p_query->debug_hook())("similarity_matrix", data);
 	}*/
 
-	const auto matcher_factory = create_matcher_factory(p_query);
-
-	if (matcher_factory->needs_magnitudes()) {
+	if (p_matcher_factory->needs_magnitudes()) {
 		const Needle needle(p_query);
 
 		compute_magnitudes(
@@ -233,6 +232,8 @@ StaticEmbeddingMetricRef StaticEmbeddingMetricFactory::create(
 			needle);
 	}
 
-	return std::make_shared<StaticEmbeddingMetric>(
-		m_embeddings[0]->name(), matrix, matcher_factory);
+	return matrix;
+
+	//return std::make_shared<StaticEmbeddingMetric>(
+	//	m_embeddings[0]->name(), matrix, matcher_factory);
 }
