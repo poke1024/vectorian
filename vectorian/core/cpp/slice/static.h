@@ -9,7 +9,7 @@
 
 template<typename Index>
 class StaticEmbeddingSlice {
-	const StaticEmbeddingMetric &m_metric;
+	const SimilarityMatrix &m_matrix;
 	const size_t m_slice_id;
 	const Token * const s_tokens;
 	const Index m_len_s;
@@ -21,12 +21,12 @@ public:
 	typedef TokenIdEncoder Encoder;
 
 	inline StaticEmbeddingSlice(
-		const StaticEmbeddingMetric &metric,
+		const SimilarityMatrix &matrix,
 		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
 
-		m_metric(metric),
+		m_matrix(matrix),
 		m_slice_id(slice_id),
 		s_tokens(s.tokens + s.offset),
 		m_len_s(s.len),
@@ -60,22 +60,22 @@ public:
 
 	inline float similarity(Index i, Index j) const {
 		const Token &s = s_tokens[i];
-		const auto &sim = m_metric.similarity();
+		const auto &sim = m_matrix.m_similarity;
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
 	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
-		return m_metric.magnitudes()(m_encoder.to_embedding(s));
+		return m_matrix.m_magnitudes(m_encoder.to_embedding(s));
 	}
 
 	inline float magnitude_t(Index i) const {
 		const Token &t = t_tokens[i];
-		return m_metric.magnitudes()(m_encoder.to_embedding(t));
+		return m_matrix.m_magnitudes(m_encoder.to_embedding(t));
 	}
 
 	inline void assert_has_magnitudes() const {
-		m_metric.assert_has_magnitudes();
+		m_matrix.assert_has_magnitudes();
 	}
 
 	inline float max_similarity_for_t(Index i) const {

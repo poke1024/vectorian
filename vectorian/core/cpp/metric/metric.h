@@ -3,19 +3,69 @@
 
 #include "common.h"
 
+class SimilarityMatrix {
+public:
+	xt::pytensor<float, 2> m_similarity;
+	xt::pytensor<float, 1> m_magnitudes;
+	bool m_needs_magnitudes;
+
+	inline SimilarityMatrix() :
+
+		m_needs_magnitudes(false) {
+
+		m_magnitudes.resize({0});
+		PPK_ASSERT(m_magnitudes.shape(0) == 0);
+	}
+
+	inline const xt::pytensor<float, 2> &similarity() const {
+		return m_similarity;
+	}
+
+	inline const xt::pytensor<float, 1> &magnitudes() const {
+		return m_magnitudes;
+	}
+
+	inline void assert_has_magnitudes() const {
+		PPK_ASSERT(m_magnitudes.shape(0) > 0);
+	}
+};
+
+typedef std::shared_ptr<SimilarityMatrix> SimilarityMatrixRef;
+
+
 class Metric : public std::enable_shared_from_this<Metric> {
-	// a point could be made that this is only a partial
-	// metric, since it's only between corpus and needle
-	// (and not between corpus and corpus), but let's
-	// keep names simple.
+protected:
+	const std::string m_name;
+	const SimilarityMatrixRef m_matrix;
+	const MatcherFactoryRef m_matcher_factory;
 
 public:
+	inline Metric(
+		const std::string &p_name,
+		const SimilarityMatrixRef &p_matrix,
+		const MatcherFactoryRef &p_matcher_factory) :
+
+		m_name(p_name),
+		m_matrix(p_matrix),
+		m_matcher_factory(p_matcher_factory) {
+	}
+
 	virtual ~Metric() {
 	}
 
-	virtual MatcherFactoryRef matcher_factory() const = 0;
+	virtual MetricRef clone(const SimilarityMatrixRef &p_matrix) = 0;
 
-	virtual const std::string &name() const = 0;
+	inline const SimilarityMatrixRef &matrix() const {
+		return m_matrix;
+	}
+
+	inline const MatcherFactoryRef &matcher_factory() const {
+		return m_matcher_factory;
+	}
+
+	inline const std::string &name() const {
+		return m_name;
+	}
 
 	virtual const std::string &origin(int p_token_id_s, int p_query_token_index) const {
 		return name();
@@ -24,7 +74,7 @@ public:
 
 typedef std::shared_ptr<Metric> MetricRef;
 
-class ExternalMetric : public Metric {
+/*class ExternalMetric : public Metric {
 	const std::string m_name;
 
 public:
@@ -42,7 +92,7 @@ public:
 	}
 };
 
-typedef std::shared_ptr<ExternalMetric> ExternalMetricRef;
+typedef std::shared_ptr<ExternalMetric> ExternalMetricRef;*/
 
 inline MetricRef lookup_metric(
 	const std::map<std::string, MetricRef> &p_metrics,

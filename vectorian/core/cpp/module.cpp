@@ -119,13 +119,6 @@ PYBIND11_MODULE(core, m) {
 	result_set.def("best_n", &ResultSet::best_n);
 	result_set.def("extend", &ResultSet::extend);
 
-	py::class_<ExternalMetric, ExternalMetricRef> ext_metric(m, "ExternalMetric");
-	ext_metric.def(py::init<const std::string&>());
-
-	/*py::class_<LargeMatrix, LargeMatrixRef> matrix(m, "LargeMatrix");
-	matrix.def(py::init<const std::string &>());
-	matrix.def("create", &LargeMatrix::create);
-	matrix.def("close", &LargeMatrix::close);
-	matrix.def("write", &LargeMatrix::write);
-	*/
+	//py::class_<ExternalMetric, ExternalMetricRef> ext_metric(m, "ExternalMetric");
+	//ext_metric.def(py::init<const std::string&>());
 }

@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "utils.h"
-#include "metric/composite.h"
 #include "vocabulary.h"
 #include "embedding/vectors.h"
 

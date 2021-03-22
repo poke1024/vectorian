@@ -2,45 +2,55 @@
 #define __VECTORIAN_CONTEXTUAL_EMBEDDING_METRIC_H__
 
 #include "metric/metric.h"
-
-class ContextualEmbedding;
-typedef std::shared_ptr<ContextualEmbedding> ContextualEmbeddingRef;
+#include "embedding/contextual.h"
 
 class ContextualEmbeddingMetric : public Metric {
-protected:
-	const ContextualEmbeddingRef m_embedding;
-	const py::dict m_sent_metric_def;
-	MatcherFactoryRef m_matcher_factory;
+public:
+	inline ContextualEmbeddingMetric(
+		const std::string &p_name,
+		const SimilarityMatrixRef &p_matrix,
+		const MatcherFactoryRef &p_matcher_factory) :
+
+		Metric(p_name, p_matrix, p_matcher_factory) {
+	}
+
+	virtual MetricRef clone(const SimilarityMatrixRef &p_matrix) {
+		return std::make_shared<ContextualEmbeddingMetric>(
+			m_name, p_matrix, m_matcher_factory);
+	}
+};
+
+typedef std::shared_ptr<ContextualEmbeddingMetric> ContextualEmbeddingMetricRef;
+
+class ContextualEmbeddingMetricFactory {
+
+	py::dict m_sent_metric_def;
+	ContextualEmbeddingRef m_embedding;
 
 	MatcherFactoryRef create_matcher_factory(
 		const QueryRef &p_query,
-		const WordMetricDef &p_word_metric);
+		const WordMetricDef &p_metric);
+
+	inline const py::dict &sent_metric_def() const {
+		return m_sent_metric_def;
+	}
 
 	inline py::dict alignment_def() const {
 		return m_sent_metric_def["alignment"].cast<py::dict>();
 	}
 
 public:
-	ContextualEmbeddingMetric(
-		const EmbeddingRef &p_embedding,
+	ContextualEmbeddingMetricFactory(
+		const ContextualEmbeddingRef &p_embedding,
 		const py::dict &p_sent_metric_def) :
 
-		m_embedding(std::dynamic_pointer_cast<ContextualEmbedding>(p_embedding)),
-		m_sent_metric_def(p_sent_metric_def) {
+		m_sent_metric_def(p_sent_metric_def),
+		m_embedding(p_embedding) {
 	}
 
-	void initialize(
+	ContextualEmbeddingMetricRef create(
 		const QueryRef &p_query,
-		const WordMetricDef &p_word_metric) {
-
-		m_matcher_factory = create_matcher_factory(p_query, p_word_metric);
-	}
-
-	virtual MatcherFactoryRef matcher_factory() const {
-		return m_matcher_factory;
-	}
-
-	virtual const std::string &name() const;
+		const WordMetricDef &p_metric);
 };
 
 #endif // __VECTORIAN_CONTEXTUAL_EMBEDDING_METRIC_H__

@@ -98,7 +98,7 @@ if __name__ == '__main__':
                     [1, 1]
                 )
 
-                #metric = TokenSimilarityMeasure(fasttext, CosineMetric())
+                metric = TokenSimilarity(fasttext, CosineSimilarity())
 
                 index = session.partition("sentence").index(AlignmentSentenceSimilarity(
                     token_metric=metric,

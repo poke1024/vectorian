@@ -10,7 +10,9 @@ ResultSetRef Query::match(
 		max_matches(), min_score());
 
 	for (const auto &metric : m_metrics) {
-		const auto matcher = metric->matcher_factory()->create_matcher(p_document);
+		const auto matcher = metric->matcher_factory()->create_matcher(
+			shared_from_this(), metric, p_document);
+
 		matcher->initialize();
 
 		{

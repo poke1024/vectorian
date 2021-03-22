@@ -4,7 +4,6 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "metric/metric.h"
-//#include "metric/composite.h"
 #include <iostream>
 
 /*template<typename T>

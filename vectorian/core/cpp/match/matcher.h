@@ -56,10 +56,17 @@ public:
 	inline MatcherFactory(const MatcherOptions &p_options) : m_options(p_options) {
 	}
 
-	virtual MatcherRef create_matcher(const DocumentRef &p_document) const = 0;
+	virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document) const = 0;
 
 	inline const MatcherOptions &options() const {
 		return m_options;
+	}
+
+	inline bool needs_magnitudes() const {
+		return m_options.needs_magnitudes;
 	}
 
 	virtual ~MatcherFactory() {
@@ -85,8 +92,12 @@ public:
         const Make &p_make) : MatcherFactory(p_options), m_make(p_make) {
 	}
 
-	virtual MatcherRef create_matcher(const DocumentRef &p_document) const {
-		return m_make(p_document, this->options());
+	virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document) const {
+
+		return m_make(p_query, p_metric, p_document, this->options());
 	}
 };
 

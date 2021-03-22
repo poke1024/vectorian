@@ -77,7 +77,7 @@ cfg['dependencies'] = [
 	'match/matcher_impl.h',
 	'match/region.h',
 	'metric/alignment.h',
-	'metric/composite.h',
+	'metric/modifier.h',
 	'metric/contextual.h',
 	'metric/factory.h',
 	'metric/metric.h',
@@ -92,8 +92,9 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
-	'module.cpp',
 	'metric/contextual.cpp',
+	'metric/modifier.cpp',
+	'module.cpp',
 	'metric/static.cpp',
 	'vocabulary.cpp',
 	'embedding/static.cpp',

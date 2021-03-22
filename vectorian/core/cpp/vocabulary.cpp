@@ -1,7 +1,8 @@
 #include "vocabulary.h"
 #include "utils.h"
 #include "embedding/static.h"
-#include "metric/composite.h"
+#include "metric/static.h"
+#include "metric/modifier.h"
 #include "query.h"
 
 template<typename VocabularyRef>
@@ -114,24 +115,19 @@ MetricRef QueryVocabulary::create_metric(
 
 	if (p_token_metric.attr("is_modifier").cast<bool>()) {
 
-		std::vector<StaticEmbeddingMetricRef> metrics;
+		std::vector<MetricRef> operand_metrics;
 
 		const auto operands = p_token_metric.attr("operands").cast<py::list>();
 		for (const auto &operand : operands) {
-			auto metric = std::dynamic_pointer_cast<StaticEmbeddingMetric>(create_metric(
-				p_query, p_sentence_metric, operand.cast<py::object>()));
-			metrics.push_back(metric);
+			auto metric = create_metric(
+				p_query, p_sentence_metric, operand.cast<py::object>());
+			operand_metrics.push_back(metric);
 		}
 
-		const auto metric = std::make_shared<StaticEmbeddingMetricInterpolator>(
-			p_sentence_metric,
-			p_token_metric,
-			metrics);
+		// std::make_shared<ModifiedMetricFactory>
 
-		metric->initialize(
-			p_query);
-
-		return metric;
+		ModifiedMetricFactory factory(p_token_metric, operand_metrics);
+		return factory.create(p_query);
 
 	} else {
 
@@ -144,18 +140,19 @@ MetricRef QueryVocabulary::create_metric(
 			token_metric_def["metric"].cast<py::object>()};
 
 		const auto embedding_index = m_embedding_manager->to_index(metric_def.embedding);
+
 		const std::vector<EmbeddingRef> embeddings = {
 			m_vocab->embedding_manager()->get_compiled(embedding_index),
 			embedding_manager()->get_compiled(embedding_index)
 		};
 
-		// since embeddings[0] and embeddings[1] have the same class (type), and
-		// we only want the vcall, it does not matter which one we choose here.
+		std::vector<StaticEmbeddingRef> static_embeddings;
+		static_embeddings.resize(embeddings.size());
+		std::transform(embeddings.begin(), embeddings.end(), static_embeddings.begin(), [] (auto x) {
+			return std::static_pointer_cast<StaticEmbedding>(x);
+		});
 
-		return embeddings[0]->create_metric(
-			p_query,
-			metric_def,
-			p_sentence_metric,
-			embeddings);
+		StaticEmbeddingMetricFactory factory(static_embeddings, p_sentence_metric);
+		return factory.create(p_query, metric_def);
 	}
 }

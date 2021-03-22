@@ -35,13 +35,10 @@ std::vector<float> parse_tag_weights(
 	return t_tokens_pos_weights;
 }
 
-MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
+MatcherFactoryRef StaticEmbeddingMetricFactory::create_matcher_factory(
 	const QueryRef &p_query) {
 
 	py::gil_scoped_acquire acquire;
-
-	const auto metric = std::dynamic_pointer_cast<StaticEmbeddingMetric>(
-		shared_from_this());
 
 	const std::string sentence_metric_kind =
 		m_sent_metric_def["metric"].cast<py::str>();
@@ -51,24 +48,28 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 	if (sentence_metric_kind == "alignment-isolated") {
 
 		const auto matcher_options = create_alignment_matcher_options(alignment_def);
-		if (matcher_options.needs_magnitudes) {
-			m_needs_magnitudes = true;
-		}
 
 		return MatcherFactory::create(
 			matcher_options,
-			[p_query, metric, alignment_def] (const DocumentRef &p_document, const auto &p_matcher_options) {
+			[alignment_def] (
 
-				const SliceFactoryFactory gen_slices([metric] (
+				const QueryRef &p_query,
+				const MetricRef &p_metric,
+				const DocumentRef &p_document,
+				const auto &p_matcher_options) {
+
+				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+
+				const SliceFactoryFactory gen_slices([matrix] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return StaticEmbeddingSlice<int16_t>(*metric.get(), slice_id, s, t);
+			        return StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t);
 				});
 
 				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, alignment_def, p_matcher_options,
+					p_query, p_document, p_metric, alignment_def, p_matcher_options,
 					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
 
@@ -85,27 +86,31 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 		}
 		options.t_pos_weights_sum = sum;
 
-		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
-		if (matcher_options.needs_magnitudes) {
-			m_needs_magnitudes = true;
-		}
+		const auto matcher_options = create_alignment_matcher_options(alignment_def);
 
 		return MatcherFactory::create(
 			matcher_options,
-			[p_query, metric, alignment_def, options] (const DocumentRef &p_document, const auto &p_matcher_options) {
+			[alignment_def, options] (
 
-				const SliceFactoryFactory gen_slices([metric, options] (
+				const QueryRef &p_query,
+				const MetricRef &p_metric,
+				const DocumentRef &p_document,
+				const auto &p_matcher_options) {
+
+				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+
+				const SliceFactoryFactory gen_slices([matrix, options] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
 					return TagWeightedSlice(
-						StaticEmbeddingSlice<int16_t>(*metric.get(), slice_id, s, t),
+						StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t),
 						options);
 				});
 
 				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, alignment_def, p_matcher_options,
+					p_query, p_document, p_metric, alignment_def, p_matcher_options,
 					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
 
@@ -119,16 +124,18 @@ MatcherFactoryRef StaticEmbeddingMetric::create_matcher_factory(
 
 // --------------------------------------------------------------------------------
 
-void StaticEmbeddingMetricAtom::build_similarity_matrix(
+SimilarityMatrixRef StaticEmbeddingMetricFactory::build_similarity_matrix(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
 
 	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
 	const Needle needle(p_query);
 
+	const auto matrix = std::make_shared<SimilarityMatrix>();
+
 	const size_t vocab_size = p_vocabulary->size();
 	const size_t needle_size = static_cast<size_t>(needle.size());
-	m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
+	matrix->m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
 
 	const auto &needle_tokens = needle.token_ids();
 	py::list sources;
@@ -154,7 +161,7 @@ void StaticEmbeddingMetricAtom::build_similarity_matrix(
 		p_metric.vector_metric(
 			vectors,
 			needle_vectors,
-			xt::strided_view(m_similarity, {xt::range(offset, offset + size), xt::all()}));
+			xt::strided_view(matrix->m_similarity, {xt::range(offset, offset + size), xt::all()}));
 
 		PPK_ASSERT(offset + size <= vocab_size);
 
@@ -169,21 +176,23 @@ void StaticEmbeddingMetricAtom::build_similarity_matrix(
 		// embedding distance).
 		const auto k = needle_tokens[j];
 		if (k >= 0) {
-			m_similarity(k, j) = 1.0f;
+			matrix->m_similarity(k, j) = 1.0f;
 		}
 	}
+
+	return matrix;
 }
 
-void StaticEmbeddingMetricAtom::initialize(
+StaticEmbeddingMetricRef StaticEmbeddingMetricFactory::create(
 	const QueryRef &p_query,
 	const WordMetricDef &p_metric) {
 
-	build_similarity_matrix(
+	const auto matrix = build_similarity_matrix(
 		p_query,
 		p_metric);
 
 	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
-	if (p_query->debug_hook().has_value()) {
+	/*if (p_query->debug_hook().has_value()) {
 		auto gen_rows = py::cpp_function([&] () {
 			const auto &vocab = p_query->vocabulary();
 
@@ -211,69 +220,19 @@ void StaticEmbeddingMetricAtom::initialize(
 		data["columns"] = gen_columns;
 
 		(*p_query->debug_hook())("similarity_matrix", data);
-	}
+	}*/
 
-	m_matcher_factory = create_matcher_factory(p_query);
+	const auto matcher_factory = create_matcher_factory(p_query);
 
-	if (m_needs_magnitudes) { // set in create_matcher_factory
+	if (matcher_factory->needs_magnitudes()) {
 		const Needle needle(p_query);
+
 		compute_magnitudes(
+			matrix,
 			p_query->vocabulary(),
 			needle);
 	}
-}
 
-const std::string &StaticEmbeddingMetricAtom::name() const {
-	return m_embeddings[0]->name();
-}
-
-// --------------------------------------------------------------------------------
-
-void StaticEmbeddingMetricInterpolator::initialize(
-	const QueryRef &p_query) {
-
-	const QueryVocabularyRef p_vocabulary = p_query->vocabulary();
-	const Needle needle(p_query);
-	const size_t vocab_size = p_vocabulary->size();
-	const size_t needle_size = static_cast<size_t>(needle.size());
-
-	py::list args;
-	bool has_magnitudes = false;
-
-	for (const auto &operand : m_operands) {
-		py::dict data;
-		data["similarity"] = operand->similarity();
-		PPK_ASSERT(operand->similarity().shape(0) == vocab_size);
-		PPK_ASSERT(operand->similarity().shape(1) == needle_size);
-		if (operand->magnitudes().shape(0) > 0) {
-			data["magnitudes"] = operand->magnitudes();
-			PPK_ASSERT(operand->magnitudes().shape(0) == vocab_size);
-			has_magnitudes = true;
-		}
-		args.append(data);
-	}
-
-	m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
-	if (has_magnitudes) {
-		m_magnitudes.resize({ssize_t(vocab_size)});
-	}
-
-	py::dict out;
-	out["similarity"] = m_similarity;
-	if (has_magnitudes) {
-		out["magnitudes"] = m_magnitudes;
-	}
-	m_operator(args, out);
-
-	PPK_ASSERT(m_similarity.shape(0) == vocab_size);
-	PPK_ASSERT(m_similarity.shape(1) == needle_size);
-	if (has_magnitudes) {
-		PPK_ASSERT(m_magnitudes.shape(0) == vocab_size);
-	}
-
-	m_matcher_factory = create_matcher_factory(p_query);
-}
-
-const std::string &StaticEmbeddingMetricInterpolator::name() const {
-	return m_name;
+	return std::make_shared<StaticEmbeddingMetric>(
+		m_embeddings[0]->name(), matrix, matcher_factory);
 }

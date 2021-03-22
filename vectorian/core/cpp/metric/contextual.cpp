@@ -7,7 +7,7 @@
 #include "metric/factory.h"
 #include "slice/contextual.h"
 
-MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
+MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 	const QueryRef &p_query,
 	const WordMetricDef &p_word_metric) {
 
@@ -16,16 +16,15 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 	// embeddings is a numpy array that can either be dynamically
 	// computed or loaded via a cache (loaded via numpy.memmap).
 
-	const auto metric = std::dynamic_pointer_cast<ContextualEmbeddingMetric>(
-		shared_from_this());
-
 	const std::string sentence_metric_kind =
 		m_sent_metric_def["metric"].cast<py::str>();
+
+	const auto alignment_def = this->alignment_def();
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
 		bool needs_magnitudes = false;
-		const auto matcher_options = create_alignment_matcher_options(metric->alignment_def());
+		const auto matcher_options = create_alignment_matcher_options(alignment_def);
 		if (matcher_options.needs_magnitudes) {
 			needs_magnitudes = true;
 		}
@@ -34,10 +33,15 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 
 		return MatcherFactory::create(
 			matcher_options,
-			[p_query, metric, vector_metric] (
-				const DocumentRef &p_document, const auto &p_matcher_options) {
+			[vector_metric, alignment_def] (
+				const QueryRef &p_query,
+				const MetricRef &p_metric,
+				const DocumentRef &p_document,
+				const auto &p_matcher_options) {
 
 				py::gil_scoped_acquire acquire;
+
+				const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
 
 				const HandleRef t_vectors = p_query->vectors_cache().open(
 					p_document->get_contextual_embedding_vectors(metric->name())
@@ -66,7 +70,7 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 				});
 
 				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, metric->alignment_def(), p_matcher_options,
+					p_query, p_document, metric, alignment_def, p_matcher_options,
 					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
 			});
 
@@ -105,6 +109,13 @@ MatcherFactoryRef ContextualEmbeddingMetric::create_matcher_factory(
 	}
 }
 
-const std::string &ContextualEmbeddingMetric::name() const {
-	return m_embedding->name();
+ContextualEmbeddingMetricRef ContextualEmbeddingMetricFactory::create(
+	const QueryRef &p_query,
+	const WordMetricDef &p_metric) {
+
+	return std::make_shared<ContextualEmbeddingMetric>(
+		m_embedding->name(),
+		SimilarityMatrixRef(), // FIXME
+		create_matcher_factory(p_query, p_metric)
+	);
 }

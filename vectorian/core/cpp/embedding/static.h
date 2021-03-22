@@ -48,12 +48,6 @@ public:
 	size_t size() const {
 		return m_size;
 	}
-
-	virtual MetricRef create_metric(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric,
-		const py::dict &p_sent_metric_def,
-		const std::vector<EmbeddingRef> &p_embeddings);
 };
 
 typedef std::shared_ptr<StaticEmbedding> StaticEmbeddingRef;

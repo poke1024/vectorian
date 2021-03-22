@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "embedding/embedding.h"
-#include "metric/contextual.h"
 
 class ContextualEmbedding : public Embedding {
 public:
@@ -13,7 +12,7 @@ public:
 		Embedding(p_name) {
 	}
 
-	virtual MetricRef create_metric(
+	/*virtual MetricRef create_metric(
 		const QueryRef &p_query,
 		const WordMetricDef &p_word_metric,
 		const py::dict &p_sent_metric_def,
@@ -26,7 +25,7 @@ public:
 		metric->initialize(p_query, p_word_metric);
 
 		return metric;
-	}
+	}*/
 };
 
 typedef std::shared_ptr<ContextualEmbedding> ContextualEmbeddingRef;
