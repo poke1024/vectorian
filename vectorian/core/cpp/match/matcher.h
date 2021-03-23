@@ -72,14 +72,10 @@ public:
 	virtual ~MatcherFactory() {
 	}
 
-	template<typename Make>
-	static inline MatcherFactoryRef create(
+	template<typename SliceFactoryFactory>
+	static MatcherFactoryRef create(
 		const MatcherOptions &p_options,
-		const Make &p_make) {
-
-		return std::make_shared<MatcherFactoryImpl<Make>>(
-			p_options, p_make);
-	}
+		const SliceFactoryFactory &p_gen_slices);
 };
 
 template<typename Make>

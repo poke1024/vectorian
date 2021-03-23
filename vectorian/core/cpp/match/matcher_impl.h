@@ -8,6 +8,7 @@
 #include "query.h"
 #include "document.h"
 #include "result_set.h"
+#include "metric/alignment.h"
 #include <fstream>
 
 template<typename Aligner>
@@ -177,4 +178,67 @@ public:
 	}
 };
 
-#endif // __VECTORIAN_ALIGNER__
+template<typename MakeSlice, typename MakeMatcher>
+class FilteredMatcherFactory {
+	const MakeSlice m_make_slice;
+	const MakeMatcher m_make_matcher;
+
+public:
+	typedef typename std::invoke_result<
+		MakeSlice,
+		const size_t,
+		const TokenSpan&,
+		const TokenSpan&>::type Slice;
+
+	FilteredMatcherFactory(
+		const MakeSlice &make_slice,
+		const MakeMatcher &make_matcher) :
+
+		m_make_slice(make_slice),
+		m_make_matcher(make_matcher) {
+	}
+
+	MatcherRef create(
+		const QueryRef &p_query,
+		const DocumentRef &p_document) const {
+
+		const auto token_filter = p_query->token_filter();
+
+		if (token_filter.all()) {
+			return m_make_matcher(SliceFactory(m_make_slice));
+		} else {
+			return m_make_matcher(FilteredSliceFactory(
+				p_query,
+				SliceFactory(m_make_slice),
+				p_document, token_filter));
+		}
+	}
+};
+
+template<typename SliceFactoryFactory>
+MatcherFactoryRef MatcherFactory::create(
+	const MatcherOptions &p_options,
+	const SliceFactoryFactory &p_gen_slices) {
+
+	const auto make_matcher = [p_gen_slices] (
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const auto &p_matcher_options) {
+
+		const auto gen_matcher = [=] (auto slice_factory) {
+			return create_alignment_matcher<int16_t>(
+				p_query, p_document, p_metric, p_matcher_options, slice_factory);
+		};
+
+		FilteredMatcherFactory factory(
+			p_gen_slices(p_query, p_metric, p_document),
+			gen_matcher);
+		return factory.create(p_query, p_document);
+	};
+
+	return std::make_shared<MatcherFactoryImpl<decltype(make_matcher)>>(
+		p_options, make_matcher);
+}
+
+#endif // __VECTORIAN_MATCHER_IMPL__

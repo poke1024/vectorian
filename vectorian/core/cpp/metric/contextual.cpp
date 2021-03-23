@@ -31,52 +31,44 @@ MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 
 		const py::object vector_metric = p_word_metric.vector_metric;
 
-		return MatcherFactory::create(
-			matcher_options,
-			[vector_metric, alignment_def] (
-				const QueryRef &p_query,
-				const MetricRef &p_metric,
-				const DocumentRef &p_document,
-				const auto &p_matcher_options) {
+		const auto gen_slices = [vector_metric] (
+			const QueryRef &p_query,
+			const MetricRef &p_metric,
+			const DocumentRef &p_document) {
 
-				py::gil_scoped_acquire acquire;
+			py::gil_scoped_acquire acquire;
 
-				const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
+			const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
 
-				const HandleRef t_vectors = p_query->vectors_cache().open(
-					p_document->get_contextual_embedding_vectors(metric->name())
-				);
-				const HandleRef s_vectors = p_query->vectors_cache().open(
-					p_query->get_contextual_embedding_vectors(metric->name())
-				);
+			const HandleRef t_vectors = p_query->vectors_cache().open(
+				p_document->get_contextual_embedding_vectors(metric->name())
+			);
+			const HandleRef s_vectors = p_query->vectors_cache().open(
+				p_query->get_contextual_embedding_vectors(metric->name())
+			);
 
-				// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
-				// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
+			// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
+			// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
 
-				const auto sim_matrix = std::make_shared<SimilarityMatrix>();
+			const auto sim_matrix = std::make_shared<SimilarityMatrix>();
 
-				sim_matrix->m_similarity.resize({
-					s_vectors->get().attr("size").cast<ssize_t>(),
-					t_vectors->get().attr("size").cast<ssize_t>()});
+			sim_matrix->m_similarity.resize({
+				s_vectors->get().attr("size").cast<ssize_t>(),
+				t_vectors->get().attr("size").cast<ssize_t>()});
 
-				vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
+			vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
 
-				const auto gen_slices = [sim_matrix] (
-					const size_t slice_id,
-					const TokenSpan &s,
-					const TokenSpan &t) {
+			return [sim_matrix] (
+				const size_t slice_id,
+				const TokenSpan &s,
+				const TokenSpan &t) {
 
-			        return ContextualEmbeddingSlice<int16_t>(sim_matrix->m_similarity, slice_id, s, t);
-				};
+		        return ContextualEmbeddingSlice<int16_t>(
+		            sim_matrix->m_similarity, slice_id, s, t);
+			};
+		};
 
-				const auto gen_matcher = [=] (auto slice_factory) {
-					return create_alignment_matcher<int16_t>(
-						p_query, p_document, metric, alignment_def, p_matcher_options, slice_factory);
-				};
-
-				FilteredMatcherFactory factory(gen_slices, gen_matcher);
-				return factory.create(p_query, p_document);
-			});
+		return MatcherFactory::create(matcher_options, gen_slices);
 
 	} /*else if (sentence_metric_kind == "alignment-tag-weighted") {
 

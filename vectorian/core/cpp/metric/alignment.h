@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_METRIC_ALIGNMENT__
+#define __VECTORIAN_METRIC_ALIGNMENT__
+
 #include "common.h"
 #include "alignment/aligner.h"
 #include "alignment/wmd.h"
@@ -492,20 +495,20 @@ public:
 };
 
 inline std::string get_alignment_algorithm(
-	const py::dict &p_alignment_def) {
+	const py::dict &alignment_def) {
 
-	if (p_alignment_def.contains("algorithm")) {
-		return p_alignment_def["algorithm"].cast<py::str>();
+	if (alignment_def.contains("algorithm")) {
+		return alignment_def["algorithm"].cast<py::str>();
 	} else {
 		return "wsb"; // default
 	}
 }
 
 inline MatcherOptions create_alignment_matcher_options(
-	const py::dict &p_alignment_def) {
+	const py::dict &alignment_def) {
 
-	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
-	return MatcherOptions{algorithm == "word-rotators-distance"};
+	const std::string algorithm = get_alignment_algorithm(alignment_def);
+	return MatcherOptions{algorithm == "word-rotators-distance", alignment_def};
 }
 
 template<typename Index, typename SliceFactory>
@@ -513,21 +516,21 @@ MatcherRef create_alignment_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
-	const py::dict &p_alignment_def,
 	const MatcherOptions &p_matcher_options,
 	const SliceFactory &p_factory) {
 
-	const std::string algorithm = get_alignment_algorithm(p_alignment_def);
+	const py::dict &alignment_def = p_matcher_options.alignment_def;
+	const std::string algorithm = get_alignment_algorithm(alignment_def);
 
 	if (algorithm == "waterman-smith-beyer") {
 		float zero = 0.5;
-		if (p_alignment_def.contains("zero")) {
-			zero = p_alignment_def["zero"].cast<float>();
+		if (alignment_def.contains("zero")) {
+			zero = alignment_def["zero"].cast<float>();
 		}
 
 		std::vector<float> gap_cost;
-		if (p_alignment_def.contains("gap")) {
-			auto cost = p_alignment_def["gap"].cast<py::array_t<float>>();
+		if (alignment_def.contains("gap")) {
+			auto cost = alignment_def["gap"].cast<py::array_t<float>>();
 			auto r = cost.unchecked<1>();
 			const ssize_t n = r.shape(0);
 			gap_cost.resize(n);
@@ -547,13 +550,13 @@ MatcherRef create_alignment_matcher(
 	} else if (algorithm == "smith-waterman") {
 
 		float gap_cost = 0.0f;
-		if (p_alignment_def.contains("gap_cost")) {
-			gap_cost = p_alignment_def["gap_cost"].cast<float>();
+		if (alignment_def.contains("gap_cost")) {
+			gap_cost = alignment_def["gap_cost"].cast<float>();
 		}
 
 		float zero = 0.5f;
-		if (p_alignment_def.contains("zero")) {
-			zero = p_alignment_def["zero"].cast<float>();
+		if (alignment_def.contains("zero")) {
+			zero = alignment_def["zero"].cast<float>();
 		}
 
 		return make_matcher(
@@ -564,8 +567,8 @@ MatcherRef create_alignment_matcher(
 	} else if (algorithm == "needleman-wunsch") {
 
 		float gap_cost = 0.0f;
-		if (p_alignment_def.contains("gap_cost")) {
-			gap_cost = p_alignment_def["gap_cost"].cast<float>();
+		if (alignment_def.contains("gap_cost")) {
+			gap_cost = alignment_def["gap_cost"].cast<float>();
 		}
 
 		return make_matcher(
@@ -581,20 +584,20 @@ MatcherRef create_alignment_matcher(
 		bool injective = true;
 		float extra_mass_penalty = -1.0f;
 
-		if (p_alignment_def.contains("relaxed")) {
-			relaxed = p_alignment_def["relaxed"].cast<bool>();
+		if (alignment_def.contains("relaxed")) {
+			relaxed = alignment_def["relaxed"].cast<bool>();
 		}
-		if (p_alignment_def.contains("normalize_bow")) {
-			normalize_bow = p_alignment_def["normalize_bow"].cast<bool>();
+		if (alignment_def.contains("normalize_bow")) {
+			normalize_bow = alignment_def["normalize_bow"].cast<bool>();
 		}
-		if (p_alignment_def.contains("symmetric")) {
-			symmetric = p_alignment_def["symmetric"].cast<bool>();
+		if (alignment_def.contains("symmetric")) {
+			symmetric = alignment_def["symmetric"].cast<bool>();
 		}
-		if (p_alignment_def.contains("injective")) {
-			injective = p_alignment_def["injective"].cast<bool>();
+		if (alignment_def.contains("injective")) {
+			injective = alignment_def["injective"].cast<bool>();
 		}
-		if (p_alignment_def.contains("extra_mass_penalty")) {
-			extra_mass_penalty = p_alignment_def["extra_mass_penalty"].cast<float>();
+		if (alignment_def.contains("extra_mass_penalty")) {
+			extra_mass_penalty = alignment_def["extra_mass_penalty"].cast<float>();
 		}
 
 		return make_matcher(
@@ -608,13 +611,13 @@ MatcherRef create_alignment_matcher(
 		PPK_ASSERT(p_matcher_options.needs_magnitudes);
 
 		bool normalize_magnitudes = true;
-		if (p_alignment_def.contains("normalize_magnitudes")) {
-			normalize_magnitudes = p_alignment_def["normalize_magnitudes"].cast<bool>();
+		if (alignment_def.contains("normalize_magnitudes")) {
+			normalize_magnitudes = alignment_def["normalize_magnitudes"].cast<bool>();
 		}
 
 		float extra_mass_penalty = -1.0f;
-		if (p_alignment_def.contains("extra_mass_penalty")) {
-			extra_mass_penalty = p_alignment_def["extra_mass_penalty"].cast<float>();
+		if (alignment_def.contains("extra_mass_penalty")) {
+			extra_mass_penalty = alignment_def["extra_mass_penalty"].cast<float>();
 		}
 
 		return make_matcher(p_query, p_document, p_metric, p_factory,
@@ -629,3 +632,5 @@ MatcherRef create_alignment_matcher(
 		throw std::runtime_error(err.str());
 	}
 }
+
+#endif // __VECTORIAN_METRIC_ALIGNMENT__

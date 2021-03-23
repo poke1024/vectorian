@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_WMD__
+#define __VECTORIAN_WMD__
+
 #include "common.h"
 #include "match/match.h"
 #include "alignment/transport.h"
@@ -619,3 +622,4 @@ public:
 	}
 };
 
+#endif // __VECTORIAN_WMD__

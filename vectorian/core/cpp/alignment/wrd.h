@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_WRD__
+#define __VECTORIAN_WRD__
+
 #include "alignment/transport.h"
 #include <chrono>
 
@@ -156,3 +159,5 @@ public:
 		m_ot.resize(max_problem_size);
 	}
 };
+
+#endif // __VECTORIAN_WRD__

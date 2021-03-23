@@ -74,6 +74,7 @@ struct Weight {
 
 struct MatcherOptions {
 	bool needs_magnitudes;
+	py::dict alignment_def;
 };
 
 class Query;

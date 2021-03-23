@@ -48,34 +48,23 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
+		const auto gen_slices = [] (
+			const QueryRef &p_query,
+			const MetricRef &p_metric,
+			const DocumentRef &p_document) {
 
-		return MatcherFactory::create(
-			matcher_options,
-			[alignment_def] (
+			const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 
-				const QueryRef &p_query,
-				const MetricRef &p_metric,
-				const DocumentRef &p_document,
-				const auto &p_matcher_options) {
+			return [matrix] (
+				const size_t slice_id,
+				const TokenSpan &s,
+				const TokenSpan &t) {
 
-				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+		        return StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t);
+			};
+		};
 
-				const auto gen_slices = [matrix] (
-					const size_t slice_id,
-					const TokenSpan &s,
-					const TokenSpan &t) {
-
-			        return StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t);
-				};
-
-				const auto gen_matcher = [=] (auto slice_factory) {
-					return create_alignment_matcher<int16_t>(
-						p_query, p_document, p_metric, alignment_def, p_matcher_options, slice_factory);
-				};
-
-				FilteredMatcherFactory factory(gen_slices, gen_matcher);
-				return factory.create(p_query, p_document);
-			});
+		return MatcherFactory::create(matcher_options, gen_slices);
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
@@ -90,35 +79,25 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 		}
 		options.t_pos_weights_sum = sum;
 
-		return MatcherFactory::create(
-			matcher_options,
-			[alignment_def, options] (
+		const auto gen_slices = [options] (
+			const QueryRef &p_query,
+			const MetricRef &p_metric,
+			const DocumentRef &p_document) {
 
-				const QueryRef &p_query,
-				const MetricRef &p_metric,
-				const DocumentRef &p_document,
-				const auto &p_matcher_options) {
+			const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 
-				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+			return [options, matrix] (
+				const size_t slice_id,
+				const TokenSpan &s,
+				const TokenSpan &t) {
 
-				const auto gen_slices = [matrix, options] (
-					const size_t slice_id,
-					const TokenSpan &s,
-					const TokenSpan &t) {
+				return TagWeightedSlice(
+					StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t),
+					options);
+			};
+		};
 
-					return TagWeightedSlice(
-						StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t),
-						options);
-				};
-
-				const auto gen_matcher = [=] (auto slice_factory) {
-					return create_alignment_matcher<int16_t>(
-						p_query, p_document, p_metric, alignment_def, p_matcher_options, slice_factory);
-				};
-
-				FilteredMatcherFactory factory(gen_slices, gen_matcher);
-				return factory.create(p_query, p_document);
-			});
+		return MatcherFactory::create(matcher_options, gen_slices);
 
 	} else {
 
