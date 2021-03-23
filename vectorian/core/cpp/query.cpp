@@ -204,7 +204,7 @@ Query::Strategy Query::create_strategy(
 				shared_from_this(), metric_def, p_matcher_factory, embedding_index);
 
 			return Strategy{
-				true,
+				false,
 				metric_def.name,
 				sim_factory};
 		}

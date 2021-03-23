@@ -6,15 +6,18 @@
 
 template<typename Index>
 class ContextualEmbeddingSlice {
+public:
+	typedef Index SliceIndex;
+	typedef ContextualEmbeddingTokenIdEncoder Encoder;
+
+private:
 	const xt::pytensor<float, 2> &m_matrix;
 	const size_t m_slice_id;
 	const TokenSpan m_s;
 	const TokenSpan m_t;
-	const TokenIdEncoder m_encoder; // FIXME should be a ContextualTokenIdEncoder
+	const Encoder m_encoder;
 
 public:
-	typedef Index SliceIndex;
-
 	inline ContextualEmbeddingSlice(
 		const xt::pytensor<float, 2> &matrix,
 		const size_t slice_id,
@@ -31,7 +34,7 @@ public:
 		return m_slice_id;
 	}
 
-	inline const TokenIdEncoder &encoder() const {
+	inline const ContextualEmbeddingTokenIdEncoder &encoder() const {
 		return m_encoder;
 	}
 
@@ -68,6 +71,7 @@ public:
 	}
 
 	inline void assert_has_magnitudes() const {
+		PPK_ASSERT(false);
 	}
 
 	inline float max_similarity_for_t(Index i) const {

@@ -9,18 +9,20 @@
 
 template<typename Index>
 class StaticEmbeddingSlice {
+public:
+	typedef Index SliceIndex;
+	typedef StaticEmbeddingTokenIdEncoder Encoder;
+
+private:
 	const SimilarityMatrix &m_matrix;
 	const size_t m_slice_id;
 	const Token * const s_tokens;
 	const Index m_len_s;
 	const Token * const t_tokens;
 	const Index m_len_t;
-	const TokenIdEncoder m_encoder;
+	const Encoder m_encoder;
 
 public:
-	typedef Index SliceIndex;
-	typedef TokenIdEncoder Encoder;
-
 	inline StaticEmbeddingSlice(
 		const SimilarityMatrix &matrix,
 		const size_t slice_id,
@@ -39,7 +41,7 @@ public:
 		return m_slice_id;
 	}
 
-	inline const TokenIdEncoder &encoder() const {
+	inline const Encoder &encoder() const {
 		return m_encoder;
 	}
 
@@ -62,7 +64,7 @@ public:
 	inline float similarity(Index i, Index j) const {
 		const Token &s = s_tokens[i];
 		const auto &sim = m_matrix.m_similarity;
-		return sim(m_encoder.to_embedding(s), j);
+		return sim(m_encoder.to_embedding(0, i, s), j);
 	}
 
 	inline float unmodified_similarity(Index i, Index j) const {
@@ -71,12 +73,12 @@ public:
 
 	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
-		return m_matrix.m_magnitudes(m_encoder.to_embedding(s));
+		return m_matrix.m_magnitudes(m_encoder.to_embedding(0, i, s));
 	}
 
 	inline float magnitude_t(Index i) const {
 		const Token &t = t_tokens[i];
-		return m_matrix.m_magnitudes(m_encoder.to_embedding(t));
+		return m_matrix.m_magnitudes(m_encoder.to_embedding(1, i, t));
 	}
 
 	inline void assert_has_magnitudes() const {
@@ -105,6 +107,7 @@ class FilteredSlice {
 
 public:
 	typedef typename Delegate::SliceIndex SliceIndex;
+	typedef typename Delegate::Encoder Encoder;
 
 	inline FilteredSlice(
 		const Delegate &p_delegate,
@@ -120,7 +123,7 @@ public:
 		return m_delegate.id();
 	}
 
-	inline const TokenIdEncoder &encoder() const {
+	inline const Encoder &encoder() const {
 		return m_delegate.encoder();
 	}
 

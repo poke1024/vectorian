@@ -77,6 +77,11 @@ struct MatcherOptions {
 	py::dict alignment_def;
 };
 
+enum EmbeddingType {
+	STATIC,
+	CONTEXTUAL
+};
+
 class Query;
 typedef std::shared_ptr<Query> QueryRef;
 class Document;

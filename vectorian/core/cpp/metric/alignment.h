@@ -345,9 +345,9 @@ class WordMoversDistance {
 			return m_wmd_tagged(
 				p_query,
 				p_slice,
-				[&enc] (const auto &t) {
+				[&enc] (const int src, const size_t pos, const auto &t) {
 					return TaggedTokenId{
-						enc.to_embedding(t),
+						enc.to_embedding(src, pos, t),
 						t.tag
 					};
 				},
@@ -361,8 +361,8 @@ class WordMoversDistance {
 			return m_wmd(
 				p_query,
 				p_slice,
-				[&enc] (const auto &t) {
-					return enc.to_embedding(t);
+				[&enc] (const int src, const size_t pos, const auto &t) {
+					return enc.to_embedding(src, pos, t);
 				},
 				m_options,
 				p_solver);

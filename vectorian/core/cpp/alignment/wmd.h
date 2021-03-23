@@ -501,11 +501,11 @@ public:
 
 			for (Index i = 0; i < len_s; i++) {
 				z[k++] = RefToken{
-					make_token(slice.s(i)), i, 0};
+					make_token(0, i, slice.s(i)), i, 0};
 			}
 			for (Index i = 0; i < len_t; i++) {
 				z[k++] = RefToken{
-					make_token(slice.t(i)), i, 1};
+					make_token(1, i, slice.t(i)), i, 1};
 			}
 
 			if (k < 1) {
