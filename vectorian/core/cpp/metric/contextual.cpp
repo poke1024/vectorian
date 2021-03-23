@@ -7,6 +7,53 @@
 #include "metric/factory.h"
 #include "slice/contextual.h"
 
+class ContextualEmbeddingMatcherFactory : public MinimalMatcherFactory {
+	const py::object m_vector_metric;
+
+public:
+	ContextualEmbeddingMatcherFactory(const py::object &p_vector_metric) :
+		m_vector_metric(p_vector_metric) {
+	}
+
+    virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options) const {
+
+		py::gil_scoped_acquire acquire;
+
+		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
+
+		const HandleRef t_vectors = p_query->vectors_cache().open(
+			p_document->get_contextual_embedding_vectors(metric->name())
+		);
+		const HandleRef s_vectors = p_query->vectors_cache().open(
+			p_query->get_contextual_embedding_vectors(metric->name())
+		);
+
+		// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
+		// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
+
+		const auto sim_matrix = std::make_shared<SimilarityMatrix>();
+
+		sim_matrix->m_similarity.resize({
+			s_vectors->get().attr("size").cast<ssize_t>(),
+			t_vectors->get().attr("size").cast<ssize_t>()});
+
+		m_vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
+
+		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [sim_matrix] (
+			const size_t slice_id,
+			const TokenSpan &s,
+			const TokenSpan &t) {
+
+	        return ContextualEmbeddingSlice<Index>(
+	            sim_matrix->m_similarity, slice_id, s, t);
+		});
+	};
+};
+
 MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 	const QueryRef &p_query,
 	const WordMetricDef &p_word_metric) {
@@ -31,44 +78,9 @@ MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 
 		const py::object vector_metric = p_word_metric.vector_metric;
 
-		const auto gen_slices = [vector_metric] (
-			const QueryRef &p_query,
-			const MetricRef &p_metric,
-			const DocumentRef &p_document) {
-
-			py::gil_scoped_acquire acquire;
-
-			const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
-
-			const HandleRef t_vectors = p_query->vectors_cache().open(
-				p_document->get_contextual_embedding_vectors(metric->name())
-			);
-			const HandleRef s_vectors = p_query->vectors_cache().open(
-				p_query->get_contextual_embedding_vectors(metric->name())
-			);
-
-			// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
-			// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.
-
-			const auto sim_matrix = std::make_shared<SimilarityMatrix>();
-
-			sim_matrix->m_similarity.resize({
-				s_vectors->get().attr("size").cast<ssize_t>(),
-				t_vectors->get().attr("size").cast<ssize_t>()});
-
-			vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
-
-			return [sim_matrix] (
-				const size_t slice_id,
-				const TokenSpan &s,
-				const TokenSpan &t) {
-
-		        return ContextualEmbeddingSlice<int16_t>(
-		            sim_matrix->m_similarity, slice_id, s, t);
-			};
-		};
-
-		return MatcherFactory::create(matcher_options, gen_slices);
+		return std::make_shared<MatcherFactory>(
+			std::make_shared<ContextualEmbeddingMatcherFactory>(vector_metric),
+			matcher_options);
 
 	} /*else if (sentence_metric_kind == "alignment-tag-weighted") {
 

@@ -49,17 +49,52 @@ typedef std::shared_ptr<MatcherFactory> MatcherFactoryRef;
 template<typename Make>
 class MatcherFactoryImpl;
 
+class MinimalMatcherFactory {
+protected:
+	typedef int16_t Index;
+
+	template<typename GenSlices>
+	MatcherRef make_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options,
+		const GenSlices &p_gen_slices) const;
+
+public:
+	virtual ~MinimalMatcherFactory() {
+	}
+
+    virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options) const = 0;
+};
+
+typedef std::shared_ptr<MinimalMatcherFactory> MinimalMatcherFactoryRef;
+
 class MatcherFactory {
+	const MinimalMatcherFactoryRef m_factory;
 	const MatcherOptions m_options;
 
 public:
-	inline MatcherFactory(const MatcherOptions &p_options) : m_options(p_options) {
+	inline MatcherFactory(
+		const MinimalMatcherFactoryRef &p_factory,
+		const MatcherOptions &p_options) :
+
+		m_factory(p_factory),
+		m_options(p_options) {
 	}
 
-	virtual MatcherRef create_matcher(
+	inline MatcherRef create_matcher(
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
-		const DocumentRef &p_document) const = 0;
+		const DocumentRef &p_document) const {
+
+		return m_factory->create_matcher(
+			p_query, p_metric, p_document, this->m_options);
+	}
 
 	inline const MatcherOptions &options() const {
 		return m_options;
@@ -72,29 +107,9 @@ public:
 	virtual ~MatcherFactory() {
 	}
 
-	template<typename SliceFactoryFactory>
 	static MatcherFactoryRef create(
-		const MatcherOptions &p_options,
-		const SliceFactoryFactory &p_gen_slices);
-};
-
-template<typename Make>
-class MatcherFactoryImpl : public MatcherFactory {
-	const Make m_make;
-
-public:
-    inline MatcherFactoryImpl(
-		const MatcherOptions &p_options,
-        const Make &p_make) : MatcherFactory(p_options), m_make(p_make) {
-	}
-
-	virtual MatcherRef create_matcher(
-		const QueryRef &p_query,
-		const MetricRef &p_metric,
-		const DocumentRef &p_document) const {
-
-		return m_make(p_query, p_metric, p_document, this->options());
-	}
+		const MinimalMatcherFactoryRef &p_factory,
+		const MatcherOptions &p_options);
 };
 
 class ExternalMatcher : public Matcher {

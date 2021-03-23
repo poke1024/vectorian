@@ -35,6 +35,59 @@ std::vector<float> parse_tag_weights(
 	return t_tokens_pos_weights;
 }
 
+class StaticEmbeddingMatcherFactory : public MinimalMatcherFactory {
+public:
+    virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options) const {
+
+		const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+
+		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix] (
+			const size_t slice_id,
+			const TokenSpan &s,
+			const TokenSpan &t) {
+
+	        return StaticEmbeddingSlice<Index>(
+	            *matrix.get(), slice_id, s, t);
+		});
+	};
+};
+
+class TagWeightedStaticEmbeddingMatcherFactory : public MinimalMatcherFactory {
+	const TagWeightedOptions m_options;
+
+public:
+	TagWeightedStaticEmbeddingMatcherFactory(
+		const TagWeightedOptions &p_options) :
+
+		m_options(p_options) {
+	}
+
+    virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options) const {
+
+		const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
+		const auto options = m_options;
+
+		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix, options] (
+			const size_t slice_id,
+			const TokenSpan &s,
+			const TokenSpan &t) {
+
+			return TagWeightedSlice(
+				StaticEmbeddingSlice<Index>(*matrix.get(), slice_id, s, t),
+				options);
+		});
+	};
+};
+
+
 MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 	const QueryRef &p_query) {
 
@@ -48,23 +101,9 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
-		const auto gen_slices = [] (
-			const QueryRef &p_query,
-			const MetricRef &p_metric,
-			const DocumentRef &p_document) {
-
-			const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
-
-			return [matrix] (
-				const size_t slice_id,
-				const TokenSpan &s,
-				const TokenSpan &t) {
-
-		        return StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t);
-			};
-		};
-
-		return MatcherFactory::create(matcher_options, gen_slices);
+		return std::make_shared<MatcherFactory>(
+			std::make_shared<StaticEmbeddingMatcherFactory>(),
+			matcher_options);
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
 
@@ -79,25 +118,9 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 		}
 		options.t_pos_weights_sum = sum;
 
-		const auto gen_slices = [options] (
-			const QueryRef &p_query,
-			const MetricRef &p_metric,
-			const DocumentRef &p_document) {
-
-			const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
-
-			return [options, matrix] (
-				const size_t slice_id,
-				const TokenSpan &s,
-				const TokenSpan &t) {
-
-				return TagWeightedSlice(
-					StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t),
-					options);
-			};
-		};
-
-		return MatcherFactory::create(matcher_options, gen_slices);
+		return std::make_shared<MatcherFactory>(
+			std::make_shared<TagWeightedStaticEmbeddingMatcherFactory>(options),
+			matcher_options);
 
 	} else {
 

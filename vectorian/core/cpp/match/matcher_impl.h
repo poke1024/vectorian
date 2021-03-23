@@ -215,30 +215,24 @@ public:
 	}
 };
 
-template<typename SliceFactoryFactory>
-MatcherFactoryRef MatcherFactory::create(
-	const MatcherOptions &p_options,
-	const SliceFactoryFactory &p_gen_slices) {
+template<typename GenSlice>
+MatcherRef MinimalMatcherFactory::make_matcher(
+	const QueryRef &p_query,
+	const MetricRef &p_metric,
+	const DocumentRef &p_document,
+	const MatcherOptions &p_matcher_options,
+	const GenSlice &p_gen_slice) const {
 
-	const auto make_matcher = [p_gen_slices] (
-		const QueryRef &p_query,
-		const MetricRef &p_metric,
-		const DocumentRef &p_document,
-		const auto &p_matcher_options) {
-
-		const auto gen_matcher = [=] (auto slice_factory) {
-			return create_alignment_matcher<int16_t>(
-				p_query, p_document, p_metric, p_matcher_options, slice_factory);
-		};
-
-		FilteredMatcherFactory factory(
-			p_gen_slices(p_query, p_metric, p_document),
-			gen_matcher);
-		return factory.create(p_query, p_document);
+	const auto gen_matcher = [p_query, p_document, p_metric, p_matcher_options] (auto slice_factory) {
+		return create_alignment_matcher<Index>(
+			p_query, p_document, p_metric, p_matcher_options, slice_factory);
 	};
 
-	return std::make_shared<MatcherFactoryImpl<decltype(make_matcher)>>(
-		p_options, make_matcher);
+	FilteredMatcherFactory factory(
+		p_gen_slice,
+		gen_matcher);
+
+	return factory.create(p_query, p_document);
 }
 
 #endif // __VECTORIAN_MATCHER_IMPL__
