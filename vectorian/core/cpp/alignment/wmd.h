@@ -417,107 +417,10 @@ public:
 	};
 };
 
-template<typename Index, typename Token>
+template<typename Index>
 class WMD {
 public:
-	struct RefToken {
-		Token id; // unique id for token
-		Index pos; // index in s or t
-		int8_t doc; // 0 for s, 1 for t
-	};
-
 	struct Problem : public AbstractWMD<Index>::Problem {
-		std::vector<RefToken> m_tokens;
-
-		void allocate(
-			const size_t max_len_s,
-			const size_t max_len_t) {
-
-			m_tokens.resize(max_len_s + max_len_t);
-			AbstractWMD<Index>::Problem::allocate(max_len_s, max_len_t);
-		}
-
-		template<typename Slice, typename MakeToken>
-		inline bool initialize(
-			const Slice &slice,
-			const MakeToken &make_token,
-			const Index len_s, const Index len_t,
-			const WMDOptions &p_options) {
-
-			Index k = 0;
-			std::vector<RefToken> &z = m_tokens;
-
-			for (Index i = 0; i < len_s; i++) {
-				z[k++] = RefToken{
-					make_token(0, i, slice.s(i)), i, 0};
-			}
-			for (Index i = 0; i < len_t; i++) {
-				z[k++] = RefToken{
-					make_token(1, i, slice.t(i)), i, 1};
-			}
-
-			if (k < 1) {
-				return false;
-			}
-
-			std::sort(z.begin(), z.begin() + k, [] (const RefToken &a, const RefToken &b) {
-				return a.id < b.id;
-			});
-
-			this->reset(k);
-
-			for (int i = 0; i < 2; i++) {
-				auto &doc = this->m_doc[i];
-				doc.w_sum = 0;
-				doc.vocab.clear();
-				doc.vocab_to_pos[0].clear();
-			}
-
-			auto cur_word_id = m_tokens[0].id;
-			Index vocab = 0;
-
-			for (Index i = 0; i < k; i++) {
-				const auto &token = m_tokens[i];
-				const auto new_word_id = token.id;
-
-				if (new_word_id != cur_word_id) {
-					cur_word_id = new_word_id;
-					vocab += 1;
-					for (int j = 0; j < 2; j++) {
-						this->m_doc[j].vocab_to_pos[vocab].clear();
-					}
-				}
-
-				const int doc_idx = token.doc;
-				auto &doc = this->m_doc[doc_idx];
-
-				doc.bow[vocab] += 1.0f;
-				doc.w_sum += 1;
-				doc.pos_to_vocab[token.pos] = vocab;
-
-				auto &to_pos = doc.vocab_to_pos[vocab];
-				if (to_pos.empty()) {
-					doc.vocab.push_back(vocab);
-				}
-				to_pos.push_back(token.pos);
-			}
-
-			if (p_options.normalize_bow) {
-				for (int c = 0; c < 2; c++) {
-					float *w = this->m_doc[c].bow.data();
-					const float s = this->m_doc[c].w_sum;
-					for (const Index i : this->m_doc[c].vocab) {
-						w[i] /= s;
-					}
-				}
-			}
-
-			this->m_vocabulary_size = vocab + 1;
-			this->m_len_s = len_s;
-			this->m_len_t = len_t;
-
-			return true;
-		}
 	};
 
 	Problem m_problem;
@@ -529,16 +432,13 @@ public:
 		m_problem.allocate(max_len_s, max_len_t);
 	}
 
-	template<typename Slice, typename MakeToken, typename Solver>
+	template<typename Slice, typename BuildBOW, typename Solver>
 	WMDSolution<typename Solver::FlowRef> operator()(
 		const QueryRef &p_query,
 		const Slice &p_slice,
-		const MakeToken &p_make_token,
+		BuildBOW &p_build_bow,
 		const WMDOptions &p_options,
 		const Solver &p_solver) {
-
-		const auto len_s = p_slice.len_s();
-		const auto len_t = p_slice.len_t();
 
 		if (p_options.symmetric && !p_options.normalize_bow) {
 			// the deeper issue here is that optimal costs of two symmetric
@@ -550,11 +450,14 @@ public:
 		}
 
 		if (!m_problem.initialize(
-			p_slice, p_make_token, len_s, len_t, p_options)) {
+			p_slice, p_build_bow, p_options.normalize_bow)) {
 
 			return WMDSolution<typename Solver::FlowRef>{
 				0.0f, typename Solver::FlowRef()};
 		}
+
+		m_problem.m_len_s = p_slice.len_s();
+		m_problem.m_len_t = p_slice.len_t();
 
 		m_problem.compute_distance_matrix(
 			[&p_slice] (int i, int j) -> float {

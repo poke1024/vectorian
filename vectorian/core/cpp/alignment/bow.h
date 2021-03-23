@@ -82,10 +82,11 @@ public:
 	template<typename Slice, typename BuildBOW>
 	inline bool initialize(
 		const Slice &slice,
-		const BuildBOW &build_bow,
+		BuildBOW &build_bow,
 		const bool normalize_bow) {
 
-		const auto vocab_size = build_bow(slice, *this, normalize_bow);
+		const auto vocab_size = build_bow.build(
+			slice, *this, normalize_bow);
 		if (vocab_size == 0) {
 			return false;
 		}
@@ -200,7 +201,7 @@ public:
 	size_t build(
 		const Slice &p_slice,
 		BOWProblem<Index> &p_problem,
-		const bool p_normalize_bow) {
+		const bool p_normalize_bow)  {
 
 		const auto len_s = p_slice.len_s();
 		const auto len_t = p_slice.len_t();
@@ -265,9 +266,9 @@ public:
 
 		if (p_normalize_bow) {
 			for (int c = 0; c < 2; c++) {
-				float *w = this->m_doc[c].bow.data();
-				const float s = this->m_doc[c].w_sum;
-				for (const Index i : this->m_doc[c].vocab) {
+				float *w = p_problem.m_doc[c].bow.data();
+				const float s = p_problem.m_doc[c].w_sum;
+				for (const Index i : p_problem.m_doc[c].vocab) {
 					w[i] /= s;
 				}
 			}

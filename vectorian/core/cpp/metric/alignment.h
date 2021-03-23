@@ -306,16 +306,13 @@ class WordMoversDistance {
 	BOWBuilder<Index, UntaggedTokenFactory> m_untagged_builder;
 	BOWBuilder<Index, TaggedTokenFactory> m_tagged_builder;
 
-	WMD<Index, token_t> m_wmd;
-	WMD<Index, TaggedTokenId> m_wmd_tagged;
+	WMD<Index> m_wmd;
 
 	template<typename Slice, typename Solver>
 	inline WMDSolution<typename Solver::FlowRef> compute(
 		const QueryRef &p_query,
 		const Slice &p_slice,
 		const Solver &p_solver) {
-
-		const auto &enc = p_slice.encoder();
 
 		switch (p_slice.similarity_dependency()) {
 			case NONE: {
@@ -325,9 +322,7 @@ class WordMoversDistance {
 				return m_wmd(
 					p_query,
 					p_slice,
-					[&enc] (const int src, const size_t pos, const auto &t) {
-						return enc.to_embedding(src, pos, t);
-					},
+					m_untagged_builder,
 					m_options,
 					p_solver);
 			} break;
@@ -336,15 +331,10 @@ class WordMoversDistance {
 				// perform WMD on a vocabulary
 				// built from (token id, pos tag).
 
-				return m_wmd_tagged(
+				return m_wmd(
 					p_query,
 					p_slice,
-					[&enc] (const int src, const size_t pos, const auto &t) {
-						return TaggedTokenId{
-							enc.to_embedding(src, pos, t),
-							t.tag
-						};
-					},
+					m_tagged_builder,
 					m_options,
 					p_solver);
 			} break;
@@ -406,7 +396,6 @@ public:
 		m_tagged_builder.allocate(max_len_s, max_len_t);
 
 		m_wmd.allocate(max_len_s, max_len_t);
-		m_wmd_tagged.allocate(max_len_s, max_len_t);
 	}
 
 	inline float gap_cost(size_t len) const {
