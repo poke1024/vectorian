@@ -7,18 +7,24 @@
 #include <xtensor/xadapt.hpp>
 
 class StaticEmbeddingMetric : public Metric {
+	const SimilarityMatrixRef m_matrix;
+
 public:
 	inline StaticEmbeddingMetric(
 		const std::string &p_name,
 		const SimilarityMatrixRef &p_matrix,
 		const MatcherFactoryRef &p_matcher_factory) :
 
-		Metric(p_name, p_matrix, p_matcher_factory) {
+		Metric(p_name, p_matcher_factory, true),
+		m_matrix(p_matrix) {
 	}
 
-	virtual MetricRef clone(const SimilarityMatrixRef &p_matrix) {
-		return std::make_shared<StaticEmbeddingMetric>(
-			m_name, p_matrix, m_matcher_factory);
+	virtual bool is_based_on_static_embedding() const {
+		return true;
+	}
+
+	inline const SimilarityMatrixRef &matrix() const {
+		return m_matrix;
 	}
 };
 

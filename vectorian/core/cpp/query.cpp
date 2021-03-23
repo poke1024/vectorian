@@ -5,6 +5,7 @@
 #include "metric/static.h"
 #include "metric/contextual.h"
 #include "metric/modifier.h"
+#include "match/instantiate.h"
 
 ResultSetRef Query::match(
 	const DocumentRef &p_document) {
@@ -124,9 +125,9 @@ void Query::initialize(
 	if (p_kwargs && p_kwargs.contains("metric")) {
 		const auto metric_def_dict = p_kwargs["metric"].cast<py::dict>();
 
-		// FIXME need to abstract this for contextual embeddings
-		StaticEmbeddingMatcherFactoryFactory matcher_ff(metric_def_dict);
-		const auto matcher_factory = matcher_ff.create_matcher_factory(shared_from_this());
+		const auto matcher_factory = create_matcher_factory(
+			shared_from_this(),
+			metric_def_dict);
 
 		auto strategy = create_strategy(
 			matcher_factory,
@@ -142,16 +143,13 @@ void Query::initialize(
 			m_metrics.push_back(m);
 		} else {
 
-			/*
 			auto m = std::make_shared<ContextualEmbeddingMetric>(
 				strategy.name,
 				strategy.matrix_factory,
-				matcher_factory // FIXME
+				matcher_factory
 			);
 
-			*/
-
-			PPK_ASSERT(false);
+			m_metrics.push_back(m);
 		}
 	}
 }

@@ -47,27 +47,25 @@ typedef std::shared_ptr<SimilarityMatrixFactory> SimilarityMatrixFactoryRef;
 class Metric : public std::enable_shared_from_this<Metric> {
 protected:
 	const std::string m_name;
-	const SimilarityMatrixRef m_matrix;
 	const MatcherFactoryRef m_matcher_factory;
+	const bool m_based_on_static_embedding;
 
 public:
 	inline Metric(
 		const std::string &p_name,
-		const SimilarityMatrixRef &p_matrix,
-		const MatcherFactoryRef &p_matcher_factory) :
+		const MatcherFactoryRef &p_matcher_factory,
+		const bool p_based_on_static_embedding) :
 
 		m_name(p_name),
-		m_matrix(p_matrix),
-		m_matcher_factory(p_matcher_factory) {
+		m_matcher_factory(p_matcher_factory),
+		m_based_on_static_embedding(p_based_on_static_embedding) {
 	}
 
 	virtual ~Metric() {
 	}
 
-	virtual MetricRef clone(const SimilarityMatrixRef &p_matrix) = 0;
-
-	inline const SimilarityMatrixRef &matrix() const {
-		return m_matrix;
+	bool is_based_on_static_embedding() const {
+		return m_based_on_static_embedding;
 	}
 
 	inline const MatcherFactoryRef &matcher_factory() const {

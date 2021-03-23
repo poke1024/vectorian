@@ -92,6 +92,8 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'match/matcher.cpp',
+	'match/instantiate.cpp',
 	'query.cpp',
 	'metric/contextual.cpp',
 	'vocabulary.cpp',
@@ -101,7 +103,6 @@ cfg['sources'] = [
 	'module.cpp',
 	'match/flow.cpp',
 	'match/match.cpp',
-	'match/matcher.cpp',
 	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',

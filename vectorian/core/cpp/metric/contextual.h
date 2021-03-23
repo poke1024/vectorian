@@ -4,56 +4,6 @@
 #include "metric/metric.h"
 #include "embedding/contextual.h"
 
-class ContextualEmbeddingMetric : public Metric {
-public:
-	inline ContextualEmbeddingMetric(
-		const std::string &p_name,
-		const SimilarityMatrixRef &p_matrix,
-		const MatcherFactoryRef &p_matcher_factory) :
-
-		Metric(p_name, p_matrix, p_matcher_factory) {
-	}
-
-	virtual MetricRef clone(const SimilarityMatrixRef &p_matrix) {
-		return std::make_shared<ContextualEmbeddingMetric>(
-			m_name, p_matrix, m_matcher_factory);
-	}
-};
-
-typedef std::shared_ptr<ContextualEmbeddingMetric> ContextualEmbeddingMetricRef;
-
-class ContextualEmbeddingMetricFactory {
-
-	py::dict m_sent_metric_def;
-	ContextualEmbeddingRef m_embedding;
-
-	MatcherFactoryRef create_matcher_factory(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric);
-
-	inline const py::dict &sent_metric_def() const {
-		return m_sent_metric_def;
-	}
-
-	inline py::dict alignment_def() const {
-		return m_sent_metric_def["alignment"].cast<py::dict>();
-	}
-
-public:
-	ContextualEmbeddingMetricFactory(
-		const ContextualEmbeddingRef &p_embedding,
-		const py::dict &p_sent_metric_def) :
-
-		m_sent_metric_def(p_sent_metric_def),
-		m_embedding(p_embedding) {
-	}
-
-	ContextualEmbeddingMetricRef create(
-		const QueryRef &p_query,
-		const WordMetricDef &p_metric);
-};
-
-
 class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const QueryRef m_query;
 	const WordMetricDef m_metric;
@@ -84,6 +34,27 @@ public:
 		const DocumentRef &p_document);
 };
 
-typedef std::shared_ptr<StaticEmbeddingSimilarityMatrixFactory> StaticEmbeddingSimilarityMatrixFactoryRef;
+typedef std::shared_ptr<ContextualEmbeddingSimilarityMatrixFactory> ContextualEmbeddingSimilarityMatrixFactoryRef;
+
+
+class ContextualEmbeddingMetric : public Metric {
+	const SimilarityMatrixFactoryRef m_factory;
+
+public:
+	inline ContextualEmbeddingMetric(
+		const std::string &p_name,
+		const SimilarityMatrixFactoryRef &p_matrix_factory,
+		const MatcherFactoryRef &p_matcher_factory) :
+
+		Metric(p_name, p_matcher_factory, false),
+		m_factory(p_matrix_factory) {
+	}
+
+	const SimilarityMatrixFactoryRef &matrix_factory() const {
+		return m_factory;
+	}
+};
+
+typedef std::shared_ptr<ContextualEmbeddingMetric> ContextualEmbeddingMetricRef;
 
 #endif // __VECTORIAN_CONTEXTUAL_EMBEDDING_METRIC_H__

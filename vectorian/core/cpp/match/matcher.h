@@ -75,26 +75,25 @@ public:
 typedef std::shared_ptr<MinimalMatcherFactory> MinimalMatcherFactoryRef;
 
 class MatcherFactory {
-	const MinimalMatcherFactoryRef m_factory;
+	const MinimalMatcherFactoryRef m_static_factory;
+	const MinimalMatcherFactoryRef m_contextual_factory;
 	const MatcherOptions m_options;
 
 public:
 	inline MatcherFactory(
-		const MinimalMatcherFactoryRef &p_factory,
+		const MinimalMatcherFactoryRef &p_static_factory,
+		const MinimalMatcherFactoryRef &p_contextual_factory,
 		const MatcherOptions &p_options) :
 
-		m_factory(p_factory),
+		m_static_factory(p_static_factory),
+		m_contextual_factory(p_contextual_factory),
 		m_options(p_options) {
 	}
 
-	inline MatcherRef create_matcher(
+	MatcherRef create_matcher(
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
-		const DocumentRef &p_document) const {
-
-		return m_factory->create_matcher(
-			p_query, p_metric, p_document, this->m_options);
-	}
+		const DocumentRef &p_document) const;
 
 	inline const MatcherOptions &options() const {
 		return m_options;
@@ -103,13 +102,6 @@ public:
 	inline bool needs_magnitudes() const {
 		return m_options.needs_magnitudes;
 	}
-
-	virtual ~MatcherFactory() {
-	}
-
-	static MatcherFactoryRef create(
-		const MinimalMatcherFactoryRef &p_factory,
-		const MatcherOptions &p_options);
 };
 
 class ExternalMatcher : public Matcher {
