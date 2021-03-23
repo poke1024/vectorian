@@ -1,3 +1,6 @@
+#ifndef __VECTORIAN_BOW__
+#define __VECTORIAN_BOW__
+
 template<typename Index>
 class BOWProblem {
 public:
@@ -54,7 +57,7 @@ public:
 	py::dict py_vocab_to_pos(const int p_doc) const {
 		py::dict result;
 		const auto &doc = m_doc[p_doc];
-		for (Index i = 0; i < m_vocabulary_size; i++) {
+		for (size_t i = 0; i < m_vocabulary_size; i++) {
 			const auto &mapping = doc.vocab_to_pos[i];
 			if (!mapping.empty()) {
 				py::list positions;
@@ -77,33 +80,22 @@ public:
 	}
 
 	template<typename Slice, typename BuildBOW>
-	bool initialize(
+	inline bool initialize(
 		const Slice &slice,
 		const BuildBOW &build_bow,
 		const bool normalize_bow) {
 
-		const auto vocab_size = build_bow(slice, *this);
+		const auto vocab_size = build_bow(slice, *this, normalize_bow);
 		if (vocab_size == 0) {
 			return false;
 		}
 
-		if (normalize_bow) {
-			for (int c = 0; c < 2; c++) {
-				float *w = this->m_doc[c].bow.data();
-				const float s = this->m_doc[c].w_sum;
-				for (const Index i : this->m_doc[c].vocab) {
-					w[i] /= s;
-				}
-			}
-		}
-
 		m_vocabulary_size = vocab_size;
-
 		return true;
 	}
 };
 
-/*struct TaggedTokenId {
+struct TaggedTokenId {
 	token_t token;
 	int8_t tag;
 
@@ -124,48 +116,108 @@ public:
 			return false;
 		}
 	}
-};*/
+};
 
-template<typename Index, typename Token, typename MakeToken>
+class UntaggedTokenFactory {
+public:
+	typedef size_t Token;
+
+	template<typename Slice>
+	Token s(
+		const Slice &p_slice,
+		const size_t i) const {
+
+		return p_slice.encoder().to_embedding(0, i, p_slice.s(i));
+	}
+
+	template<typename Slice>
+	Token t(
+		const Slice &p_slice,
+		const size_t i) const {
+
+		return p_slice.encoder().to_embedding(1, i, p_slice.t(i));
+	}
+};
+
+class TaggedTokenFactory {
+public:
+	typedef TaggedTokenId Token;
+
+	template<typename Slice>
+	Token s(
+		const Slice &p_slice,
+		const size_t i) const {
+
+		const auto &token = p_slice.s(i);
+		return Token{
+			p_slice.encoder().to_embedding(0, i, token),
+			token.tag
+		};
+	}
+
+	template<typename Slice>
+	Token t(
+		const Slice &p_slice,
+		const size_t i) const {
+
+		const auto &token = p_slice.t(i);
+		return Token{
+			p_slice.encoder().to_embedding(1, i, token),
+			token.tag
+		};
+	}
+};
+
+template<typename Index, typename TokenFactory>
 class BOWBuilder {
 public:
+	typedef typename TokenFactory::Token Token;
+
 	struct RefToken {
 		Token id; // unique id for token
 		Index pos; // index in s or t
 		int8_t doc; // 0 for s, 1 for t
 	};
 
-	const MakeToken m_make_token;
+	const TokenFactory m_token_factory;
 	std::vector<RefToken> m_tokens;
 
-	BOWBuilder(const MakeToken &p_make_token) : m_make_token(p_make_token) {
+	inline BOWBuilder() {
 	}
 
-	void allocate(const size_t p_size) {
-		m_tokens.resize(p_size);
+	inline BOWBuilder(const TokenFactory &p_token_factory) :
+		m_token_factory(p_token_factory) {
+	}
+
+	inline void allocate(
+		const size_t max_len_s,
+		const size_t max_len_t) {
+
+		m_tokens.resize(max_len_s + max_len_t);
 	}
 
 	template<typename Slice>
 	size_t build(
-		const Slice &slice,
-		BOWProblem<Index> &p_problem) {
+		const Slice &p_slice,
+		BOWProblem<Index> &p_problem,
+		const bool p_normalize_bow) {
 
-		const auto len_s = slice.len_s();
-		const auto len_t = slice.len_t();
+		const auto len_s = p_slice.len_s();
+		const auto len_t = p_slice.len_t();
 
 		Index k = 0;
 		std::vector<RefToken> &z = m_tokens;
 
 		for (Index i = 0; i < len_s; i++) {
 			z[k++] = RefToken{
-				m_make_token(0, i, slice.s(i)), i, 0};
+				m_token_factory.s(p_slice, i), i, 0};
 		}
 		for (Index i = 0; i < len_t; i++) {
 			z[k++] = RefToken{
-				m_make_token(1, i, slice.t(i)), i, 1};
+				m_token_factory.t(p_slice, i), i, 1};
 		}
 
-		if (k < 1) {
+		if (k == 0) {
 			return 0;
 		}
 
@@ -211,6 +263,18 @@ public:
 			to_pos.push_back(token.pos);
 		}
 
+		if (p_normalize_bow) {
+			for (int c = 0; c < 2; c++) {
+				float *w = this->m_doc[c].bow.data();
+				const float s = this->m_doc[c].w_sum;
+				for (const Index i : this->m_doc[c].vocab) {
+					w[i] /= s;
+				}
+			}
+		}
+
 		return vocab + 1;
 	}
 };
+
+#endif // __VECTORIAN_BOW__

@@ -299,32 +299,12 @@ public:
 	}
 };
 
-struct TaggedTokenId {
-	token_t token;
-	int8_t tag;
-
-	inline bool operator==(const TaggedTokenId &t) const {
-		return token == t.token && tag == t.tag;
-	}
-
-	inline bool operator!=(const TaggedTokenId &t) const {
-		return !(*this == t);
-	}
-
-	inline bool operator<(const TaggedTokenId &t) const {
-		if (token < t.token) {
-			return true;
-		} else if (token == t.token) {
-			return tag < t.tag;
-		} else {
-			return false;
-		}
-	}
-};
-
 template<typename Index>
 class WordMoversDistance {
 	const WMDOptions m_options;
+
+	BOWBuilder<Index, UntaggedTokenFactory> m_untagged_builder;
+	BOWBuilder<Index, TaggedTokenFactory> m_tagged_builder;
 
 	WMD<Index, token_t> m_wmd;
 	WMD<Index, TaggedTokenId> m_wmd_tagged;
@@ -422,7 +402,11 @@ public:
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
+		m_untagged_builder.allocate(max_len_s, max_len_t);
+		m_tagged_builder.allocate(max_len_s, max_len_t);
+
 		m_wmd.allocate(max_len_s, max_len_t);
+		m_wmd_tagged.allocate(max_len_s, max_len_t);
 	}
 
 	inline float gap_cost(size_t len) const {
