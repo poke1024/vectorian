@@ -1,6 +1,12 @@
 #ifndef __VECTORIAN_TOKEN_ID_ENCODER_H__
 #define __VECTORIAN_TOKEN_ID_ENCODER_H__
 
+enum Dependency {
+	NONE, // only depends on token id
+	TAGS, // depends on tagging, e.g. POS tags
+	POSITION // fully contextual
+};
+
 class StaticEmbeddingTokenIdEncoder {
 public:
 	inline wvec_t to_embedding(

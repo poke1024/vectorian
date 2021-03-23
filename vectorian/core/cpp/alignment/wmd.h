@@ -4,6 +4,7 @@
 #include "common.h"
 #include "match/match.h"
 #include "alignment/transport.h"
+#include "alignment/bow.h"
 
 #include <xtensor/xadapt.hpp>
 
@@ -35,27 +36,6 @@ public:
 		}
 	};
 
-	typedef std::vector<Index> IndexVector;
-
-	struct Document {
-		std::vector<float> bow; // (n)bow
-		Index w_sum;
-		std::vector<Index> vocab;
-		std::vector<Index> pos_to_vocab;
-		std::vector<IndexVector> vocab_to_pos; // 1:n
-
-		void allocate(const size_t p_size) {
-			bow.resize(p_size);
-			vocab.reserve(p_size);
-			pos_to_vocab.resize(p_size);
-			vocab_to_pos.reserve(p_size);
-			for (size_t i = 0; i < p_size; i++) {
-				vocab_to_pos.emplace_back(std::vector<Index>());
-				vocab_to_pos.back().reserve(p_size);
-			}
-		}
-	};
-
 	struct Weight {
 		float flow;
 		float distance;
@@ -67,61 +47,39 @@ public:
 		Weight weight;
 	};
 
+	typedef typename BOWProblem<Index>::Document Document;
+
 	static constexpr float MAX_SIMILARITY = 1.0f;
 
-	struct Problem {
-		Document m_doc[2]; // s, t
+	struct Problem : public BOWProblem<Index> {
+
+		typedef typename BOWProblem<Index>::Document Document;
 
 		xt::xtensor<float, 2> m_distance_matrix;
 		std::vector<DistanceRef> m_candidates;
 		std::vector<Edge> m_tmp_costs[2];
 		xt::xtensor<float, 3> m_flow_dist_result;
 
-		size_t m_max_size; // i.e. pre-allocation
-
 		OptimalTransport m_ot;
 
 		// the following values contain the size of
 		// the problem currently operated on.
 
-		Index m_vocabulary_size;
 		Index m_len_s;
 		Index m_len_t;
 
 		auto mutable_distance_matrix() {
 			return xt::view(
 				m_distance_matrix,
-				xt::range(0, m_vocabulary_size),
-				xt::range(0, m_vocabulary_size));
+				xt::range(0, this->m_vocabulary_size),
+				xt::range(0, this->m_vocabulary_size));
 		}
 
 		auto distance_matrix() const {
 			return xt::view(
 				m_distance_matrix,
-				xt::range(0, m_vocabulary_size),
-				xt::range(0, m_vocabulary_size));
-		}
-
-		auto bow(const int p_doc) const {
-			return xt::adapt(
-				m_doc[p_doc].bow.data(),
-				{m_vocabulary_size});
-		}
-
-		py::dict py_vocab_to_pos(const int p_doc) const {
-			py::dict result;
-			const auto &doc = m_doc[p_doc];
-			for (Index i = 0; i < m_vocabulary_size; i++) {
-				const auto &mapping = doc.vocab_to_pos[i];
-				if (!mapping.empty()) {
-					py::list positions;
-					for (auto p : mapping) {
-						positions.append(p);
-					}
-					result[py::int_(i)] = positions;
-				}
-			}
-			return result;
+				xt::range(0, this->m_vocabulary_size),
+				xt::range(0, this->m_vocabulary_size));
 		}
 
 		void allocate(
@@ -131,12 +89,11 @@ public:
 			PPK_ASSERT(max_len_s > 0);
 			PPK_ASSERT(max_len_t > 0);
 
+			BOWProblem<Index>::allocate(max_len_s, max_len_t);
+
 			const size_t size = max_len_s + max_len_t;
 
-			m_max_size = size;
-
 			for (int i = 0; i < 2; i++) {
-				m_doc[i].allocate(size);
 				m_tmp_costs[i].reserve(size * size);
 			}
 
@@ -147,22 +104,13 @@ public:
 			m_flow_dist_result.resize({max_len_t, max_len_s, 2});
 		}
 
-		inline void reset(const int k) {
-			for (int j = 0; j < 2; j++) {
-				float *w = m_doc[j].bow.data();
-				for (int i = 0; i < k; i++) {
-					w[i] = 0.0f;
-				}
-			}
-		}
-
 		template<typename Similarity>
 		inline void compute_distance_matrix(
 			const Similarity &sim,
 			const bool make_sparse) {
 
-			Document &doc_s = m_doc[0];
-			Document &doc_t = m_doc[1];
+			Document &doc_s = this->m_doc[0];
+			Document &doc_t = this->m_doc[1];
 
 			auto dist = mutable_distance_matrix();
 

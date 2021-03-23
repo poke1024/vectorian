@@ -54,6 +54,10 @@ public:
 		return m_t.len;
 	}
 
+	inline Dependency similarity_dependency() const {
+		return POSITION;
+	}
+
 	inline float similarity(Index i, Index j) const {
 		return m_matrix(m_s.offset + i, m_t.offset + j);
 	}
@@ -80,10 +84,6 @@ public:
 
 	inline float max_sum_of_similarities() const {
 		return m_t.len;
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return false;
 	}
 };
 

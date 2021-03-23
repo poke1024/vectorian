@@ -335,37 +335,43 @@ class WordMoversDistance {
 		const Slice &p_slice,
 		const Solver &p_solver) {
 
-		const bool pos_tag_aware = p_slice.similarity_depends_on_pos();
 		const auto &enc = p_slice.encoder();
 
-		if (pos_tag_aware) {
-			// perform WMD on a vocabulary
-			// built from (token id, pos tag).
+		switch (p_slice.similarity_dependency()) {
+			case NONE: {
+				// perform WMD on a vocabulary
+				// built from token ids.
 
-			return m_wmd_tagged(
-				p_query,
-				p_slice,
-				[&enc] (const int src, const size_t pos, const auto &t) {
-					return TaggedTokenId{
-						enc.to_embedding(src, pos, t),
-						t.tag
-					};
-				},
-				m_options,
-				p_solver);
+				return m_wmd(
+					p_query,
+					p_slice,
+					[&enc] (const int src, const size_t pos, const auto &t) {
+						return enc.to_embedding(src, pos, t);
+					},
+					m_options,
+					p_solver);
+			} break;
 
-		} else {
-			// perform WMD on a vocabulary
-			// built from token ids.
+			case TAGS: {
+				// perform WMD on a vocabulary
+				// built from (token id, pos tag).
 
-			return m_wmd(
-				p_query,
-				p_slice,
-				[&enc] (const int src, const size_t pos, const auto &t) {
-					return enc.to_embedding(src, pos, t);
-				},
-				m_options,
-				p_solver);
+				return m_wmd_tagged(
+					p_query,
+					p_slice,
+					[&enc] (const int src, const size_t pos, const auto &t) {
+						return TaggedTokenId{
+							enc.to_embedding(src, pos, t),
+							t.tag
+						};
+					},
+					m_options,
+					p_solver);
+			} break;
+
+			default: {
+				throw std::runtime_error("unsupported similarity dependency in WMD");
+			} break;
 		}
 	}
 

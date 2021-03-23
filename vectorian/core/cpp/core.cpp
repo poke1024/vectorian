@@ -64,6 +64,7 @@ cfg['compiler_args'].append('-fvisibility=hidden')
 
 cfg['dependencies'] = [
 	'alignment/aligner.h',
+	'alignment/bow.h',
 	'alignment/transport.h',
 	'alignment/wmd.h',
 	'alignment/wrd.h',

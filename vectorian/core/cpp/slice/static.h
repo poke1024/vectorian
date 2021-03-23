@@ -61,6 +61,10 @@ public:
 		return m_len_t;
 	}
 
+	inline Dependency similarity_dependency() const {
+		return NONE;
+	}
+
 	inline float similarity(Index i, Index j) const {
 		const Token &s = s_tokens[i];
 		const auto &sim = m_matrix.m_similarity;
@@ -91,10 +95,6 @@ public:
 
 	inline float max_sum_of_similarities() const {
 		return m_len_t;
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return false;
 	}
 };
 
@@ -143,6 +143,10 @@ public:
 		return m_delegate.len_t();
 	}
 
+	inline Dependency similarity_dependency() const {
+		return m_delegate.similarity_dependency();
+	}
+
 	inline float similarity(Index i, Index j) const {
 		return m_delegate.similarity(m_s_map[i], j);
 	}
@@ -169,10 +173,6 @@ public:
 
 	inline float max_sum_of_similarities() const {
 		return m_delegate.max_sum_of_similarities();
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return m_delegate.similarity_depends_on_pos();
 	}
 };
 
@@ -239,6 +239,10 @@ public:
 		return weight;
 	}
 
+	inline Dependency similarity_dependency() const {
+		return TAGS;
+	}
+
 	inline float similarity(int i, int j) const {
 		const float score = m_delegate.similarity(i, j) * weight(i, j);
 
@@ -271,10 +275,6 @@ public:
 
 	inline float max_sum_of_similarities() const {
 		return m_modifiers.t_pos_weights_sum;
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return true;
 	}
 };
 
@@ -313,6 +313,10 @@ public:
 	    return m_slice.len_t();
 	}
 
+	inline Dependency similarity_dependency() const {
+		return m_slice.similarity_dependency();
+	}
+
 	inline float similarity(int u, int v) const {
 		const auto len_s = m_slice.len_s();
 		const auto len_t = m_slice.len_t();
@@ -346,10 +350,6 @@ public:
 
 	inline float max_sum_of_similarities() const {
 		return m_slice.max_sum_of_similarities();
-	}
-
-	inline bool similarity_depends_on_pos() const {
-		return m_slice.similarity_depends_on_pos();
 	}
 };*/
 
