@@ -197,11 +197,19 @@ class AbstractTokenSimilarity:
 	def is_modifier(self):
 		return False
 
+	@property
+	def name(self):
+		raise NotImplementedError()
+
 
 class TokenSimilarityModifier(AbstractTokenSimilarity):
 	@property
 	def is_modifier(self):
 		return True
+
+	@property
+	def name(self):
+		raise NotImplementedError()
 
 
 class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
@@ -232,6 +240,10 @@ class TokenSimilarity(AbstractTokenSimilarity):
 	def __init__(self, embedding, metric: VectorSpaceMetric):
 		self._embedding = embedding
 		self._metric = metric
+
+	@property
+	def name(self):
+		return f'{self._metric.name}[{self._embedding.name}]'
 
 	def to_args(self, index):
 		return {
