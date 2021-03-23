@@ -18,6 +18,7 @@ class StaticEmbeddingSlice {
 	const TokenIdEncoder m_encoder;
 
 public:
+	typedef Index SliceIndex;
 	typedef TokenIdEncoder Encoder;
 
 	inline StaticEmbeddingSlice(
@@ -64,6 +65,10 @@ public:
 		return sim(m_encoder.to_embedding(s), j);
 	}
 
+	inline float unmodified_similarity(Index i, Index j) const {
+		return similarity(i, j);
+	}
+
 	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
 		return m_matrix.m_magnitudes(m_encoder.to_embedding(s));
@@ -89,9 +94,82 @@ public:
 	inline bool similarity_depends_on_pos() const {
 		return false;
 	}
+};
+
+
+template<typename Index, typename Delegate>
+class FilteredSlice {
+	const Delegate m_delegate;
+	const Index *m_s_map;
+	const Index m_len_s;
+
+public:
+	typedef typename Delegate::SliceIndex SliceIndex;
+
+	inline FilteredSlice(
+		const Delegate &p_delegate,
+		const Index *p_s_map,
+		const Index p_len_s) :
+
+		m_delegate(p_delegate),
+		m_s_map(p_s_map),
+		m_len_s(p_len_s) {
+	}
+
+	size_t id() const {
+		return m_delegate.id();
+	}
+
+	inline const TokenIdEncoder &encoder() const {
+		return m_delegate.encoder();
+	}
+
+	inline const Token &s(Index i) const {
+		return m_delegate.s(m_s_map[i]);
+	}
+
+	inline const Token &t(Index i) const {
+		return m_delegate.t(i);
+	}
+
+	inline Index len_s() const {
+		return m_len_s;
+	}
+
+	inline Index len_t() const {
+		return m_delegate.len_t();
+	}
+
+	inline float similarity(Index i, Index j) const {
+		return m_delegate.similarity(m_s_map[i], j);
+	}
 
 	inline float unmodified_similarity(Index i, Index j) const {
-		return similarity(i, j);
+		return m_delegate.unmodified_similarity(m_s_map[i], j);
+	}
+
+	inline float magnitude_s(Index i) const {
+		return m_delegate.magnitude_s(m_s_map[i]);
+	}
+
+	inline float magnitude_t(Index i) const {
+		return m_delegate.magnitude_t(i);
+	}
+
+	inline void assert_has_magnitudes() const {
+		m_delegate.assert_has_magnitudes();
+	}
+
+	inline float max_similarity_for_t(Index i) const {
+		return m_delegate.max_similarity_for_t(i);
+	}
+
+	inline float max_sum_of_similarities() const {
+		return m_delegate.max_sum_of_similarities();
+	}
+
+	inline bool similarity_depends_on_pos() const {
+		return m_delegate.similarity_depends_on_pos();
 	}
 };
 
@@ -108,6 +186,7 @@ class TagWeightedSlice {
 	const TagWeightedOptions &m_modifiers;
 
 public:
+	typedef typename Delegate::SliceIndex SliceIndex;
 	typedef typename Delegate::Encoder Encoder;
 
 	inline TagWeightedSlice(
@@ -167,6 +246,10 @@ public:
 		}
 	}
 
+	inline float unmodified_similarity(int i, int j) const {
+		return m_delegate.similarity(i, j);
+	}
+
 	inline float magnitude_s(int i) const {
 		return m_delegate.magnitude_s(i);
 	}
@@ -190,17 +273,11 @@ public:
 	inline bool similarity_depends_on_pos() const {
 		return true;
 	}
-
-	inline float unmodified_similarity(int i, int j) const {
-		return m_delegate.similarity(i, j);
-	}
-
-
 };
 
 /*template<typename Slice>
 class ReversedSlice {
-	const Slice &m_slice;
+	const Slice m_slice;
 
 public:
 	inline ReversedSlice(const Slice &slice) :
@@ -239,6 +316,12 @@ public:
 		return m_slice.similarity(len_s - 1 - u, len_t - 1 - v);
 	}
 
+	inline float unmodified_similarity(int u, int v) const {
+		const auto len_s = m_slice.len_s();
+		const auto len_t = m_slice.len_t();
+		return m_slice.unmodified_similarity(len_s - 1 - u, len_t - 1 - v);
+	}
+
 	inline float magnitude_s(int i) const {
 		const auto len_s = m_slice.len_s();
 		return m_slice.magnitude_s(len_s - 1 - i);
@@ -265,65 +348,57 @@ public:
 	inline bool similarity_depends_on_pos() const {
 		return m_slice.similarity_depends_on_pos();
 	}
-
-	inline float unmodified_similarity(int u, int v) const {
-		const auto len_s = m_slice.len_s();
-		const auto len_t = m_slice.len_t();
-		return m_slice.unmodified_similarity(len_s - 1 - u, len_t - 1 - v);
-	}
 };*/
 
-template<typename Delegate>
+template<typename Factory>
 class FilteredSliceFactory {
-	const Delegate m_delegate;
+public:
+	typedef typename Factory::Index Index;
+	typedef typename Factory::Slice Slice;
+
+private:
+	const Factory m_factory;
 	const TokenFilter m_filter;
 
-	mutable std::vector<Token> m_filtered;
+	mutable std::vector<Index> m_s_map;
 
 public:
-	typedef typename Delegate::Slice Slice;
-
 	inline FilteredSliceFactory(
 		const QueryRef &p_query,
-		const Delegate &p_delegate,
+		const Factory &p_factory,
 		const DocumentRef &p_document,
 		const TokenFilter &p_filter) :
 
-		m_delegate(p_delegate),
+		m_factory(p_factory),
 		m_filter(p_filter) {
 
+		PPK_ASSERT(!m_filter.all());
+
 		const auto &slice_strategy = p_query->slice_strategy();
-		m_filtered.resize(p_document->spans(
+		m_s_map.resize(p_document->spans(
 			slice_strategy.level)->max_len(slice_strategy.window_size));
 	}
 
-	inline Slice create_slice(
+	inline auto create_slice(
 		const size_t slice_id,
 		const TokenSpan &s_span,
 		const TokenSpan &t_span) const {
 
-		if (m_filter.all()) {
-			return m_delegate.create_slice(
-				slice_id, s_span, t_span);
+	    const Token *s = s_span.tokens + s_span.offset;
+	    const auto len_s = s_span.len;
 
-		} else {
+	    Index *new_s = m_s_map.data();
+        PPK_ASSERT(static_cast<size_t>(len_s) <= m_s_map.size());
 
-		    const Token *s = s_span.tokens + s_span.offset;
-		    const auto len_s = s_span.len;
+	    int32_t new_len_s = 0;
+        for (int32_t i = 0; i < len_s; i++) {
+            if (m_filter(s[i])) {
+                new_s[new_len_s++] = i;
+            }
+        }
 
-		    Token *new_s = m_filtered.data();
-	        PPK_ASSERT(static_cast<size_t>(len_s) <= m_filtered.size());
-
-		    int32_t new_len_s = 0;
-	        for (int32_t i = 0; i < len_s; i++) {
-	            if (m_filter(s[i])) {
-	                new_s[new_len_s++] = s[i];
-	            }
-	        }
-
-			return m_delegate.create_slice(
-				slice_id, TokenSpan{new_s, 0, new_len_s}, t_span);
-		}
+        return FilteredSlice<Index, Slice>(m_factory.create_slice(
+			slice_id, s_span, t_span), new_s, new_len_s);
 	}
 };
 
@@ -337,6 +412,8 @@ public:
 		const size_t,
 		const TokenSpan&,
 		const TokenSpan&>::type Slice;
+
+	typedef typename Slice::SliceIndex Index;
 
 	inline SliceFactory(
 		const Make &p_make) :

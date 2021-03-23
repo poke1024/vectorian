@@ -61,17 +61,21 @@ MatcherFactoryRef ContextualEmbeddingMetricFactory::create_matcher_factory(
 
 				vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
 
-				const SliceFactoryFactory gen_slices([sim_matrix] (
+				const auto gen_slices = [sim_matrix] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
-			        return ContextualEmbeddingSlice(sim_matrix->m_similarity, slice_id, s, t);
-				});
+			        return ContextualEmbeddingSlice<int16_t>(sim_matrix->m_similarity, slice_id, s, t);
+				};
 
-				return create_alignment_matcher<int16_t>(
-					p_query, p_document, metric, alignment_def, p_matcher_options,
-					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
+				const auto gen_matcher = [=] (auto slice_factory) {
+					return create_alignment_matcher<int16_t>(
+						p_query, p_document, metric, alignment_def, p_matcher_options, slice_factory);
+				};
+
+				FilteredMatcherFactory factory(gen_slices, gen_matcher);
+				return factory.create(p_query, p_document);
 			});
 
 	} /*else if (sentence_metric_kind == "alignment-tag-weighted") {

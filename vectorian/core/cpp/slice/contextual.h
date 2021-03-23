@@ -4,6 +4,7 @@
 #include "slice/encoder.h"
 #include "embedding/vectors.h"
 
+template<typename Index>
 class ContextualEmbeddingSlice {
 	const xt::pytensor<float, 2> &m_matrix;
 	const size_t m_slice_id;
@@ -12,6 +13,8 @@ class ContextualEmbeddingSlice {
 	const TokenIdEncoder m_encoder; // FIXME should be a ContextualTokenIdEncoder
 
 public:
+	typedef Index SliceIndex;
+
 	inline ContextualEmbeddingSlice(
 		const xt::pytensor<float, 2> &matrix,
 		const size_t slice_id,
@@ -32,11 +35,11 @@ public:
 		return m_encoder;
 	}
 
-	inline const Token &s(int i) const {
+	inline const Token &s(Index i) const {
 		return m_s.tokens[m_s.offset + i];
 	}
 
-	inline const Token &t(int i) const {
+	inline const Token &t(Index i) const {
 		return m_t.tokens[m_t.offset + i];
 	}
 
@@ -48,22 +51,26 @@ public:
 		return m_t.len;
 	}
 
-	inline float similarity(int i, int j) const {
+	inline float similarity(Index i, Index j) const {
 		return m_matrix(m_s.offset + i, m_t.offset + j);
 	}
 
-	inline float magnitude_s(int i) const {
+	inline float unmodified_similarity(Index i, Index j) const {
+		return similarity(i, j);
+	}
+
+	inline float magnitude_s(Index i) const {
 		return 1.0f; // FIXME m_magnitudes_s(i);
 	}
 
-	inline float magnitude_t(int i) const {
+	inline float magnitude_t(Index i) const {
 		return 1.0f; // FIXME m_magnitudes_t(i);
 	}
 
 	inline void assert_has_magnitudes() const {
 	}
 
-	inline float max_similarity_for_t(int i) const {
+	inline float max_similarity_for_t(Index i) const {
 		return 1.0f;
 	}
 
@@ -73,10 +80,6 @@ public:
 
 	inline bool similarity_depends_on_pos() const {
 		return false;
-	}
-
-	inline float unmodified_similarity(int i, int j) const {
-		return similarity(i, j);
 	}
 };
 

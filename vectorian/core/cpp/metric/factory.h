@@ -13,9 +13,10 @@ MatcherRef make_matcher(
 		p_query, p_document, p_metric, std::move(p_aligner), p_finalizer, p_factory);
 }
 
-template<typename MakeSlice>
-class SliceFactoryFactory {
+template<typename MakeSlice, typename MakeMatcher>
+class FilteredMatcherFactory {
 	const MakeSlice m_make_slice;
+	const MakeMatcher m_make_matcher;
 
 public:
 	typedef typename std::invoke_result<
@@ -24,24 +25,27 @@ public:
 		const TokenSpan&,
 		const TokenSpan&>::type Slice;
 
-	SliceFactoryFactory(const MakeSlice &make_slice) :
-		m_make_slice(make_slice) {
+	FilteredMatcherFactory(
+		const MakeSlice &make_slice,
+		const MakeMatcher &make_matcher) :
+
+		m_make_slice(make_slice),
+		m_make_matcher(make_matcher) {
 	}
 
-	SliceFactory<MakeSlice> create(
+	MatcherRef create(
+		const QueryRef &p_query,
 		const DocumentRef &p_document) const {
 
-		return SliceFactory(m_make_slice);
-	}
+		const auto token_filter = p_query->token_filter();
 
-	FilteredSliceFactory<SliceFactory<MakeSlice>> create_filtered(
-		const QueryRef &p_query,
-		const DocumentRef &p_document,
-		const TokenFilter &p_token_filter) const {
-
-		return FilteredSliceFactory(
-			p_query,
-			create(p_document),
-			p_document, p_token_filter);
+		if (token_filter.all()) {
+			return m_make_matcher(SliceFactory(m_make_slice));
+		} else {
+			return m_make_matcher(FilteredSliceFactory(
+				p_query,
+				SliceFactory(m_make_slice),
+				p_document, token_filter));
+		}
 	}
 };

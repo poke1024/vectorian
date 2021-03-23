@@ -44,10 +44,10 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 		m_sent_metric_def["metric"].cast<py::str>();
 
 	const py::dict alignment_def = this->alignment_def();
+	const auto matcher_options = create_alignment_matcher_options(alignment_def);
 
 	if (sentence_metric_kind == "alignment-isolated") {
 
-		const auto matcher_options = create_alignment_matcher_options(alignment_def);
 
 		return MatcherFactory::create(
 			matcher_options,
@@ -60,17 +60,21 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 
 				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 
-				const SliceFactoryFactory gen_slices([matrix] (
+				const auto gen_slices = [matrix] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
 
 			        return StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t);
-				});
+				};
 
-				return create_alignment_matcher<int16_t>(
-					p_query, p_document, p_metric, alignment_def, p_matcher_options,
-					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
+				const auto gen_matcher = [=] (auto slice_factory) {
+					return create_alignment_matcher<int16_t>(
+						p_query, p_document, p_metric, alignment_def, p_matcher_options, slice_factory);
+				};
+
+				FilteredMatcherFactory factory(gen_slices, gen_matcher);
+				return factory.create(p_query, p_document);
 			});
 
 	} else if (sentence_metric_kind == "alignment-tag-weighted") {
@@ -86,8 +90,6 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 		}
 		options.t_pos_weights_sum = sum;
 
-		const auto matcher_options = create_alignment_matcher_options(alignment_def);
-
 		return MatcherFactory::create(
 			matcher_options,
 			[alignment_def, options] (
@@ -99,7 +101,7 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 
 				const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 
-				const SliceFactoryFactory gen_slices([matrix, options] (
+				const auto gen_slices = [matrix, options] (
 					const size_t slice_id,
 					const TokenSpan &s,
 					const TokenSpan &t) {
@@ -107,11 +109,15 @@ MatcherFactoryRef StaticEmbeddingMatcherFactoryFactory::create_matcher_factory(
 					return TagWeightedSlice(
 						StaticEmbeddingSlice<int16_t>(*matrix.get(), slice_id, s, t),
 						options);
-				});
+				};
 
-				return create_alignment_matcher<int16_t>(
-					p_query, p_document, p_metric, alignment_def, p_matcher_options,
-					gen_slices.create_filtered(p_query, p_document, p_query->token_filter()));
+				const auto gen_matcher = [=] (auto slice_factory) {
+					return create_alignment_matcher<int16_t>(
+						p_query, p_document, p_metric, alignment_def, p_matcher_options, slice_factory);
+				};
+
+				FilteredMatcherFactory factory(gen_slices, gen_matcher);
+				return factory.create(p_query, p_document);
 			});
 
 	} else {
