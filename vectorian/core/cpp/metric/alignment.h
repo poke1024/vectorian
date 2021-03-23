@@ -305,6 +305,7 @@ class WordMoversDistance {
 
 	BOWBuilder<Index, UntaggedTokenFactory> m_untagged_builder;
 	BOWBuilder<Index, TaggedTokenFactory> m_tagged_builder;
+	UniqueTokensBOWBuilder<Index> m_unique_builder;
 
 	WMD<Index> m_wmd;
 
@@ -316,28 +317,25 @@ class WordMoversDistance {
 
 		switch (p_slice.similarity_dependency()) {
 			case NONE: {
-				// perform WMD on a vocabulary
-				// built from token ids.
-
 				return m_wmd(
-					p_query,
-					p_slice,
+					p_query, p_slice,
 					m_untagged_builder,
-					m_options,
-					p_solver);
+					m_options, p_solver);
 			} break;
 
 			case TAGS: {
-				// perform WMD on a vocabulary
-				// built from (token id, pos tag).
-
 				return m_wmd(
-					p_query,
-					p_slice,
+					p_query, p_slice,
 					m_tagged_builder,
-					m_options,
-					p_solver);
+					m_options, p_solver);
 			} break;
+
+			case POSITION: {
+				return m_wmd(
+					p_query, p_slice,
+					m_unique_builder,
+					m_options, p_solver);
+			};
 
 			default: {
 				throw std::runtime_error("unsupported similarity dependency in WMD");

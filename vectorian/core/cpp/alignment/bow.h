@@ -70,12 +70,19 @@ public:
 		return result;
 	}
 
-	inline void reset(const int k) {
+	inline void reset(const size_t k) {
 		for (int j = 0; j < 2; j++) {
 			float *w = m_doc[j].bow.data();
-			for (int i = 0; i < k; i++) {
+			for (size_t i = 0; i < k; i++) {
 				w[i] = 0.0f;
 			}
+		}
+
+		for (int i = 0; i < 2; i++) {
+			auto &doc = m_doc[i];
+			doc.w_sum = 0;
+			doc.vocab.clear();
+			doc.vocab_to_pos[0].clear();
 		}
 	}
 
@@ -206,6 +213,10 @@ public:
 		const auto len_s = p_slice.len_s();
 		const auto len_t = p_slice.len_t();
 
+		if (len_s == 0 || len_t == 0) {
+			return 0;
+		}
+
 		Index k = 0;
 		std::vector<RefToken> &z = m_tokens;
 
@@ -218,22 +229,11 @@ public:
 				m_token_factory.t(p_slice, i), i, 1};
 		}
 
-		if (k == 0) {
-			return 0;
-		}
-
 		std::sort(z.begin(), z.begin() + k, [] (const RefToken &a, const RefToken &b) {
 			return a.id < b.id;
 		});
 
 		p_problem.reset(k);
-
-		for (int i = 0; i < 2; i++) {
-			auto &doc = p_problem.m_doc[i];
-			doc.w_sum = 0;
-			doc.vocab.clear();
-			doc.vocab_to_pos[0].clear();
-		}
 
 		auto cur_word_id = m_tokens[0].id;
 		Index vocab = 0;
@@ -275,6 +275,64 @@ public:
 		}
 
 		return vocab + 1;
+	}
+};
+
+template<typename Index>
+class UniqueTokensBOWBuilder {
+public:
+	template<typename Slice>
+	size_t build(
+		const Slice &p_slice,
+		BOWProblem<Index> &p_problem,
+		const bool p_normalize_bow)  {
+
+		const auto len_s = p_slice.len_s();
+		const auto len_t = p_slice.len_t();
+
+		if (len_s == 0 || len_t == 0) {
+			return 0;
+		}
+
+		const size_t k = len_s + len_t;
+
+		p_problem.reset(k);
+
+		const Index lens[2] = {Index(len_s), Index(len_t)};
+
+		size_t offset = 0;
+		for (int i = 0; i < 2; i++) {
+			const size_t len = lens[i];
+			auto &doc = p_problem.m_doc[i];
+
+			for (size_t j = 0; j < k; j++) {
+				doc.vocab_to_pos[j].clear();
+			}
+			doc.vocab.resize(len);
+			doc.w_sum = len;
+
+			for (size_t j = 0; j < len; j++) {
+				const auto vocab = offset + j;
+				doc.bow[vocab] = 1.0f;
+				doc.pos_to_vocab[j] = vocab;
+				doc.vocab[j] = vocab;
+				doc.vocab_to_pos[vocab].push_back(j);
+			}
+
+			offset += len;
+		}
+
+		if (p_normalize_bow) {
+			for (int c = 0; c < 2; c++) {
+				float *w = p_problem.m_doc[c].bow.data();
+				const float s = p_problem.m_doc[c].w_sum;
+				for (const Index i : p_problem.m_doc[c].vocab) {
+					w[i] /= s;
+				}
+			}
+		}
+
+		return k;
 	}
 };
 
