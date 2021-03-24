@@ -31,7 +31,7 @@ SimilarityMatrixRef ModifiedSimilarityMatrixFactory::create(
 		args.append(data);
 	}
 
-	const auto matrix = std::make_shared<SimilarityMatrix>();
+	const auto matrix = operands[0]->clone_empty();
 
 	matrix->m_similarity.resize({ssize_t(num_rows), ssize_t(num_cols)});
 	if (has_magnitudes) {

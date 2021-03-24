@@ -48,7 +48,16 @@ protected:
 
 		py::gil_scoped_acquire acquire;
 
+		py::array_t<float> sim({ p_slice.len_s(), p_slice.len_t() });
+		auto mutable_sim = sim.mutable_unchecked<2>();
+		for (ssize_t i = 0; i < p_slice.len_s(); i++) {
+			for (ssize_t j = 0; j < p_slice.len_t(); j++) {
+				mutable_sim(i, j) = p_slice.similarity(i, j);
+			}
+		}
+
 		py::dict data;
+		data["similarity"] = sim;
 		data["values"] = xt::pyarray<float>(m_aligner->value_matrix(
 			p_slice.len_s(), p_slice.len_t()));
 		data["traceback"] = xt::pyarray<float>(m_aligner->traceback_matrix(

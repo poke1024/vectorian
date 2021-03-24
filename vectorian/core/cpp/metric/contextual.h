@@ -4,6 +4,16 @@
 #include "metric/metric.h"
 #include "embedding/contextual.h"
 
+class ContextualSimilarityMatrix : public SimilarityMatrix {
+public:
+	virtual void call_hook(
+		const QueryRef &p_query) const final;
+
+	virtual SimilarityMatrixRef clone_empty() const final {
+		return std::make_shared<ContextualSimilarityMatrix>();
+	}
+};
+
 class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const QueryRef m_query;
 	const WordMetricDef m_metric;

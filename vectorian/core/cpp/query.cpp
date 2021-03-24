@@ -133,17 +133,21 @@ void Query::initialize(
 			matcher_factory,
 			metric_def_dict["token_metric"].cast<py::object>());
 
-		MetricRef m;
+		MetricRef metric;
 
 		switch (strategy.type) {
 			case STATIC: {
-				m = std::make_shared<StaticEmbeddingMetric>(
+				const auto matrix = strategy.matrix_factory->create(DocumentRef());
+				if (debug_hook().has_value()) {
+					matrix->call_hook(shared_from_this());
+				}
+				metric = std::make_shared<StaticEmbeddingMetric>(
 					strategy.name,
-					strategy.matrix_factory->create(DocumentRef()),
+					matrix,
 					matcher_factory);
 			} break;
 			case CONTEXTUAL: {
-				m = std::make_shared<ContextualEmbeddingMetric>(
+				metric = std::make_shared<ContextualEmbeddingMetric>(
 					strategy.name,
 					strategy.matrix_factory,
 					matcher_factory
@@ -154,7 +158,7 @@ void Query::initialize(
 			}
 		}
 
-		m_metrics.push_back(m);
+		m_metrics.push_back(metric);
 	}
 }
 

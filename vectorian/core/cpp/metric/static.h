@@ -6,6 +6,16 @@
 #include "vocabulary.h"
 #include <xtensor/xadapt.hpp>
 
+class StaticSimilarityMatrix : public SimilarityMatrix {
+public:
+	virtual void call_hook(
+		const QueryRef &p_query) const final;
+
+	virtual SimilarityMatrixRef clone_empty() const final {
+		return std::make_shared<StaticSimilarityMatrix>();
+	}
+};
+
 class StaticEmbeddingMetric : public Metric {
 	const SimilarityMatrixRef m_matrix;
 

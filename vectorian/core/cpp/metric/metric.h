@@ -3,6 +3,9 @@
 
 #include "common.h"
 
+class SimilarityMatrix;
+typedef std::shared_ptr<SimilarityMatrix> SimilarityMatrixRef;
+
 class SimilarityMatrix {
 public:
 	xt::pytensor<float, 2> m_similarity;
@@ -17,6 +20,9 @@ public:
 		PPK_ASSERT(m_magnitudes.shape(0) == 0);
 	}
 
+	virtual ~SimilarityMatrix() {
+	}
+
 	inline const xt::pytensor<float, 2> &similarity() const {
 		return m_similarity;
 	}
@@ -28,9 +34,12 @@ public:
 	inline void assert_has_magnitudes() const {
 		PPK_ASSERT(m_magnitudes.shape(0) > 0);
 	}
-};
 
-typedef std::shared_ptr<SimilarityMatrix> SimilarityMatrixRef;
+	virtual void call_hook(
+		const QueryRef &p_query) const = 0;
+
+	virtual SimilarityMatrixRef clone_empty() const = 0;
+};
 
 
 class SimilarityMatrixFactory {

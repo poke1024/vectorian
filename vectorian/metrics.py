@@ -46,18 +46,7 @@ class CosineSimilarity(VectorSpaceMetric):
 	"""
 
 	def __call__(self, a, b, out):
-		import json
-		with open("/Users/arbeit/Desktop/debug.json", "w") as f:
-			f.write(json.dumps({
-				'a': a.unmodified.tolist(),
-				'b': b.unmodified.tolist()
-			}, indent=4))
-
 		np.linalg.multi_dot([a.normalized, b.normalized.T], out=out)
-
-		with open("/Users/arbeit/Desktop/debug2.json", "w") as f:
-			f.write(json.dumps(out.tolist()))
-
 
 	@property
 	def name(self):

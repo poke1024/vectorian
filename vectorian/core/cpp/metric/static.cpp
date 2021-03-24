@@ -11,7 +11,7 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_similarity_mat
 	const QueryVocabularyRef vocab = m_query->vocabulary();
 	const Needle needle(m_query);
 
-	const auto matrix = std::make_shared<SimilarityMatrix>();
+	const auto matrix = std::make_shared<StaticSimilarityMatrix>();
 
 	const size_t vocab_size = vocab->size();
 	const size_t needle_size = static_cast<size_t>(needle.size());
@@ -92,37 +92,6 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 
 	const auto matrix = build_similarity_matrix(embeddings);
 
-	//std::cout << "has debug hook " << p_query->debug_hook().has_value() << "\n";
-	/*if (p_query->debug_hook().has_value()) {
-		auto gen_rows = py::cpp_function([&] () {
-			const auto &vocab = p_query->vocabulary();
-
-			py::list row_tokens;
-			const size_t n = vocab->size();
-			for (size_t i = 0; i < n; i++) {
-				row_tokens.append(vocab->id_to_token(i));
-			}
-			return row_tokens;
-		});
-
-		auto gen_columns = py::cpp_function([&] () {
-			const auto &vocab = p_query->vocabulary();
-
-			py::list col_tokens;
-			for (const auto &t : *p_query->tokens()) {
-				col_tokens.append(vocab->id_to_token(t.id));
-			}
-			return col_tokens;
-		});
-
-		py::dict data;
-		data["matrix"] = m_similarity;
-		data["rows"] = gen_rows;
-		data["columns"] = gen_columns;
-
-		(*p_query->debug_hook())("similarity_matrix", data);
-	}*/
-
 	if (m_matcher_factory->needs_magnitudes()) {
 		compute_magnitudes(
 			embeddings,
@@ -130,7 +99,39 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 	}
 
 	return matrix;
+}
 
-	//return std::make_shared<StaticEmbeddingMetric>(
-	//	m_embeddings[0]->name(), matrix, matcher_factory);
+void StaticSimilarityMatrix::call_hook(
+	const QueryRef &p_query) const {
+
+	auto gen_rows = py::cpp_function([&] () {
+		const auto &vocab = p_query->vocabulary();
+
+		py::list row_tokens;
+		const size_t n = vocab->size();
+		for (size_t i = 0; i < n; i++) {
+			row_tokens.append(vocab->id_to_token(i));
+		}
+		return row_tokens;
+	});
+
+	auto gen_columns = py::cpp_function([&] () {
+		const auto &vocab = p_query->vocabulary();
+
+		py::list col_tokens;
+		for (const auto &t : *p_query->tokens()) {
+			col_tokens.append(vocab->id_to_token(t.id));
+		}
+		return col_tokens;
+	});
+
+	py::dict data;
+	data["similarity"] = m_similarity;
+	if (m_magnitudes.shape(0) > 0) {
+		data["magnitudes"] = m_magnitudes;
+	}
+	data["rows"] = gen_rows;
+	data["columns"] = gen_columns;
+
+	(*p_query->debug_hook())("static_similarity_matrix", data);
 }
