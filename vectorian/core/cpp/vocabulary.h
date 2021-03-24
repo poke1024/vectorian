@@ -173,7 +173,7 @@ class EmbeddingManager {
 	struct Embedding {
 		py::object embedding; // py embedding session instance
 		py::str py_name;
-		bool is_static;
+		EmbeddingType type;
 		py::object to_core;
 		EmbeddingRef compiled;
 	};
@@ -210,8 +210,8 @@ public:
 		return it->second;
 	}
 
-	inline bool is_static(const size_t p_index) const {
-		return m_embeddings.at(p_index).is_static;
+	inline EmbeddingType get_embedding_type(const size_t p_index) const {
+		return m_embeddings.at(p_index).type;
 	}
 
 	inline py::str get_py_name(const size_t p_index) const {
@@ -230,7 +230,7 @@ public:
 		Embedding e;
 		e.embedding = p_embedding;
 		e.py_name = p_embedding.attr("name").cast<py::str>();
-		e.is_static = p_embedding.attr("is_static").cast<bool>();
+		e.type = p_embedding.attr("is_static").cast<bool>() ? STATIC : CONTEXTUAL;
 		e.to_core = p_embedding.attr("to_core");
 		m_embeddings.push_back(e);
 
@@ -239,7 +239,7 @@ public:
 
 	void compile_static(const py::list &p_tokens) {
 		for (auto &e : m_embeddings) {
-			if (e.is_static) {
+			if (e.type == STATIC) {
 				e.compiled = e.to_core(p_tokens).template cast<EmbeddingRef>();
 			}
 		}
@@ -248,7 +248,7 @@ public:
 
 	void compile_contextual() {
 		for (auto &e : m_embeddings) {
-			if (!e.is_static) {
+			if (e.type == CONTEXTUAL) {
 				e.compiled = e.to_core().template cast<EmbeddingRef>();
 			}
 		}

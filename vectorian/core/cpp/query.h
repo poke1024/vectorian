@@ -101,7 +101,7 @@ class Query :
 	std::optional<py::object> m_debug_hook;
 
 	struct Strategy {
-		bool is_static;
+		EmbeddingType type;
 		std::string name;
 		SimilarityMatrixFactoryRef matrix_factory;
 	};

@@ -494,7 +494,7 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 class VectorsCache:
 	def open(self, vectors_ref):
-		pass
+		raise NotImplementedError("VectorsCache not implemented yet")
 
 
 class VectorsRef:

@@ -129,28 +129,32 @@ void Query::initialize(
 			shared_from_this(),
 			metric_def_dict);
 
-		auto strategy = create_strategy(
+		const auto strategy = create_strategy(
 			matcher_factory,
 			metric_def_dict["token_metric"].cast<py::object>());
 
-		if (strategy.is_static) {
-			auto m = std::make_shared<StaticEmbeddingMetric>(
-				strategy.name,
-				strategy.matrix_factory->create(DocumentRef()),
-				matcher_factory
-			);
+		MetricRef m;
 
-			m_metrics.push_back(m);
-		} else {
-
-			auto m = std::make_shared<ContextualEmbeddingMetric>(
-				strategy.name,
-				strategy.matrix_factory,
-				matcher_factory
-			);
-
-			m_metrics.push_back(m);
+		switch (strategy.type) {
+			case STATIC: {
+				m = std::make_shared<StaticEmbeddingMetric>(
+					strategy.name,
+					strategy.matrix_factory->create(DocumentRef()),
+					matcher_factory);
+			} break;
+			case CONTEXTUAL: {
+				m = std::make_shared<ContextualEmbeddingMetric>(
+					strategy.name,
+					strategy.matrix_factory,
+					matcher_factory
+				);
+			} break;
+			default: {
+				throw std::runtime_error("unsupported embedding type");
+			}
 		}
+
+		m_metrics.push_back(m);
 	}
 }
 
@@ -161,17 +165,21 @@ Query::Strategy Query::create_strategy(
 	if (p_token_metric.attr("is_modifier").cast<bool>()) {
 
 		std::vector<SimilarityMatrixFactoryRef> operands;
-		bool is_static;
+		std::optional<EmbeddingType> type;
 
 		for (const auto &operand : p_token_metric.attr("operands").cast<py::list>()) {
 			auto strategy = create_strategy(
 				p_matcher_factory, operand.cast<py::object>());
-			is_static = strategy.is_static; // FIXME
+			if (!type.has_value()) {
+				type = strategy.type;
+			} else if (*type != strategy.type) {
+				throw std::runtime_error("cannot mix embedding types in operands");
+			}
 			operands.push_back(strategy.matrix_factory);
 		}
 
 		return Strategy{
-			is_static,
+			*type,
 			p_token_metric.attr("name").cast<py::str>(),
 			std::make_shared<ModifiedSimilarityMatrixFactory>(
 				p_token_metric, operands)
@@ -190,23 +198,28 @@ Query::Strategy Query::create_strategy(
 		const auto embedding_manager = m_vocab->embedding_manager();
 		const auto embedding_index = embedding_manager->to_index(metric_def.embedding);
 
-		if (embedding_manager->is_static(embedding_index)) {
-			const auto sim_factory = std::make_shared<StaticEmbeddingSimilarityMatrixFactory>(
-				shared_from_this(), metric_def, p_matcher_factory, embedding_index);
+		switch (embedding_manager->get_embedding_type(embedding_index)) {
+			case STATIC: {
+				const auto sim_factory = std::make_shared<StaticEmbeddingSimilarityMatrixFactory>(
+					shared_from_this(), metric_def, p_matcher_factory, embedding_index);
 
-			return Strategy{
-				true,
-				metric_def.name,
-				sim_factory};
-		} else {
+				return Strategy{
+					STATIC,
+					metric_def.name,
+					sim_factory};
+			}
+			case CONTEXTUAL: {
+				const auto sim_factory = std::make_shared<ContextualEmbeddingSimilarityMatrixFactory>(
+					shared_from_this(), metric_def, p_matcher_factory, embedding_index);
 
-			const auto sim_factory = std::make_shared<ContextualEmbeddingSimilarityMatrixFactory>(
-				shared_from_this(), metric_def, p_matcher_factory, embedding_index);
-
-			return Strategy{
-				false,
-				metric_def.name,
-				sim_factory};
+				return Strategy{
+					CONTEXTUAL,
+					metric_def.name,
+					sim_factory};
+			}
+			default: {
+				throw std::runtime_error("unsupported embedding type");
+			}
 		}
 	}
 }
