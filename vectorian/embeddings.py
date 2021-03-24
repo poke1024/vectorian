@@ -491,7 +491,24 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
-		return doc._.trf_data.tensors[-1]
+		# https://explosion.ai/blog/spacy-transformers
+		# https://github.com/explosion/spaCy/issues/6403
+		# https://github.com/explosion/spaCy/issues/7032
+		# https://github.com/explosion/spaCy/discussions/6511
+
+		token_emb, sent_emb = doc._.trf_data.tensors
+		trf_vectors = []
+
+		assert len(doc) == len(doc._.trf_data.align)
+		for x in doc._.trf_data.align:
+			trf_vector = []
+			for i in x.data:
+				trf_vector.append(token_emb[0][i[0]])
+			trf_vectors.append(np.average(trf_vector, axis=0))
+
+		trf_vectors = np.array(trf_vectors)
+
+		return trf_vectors
 
 	@cached_property
 	def name(self):

@@ -4,6 +4,14 @@ from vectorian.alignment import AlignmentAlgorithm, WatermanSmithBeyer
 from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
 
 
+# inspired by https://github.com/explosion/thinc/blob/master/thinc/types.py
+try:
+	import cupy
+	get_array_module = cupy.get_array_module
+except ImportError:
+	get_array_module = lambda obj: np
+
+
 class VectorSpaceMetric:
 	def __call__(self, a, b, out):
 		raise NotImplementedError()
@@ -11,6 +19,21 @@ class VectorSpaceMetric:
 	@property
 	def name(self):
 		raise NotImplementedError()
+
+
+class LoggingSimilarity(VectorSpaceMetric):
+	def __init__(self, path, base):
+		self._path = path
+		self._base = base
+		self._file = open(self._path, "w")
+
+	def __call__(self, a, b, out):
+		import json
+		self._file.write(json.dumps({
+			'a': a.unmodified.tolist(),
+			'b': b.unmodified.tolist()
+		}, indent=4))
+		self._base(a, b, out)
 
 
 class CosineSimilarity(VectorSpaceMetric):
@@ -23,7 +46,18 @@ class CosineSimilarity(VectorSpaceMetric):
 	"""
 
 	def __call__(self, a, b, out):
+		import json
+		with open("/Users/arbeit/Desktop/debug.json", "w") as f:
+			f.write(json.dumps({
+				'a': a.unmodified.tolist(),
+				'b': b.unmodified.tolist()
+			}, indent=4))
+
 		np.linalg.multi_dot([a.normalized, b.normalized.T], out=out)
+
+		with open("/Users/arbeit/Desktop/debug2.json", "w") as f:
+			f.write(json.dumps(out.tolist()))
+
 
 	@property
 	def name(self):

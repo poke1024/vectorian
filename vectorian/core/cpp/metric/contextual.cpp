@@ -14,9 +14,9 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 
 	const auto &cache = m_query->vectors_cache();
 
-	const HandleRef t_vectors = cache.open(
-		p_document->get_contextual_embedding_vectors(embedding_name));
 	const HandleRef s_vectors = cache.open(
+		p_document->get_contextual_embedding_vectors(embedding_name));
+	const HandleRef t_vectors = cache.open(
 		m_query->get_contextual_embedding_vectors(embedding_name));
 
 	// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
