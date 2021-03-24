@@ -527,16 +527,21 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		# https://github.com/explosion/spaCy/discussions/6511
 
 		token_emb, sent_emb = doc._.trf_data.tensors
+		token_emb = token_emb.reshape(-1, token_emb.shape[-1])
+		n_dims = token_emb.shape[-1]
+
 		trf_vectors = []
 
 		assert len(doc) == len(doc._.trf_data.align)
 		for x in doc._.trf_data.align:
-			trf_vector = []
-			for i in x.data:
-				trf_vector.append(token_emb[0][i[0]])
-			trf_vectors.append(np.average(trf_vector, axis=0))
+			trf_vector = [token_emb[i[0]] for i in x.data]
+			if trf_vector:
+				trf_vectors.append(np.average(trf_vector, axis=0))
+			else:
+				trf_vectors.append(np.zeros((n_dims,), dtype=np.float32))
 
 		trf_vectors = np.array(trf_vectors)
+		assert len(doc) == trf_vectors.shape[0]
 
 		return trf_vectors
 
