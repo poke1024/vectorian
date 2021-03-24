@@ -135,7 +135,7 @@ class Document:
 		self._contextual_embeddings = contextual_embeddings or {}
 
 	def has_contextual_embedding(self, name):
-		return name in self.__contextual_embeddings
+		return name in self._contextual_embeddings
 
 	@staticmethod
 	def load(path):

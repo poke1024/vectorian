@@ -7,10 +7,8 @@
 #include "metric/factory.h"
 #include "slice/contextual.h"
 
-SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create(
+SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_context(
 	const DocumentRef &p_document) {
-
-	py::gil_scoped_acquire acquire;
 
 	const auto embedding_name = m_query->vocabulary()->embedding_manager()->get_py_name(m_embedding_index);
 
@@ -30,7 +28,17 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create(
 		s_vectors->get().attr("size").cast<ssize_t>(),
 		t_vectors->get().attr("size").cast<ssize_t>()});
 
-	m_metric.vector_metric(*s_vectors, *t_vectors, sim_matrix->m_similarity);
+	m_metric.vector_metric(s_vectors->get(), t_vectors->get(), sim_matrix->m_similarity);
+
+	s_vectors->close();
+	t_vectors->close();
 
 	return sim_matrix;
+}
+
+SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create(
+	const DocumentRef &p_document) {
+
+	py::gil_scoped_acquire acquire;
+	return create_with_py_context(p_document);
 }

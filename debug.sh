@@ -3,4 +3,4 @@
 export DEBUG_VECTORIAN_CORE=1
 export VECTORIAN_SANITIZE_ADDRESS=1
 ASAN_OPTIONS=detect_container_overflow=0
-lldb python -- main.py
+lldb python -- debug/contextual.py

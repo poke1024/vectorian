@@ -17,6 +17,9 @@ class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactor
 		const std::vector<StaticEmbeddingRef> &p_embeddings,
 		const SimilarityMatrixRef &p_matrix);
 
+	SimilarityMatrixRef create_with_py_context(
+		const DocumentRef &p_document);
+
 public:
 	ContextualEmbeddingSimilarityMatrixFactory(
 		const QueryRef &p_query,

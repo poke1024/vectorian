@@ -13,6 +13,7 @@ from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
 from vectorian.corpus.document import TokenTable
+from vectorian.embeddings import InMemoryVectorsRef
 
 
 class Query:
@@ -48,10 +49,13 @@ class PreparedQuery:
 		# FIXME gather contextual_embeddings actually used in this query
 		# by analyzing query
 
-		self._contextual_embeddings = collections.defaultdict(list)
+		contextual_embeddings = collections.defaultdict(list)
 		for e in self._query.index.session.embeddings:
 			if e.is_contextual:
-				self._contextual_embeddings[e.name].append(e.encode(doc))
+				contextual_embeddings[e.name].append(e.encode(doc))
+
+		contextual_embeddings = dict(
+			(k, np.vstack(v)) for k, v in contextual_embeddings.items())
 
 		tokens = doc.to_json()["tokens"]
 
@@ -59,8 +63,11 @@ class PreparedQuery:
 			mask = self._mask(tokens, f'{token_attr}_filter', 'pos')
 			if mask is not None:
 				tokens = [t for t, m in zip(tokens, mask) if m]
-				self._contextual_embeddings = dict(
-					(k, v[mask, :]) for k, v in self._contextual_embeddings.items())
+				contextual_embeddings = dict(
+					(k, v[mask, :]) for k, v in contextual_embeddings.items())
+
+		self._contextual_embeddings = dict(
+			(k, InMemoryVectorsRef(v)) for k, v in contextual_embeddings.items())
 
 		token_table = TokenTable(self.index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)

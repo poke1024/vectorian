@@ -106,14 +106,20 @@ class StaticEmbedding(Embedding):
 	def create_instance(self, session):
 		raise NotImplementedError()
 
+	@property
+	def name(self):
+		raise NotImplementedError()
+
 
 class Vectors:  # future: CudaVectors
 	def __init__(self, unmodified):
 		self._unmodified = unmodified
 
+	def close(self):
+		pass  # a no op
+
 	@property
 	def memory_usage(self):
-		print(sys.getsizeof(self))
 		return sys.getsizeof(self._unmodified)
 
 	@property
@@ -467,7 +473,7 @@ class ContextualEmbedding(Embedding):
 	def encode(self, doc):
 		raise NotImplementedError()
 
-	def create_instance(self):
+	def create_instance(self, session):
 		# ContextualEmbeddings are their own instance
 		return self
 
@@ -489,12 +495,13 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 	@cached_property
 	def name(self):
-		return '/'.join('spacy', self._nlp.meta['name'], self._nlp.meta['version'])
+		return '/'.join(['spacy', self._nlp.meta['name'], self._nlp.meta['version']])
 
 
 class VectorsCache:
 	def open(self, vectors_ref):
-		raise NotImplementedError("VectorsCache not implemented yet")
+		# add caching for mmap vectors here.
+		return vectors_ref.open()
 
 
 class VectorsRef:
@@ -504,7 +511,7 @@ class VectorsRef:
 
 class InMemoryVectorsRef(VectorsRef):
 	def __init__(self, vectors):
-		self._vectors = vectors
+		self._vectors = np.array(vectors, dtype=np.float32)
 
 	def open(self):
 		return Vectors(self._vectors)

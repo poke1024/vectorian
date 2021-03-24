@@ -58,13 +58,15 @@ public:
 		return m_object;
 	}
 
-	~Handle() {
-		py::gil_scoped_acquire acquire;
+	inline void close() {
 		m_object.attr("close")();
+	}
+
+	inline ~Handle() {
 	}
 };
 
-typedef std::shared_ptr<Handle> HandleRef;
+typedef std::unique_ptr<Handle> HandleRef;
 
 class VectorsCache {
 	const py::object m_open;
@@ -75,7 +77,7 @@ public:
 	}
 
 	HandleRef open(const py::object &p_vectors_ref) const {
-		return std::make_shared<Handle>(m_open(p_vectors_ref));
+		return std::make_unique<Handle>(m_open(p_vectors_ref));
 	}
 };
 
