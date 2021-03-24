@@ -8,7 +8,8 @@ import numpy as np
 
 from functools import lru_cache
 from slugify import slugify
-from vectorian.embeddings import MaskedVectorsRef
+from pathlib import Path
+from vectorian.embeddings import MaskedVectorsRef, OnDiskVectorsRef
 
 
 class SpansTable:
@@ -141,14 +142,43 @@ class Document:
 
 	@staticmethod
 	def load(path):
-		with open(path, "r") as f:
+		path = Path(path)
+
+		with open(path.with_suffix(".json"), "r") as f:
 			data = json.loads(f.read())
 			data['metadata']['origin'] = path
-			return Document(data)
+
+		contextual_embeddings = dict()
+		emb_path = path.with_suffix(".embeddings")
+		emb_json_path = emb_path / "info.json"
+		if emb_json_path.exists():
+			with open(emb_json_path, "r") as f:
+				emb_data = json.loads(f.read())
+
+			for k, slug_name in emb_data.items():
+				contextual_embeddings[k] = OnDiskVectorsRef(emb_path / slug_name)
+
+		return Document(data, contextual_embeddings)
 
 	def save(self, path):
-		with open(path, "w") as f:
+		path = Path(path)
+
+		with open(path.with_suffix(".json"), "w") as f:
 			f.write(json.dumps(self._json, indent=4, sort_keys=True))
+
+		if self._contextual_embeddings:
+			emb_data = dict()
+
+			emb_path = path.with_suffix(".embeddings")
+			emb_path.mkdir(exist_ok=True)
+
+			for k, vectors in self._contextual_embeddings.items():
+				slug_name = slugify(k)
+				emb_data[k] = slug_name
+				vectors.save(emb_path / slug_name)
+
+			with open(emb_path / "info.json", "w") as f:
+				f.write(json.dumps(emb_data))
 
 	def to_json(self):
 		return self._json

@@ -19,3 +19,4 @@ holoviews>=1.14.2
 bokeh>=2.3.0
 gensim>=3.8.3
 compress_fasttext>=0.0.6
+h5py>=3.2.1

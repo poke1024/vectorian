@@ -10,6 +10,7 @@ import os
 import sys
 import download
 import compress_fasttext
+import h5py
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -544,6 +545,35 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		return '/'.join(['spacy', self._nlp.meta['name'], self._nlp.meta['version']])
 
 
+class OnDiskVectors:
+	def __init__(self, path):
+		self._path = path
+		self._hf = h5py.File(self._path.with_suffix(".h5"), "r")
+
+	def close(self):
+		self._hf.close()
+
+	@property
+	def size(self):
+		return self.unmodified.shape[0]
+
+	@property
+	def shape(self):
+		return self.unmodified.shape
+
+	@property
+	def unmodified(self):
+		return np.array(self._hf["unmodified"])
+
+	@property
+	def normalized(self):
+		return np.array(self._hf["normalized"])
+
+	@cached_property
+	def magnitudes(self):
+		return np.array(self._hf["magnitudes"])
+
+
 class VectorsCache:
 	def open(self, vectors_ref):
 		# add caching for mmap vectors here.
@@ -554,6 +584,16 @@ class VectorsRef:
 	def open(self):
 		raise NotImplementedError()
 
+	def save(self, path):
+		v = self.open()
+		try:
+			with h5py.File(path.with_suffix(".h5"), "w") as hf:
+				hf.create_dataset("unmodified", data=v.unmodified)
+				hf.create_dataset("normalized", data=v.normalized)
+				hf.create_dataset("magnitudes", data=v.magnitudes)
+		finally:
+			v.close()
+
 
 class InMemoryVectorsRef(VectorsRef):
 	def __init__(self, vectors):
@@ -561,6 +601,14 @@ class InMemoryVectorsRef(VectorsRef):
 
 	def open(self):
 		return Vectors(self._vectors)
+
+
+class OnDiskVectorsRef(VectorsRef):
+	def __init__(self, path):
+		self._path = path
+
+	def open(self):
+		return OnDiskVectors(self._path)
 
 
 class MaskedVectorsRef(VectorsRef):
