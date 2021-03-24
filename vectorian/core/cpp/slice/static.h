@@ -117,6 +117,11 @@ public:
 		m_delegate(p_delegate),
 		m_s_map(p_s_map),
 		m_len_s(p_len_s) {
+
+		std::cout << "FilteredSlice: " << m_len_s << "\n" << std::flush;
+		for (ssize_t i = 0; i < m_len_s; i++) {
+			std::cout << i << ": " << m_s_map[i] << "\n" << std::flush;
+		}
 	}
 
 	size_t id() const {
@@ -387,14 +392,14 @@ public:
 		const TokenSpan &s_span,
 		const TokenSpan &t_span) const {
 
-	    const Token *s = s_span.tokens + s_span.offset;
+	    const Token * const s = s_span.tokens + s_span.offset;
 	    const auto len_s = s_span.len;
 
 	    Index *new_s = m_s_map.data();
         PPK_ASSERT(static_cast<size_t>(len_s) <= m_s_map.size());
 
-	    int32_t new_len_s = 0;
-        for (int32_t i = 0; i < len_s; i++) {
+	    ssize_t new_len_s = 0;
+        for (ssize_t i = 0; i < len_s; i++) {
             if (m_filter(s[i])) {
                 new_s[new_len_s++] = i;
             }

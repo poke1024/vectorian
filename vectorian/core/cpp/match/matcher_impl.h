@@ -204,6 +204,8 @@ public:
 
 		const auto token_filter = p_query->token_filter();
 
+		std::cout << "token_filter? " << int(token_filter.all()) << "\n" << std::flush;
+
 		if (token_filter.all()) {
 			return m_make_matcher(SliceFactory(m_make_slice));
 		} else {

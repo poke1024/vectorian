@@ -4,9 +4,11 @@ import pandas as pd
 import vectorian.core as core
 import collections
 import html
+import numpy as np
 
 from functools import lru_cache
 from slugify import slugify
+from vectorian.embeddings import MaskedVectorsRef
 
 
 class SpansTable:
@@ -253,7 +255,6 @@ class Span:
 class PreparedDocument:
 	def __init__(self, session, json, contextual_embeddings):
 		self._session = session
-		self._contextual_embeddings = contextual_embeddings
 
 		token_mapper = session.token_mapper('tagger')
 
@@ -262,8 +263,10 @@ class PreparedDocument:
 		token_table = TokenTable(self._session.token_mapper('tokenizer'))
 		sentence_table = SpansTable(json['loc_keys'])
 
-		partitions = json['partitions']
-		for partition_i, partition in enumerate(partitions):
+		token_count = sum(len(p['tokens']) for p in json['partitions'])
+		token_mask = np.zeros((token_count,), dtype=np.bool)
+
+		for partition_i, partition in enumerate(json['partitions']):
 			text = partition["text"]
 			tokens = partition["tokens"]
 			sents = partition["sents"]
@@ -290,9 +293,10 @@ class PreparedDocument:
 						break
 					token_j += 1
 
-				for t0 in tokens[token_i:token_j]:
-					t = token_mapper(t0)
+				for i in range(token_i, token_j):
+					t = token_mapper(tokens[i])
 					if t:
+						token_mask[i] = True
 						sent_tokens.append(t)
 
 				token_i = token_j
@@ -310,7 +314,9 @@ class PreparedDocument:
 		}
 		self._token_table = token_table.to_arrow()
 		self._token_str = token_table.normalized_tokens
-		#self._save_tokens("/Users/arbeit/Desktop/tokens.txt")
+
+		self._contextual_embeddings = dict(
+			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())
 
 		self._metadata = json['metadata']
 

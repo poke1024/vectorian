@@ -152,6 +152,35 @@ class Vectors:  # future: CudaVectors
 		return data
 
 
+class MaskedVectors:
+	def __init__(self, vectors, mask):
+		self._vectors = vectors
+		self._mask = mask
+
+	def close(self):
+		return self._vectors.close()
+
+	@property
+	def size(self):
+		return self.shape[0]
+
+	@property
+	def shape(self):
+		return self.unmodified.shape
+
+	@cached_property
+	def unmodified(self):
+		return self._vectors.unmodified[self._mask]
+
+	@cached_property
+	def normalized(self):
+		return self._vectors.normalized[self._mask]
+
+	@cached_property
+	def magnitudes(self):
+		return self._vectors.magnitudes[self._mask]
+
+
 class StackedVectors:
 	def __init__(self, sources, indices):
 		self._sources = sources
@@ -532,3 +561,13 @@ class InMemoryVectorsRef(VectorsRef):
 
 	def open(self):
 		return Vectors(self._vectors)
+
+
+class MaskedVectorsRef(VectorsRef):
+	def __init__(self, vectors, mask):
+		self._vectors = vectors
+		self._mask = mask
+
+	def open(self):
+		return MaskedVectors(
+			self._vectors.open(), self._mask)
