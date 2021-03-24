@@ -57,6 +57,7 @@ protected:
 		}
 
 		py::dict data;
+		data["slice"] = p_slice.id();
 		data["similarity"] = sim;
 		data["values"] = xt::pyarray<float>(m_aligner->value_matrix(
 			p_slice.len_s(), p_slice.len_t()));
@@ -101,13 +102,13 @@ public:
 		const float score = m_aligner->score() / reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
 
+		if (Hook) {
+			call_debug_hook(p_matcher->query(), p_slice, m_cached_flow, m_aligner->score());
+		}
+
 		if (score > p_result_set->worst_score()) {
 			const auto flow = m_cached_flow;
 			m_cached_flow.reset();
-
-			if (Hook) {
-				call_debug_hook(p_matcher->query(), p_slice, flow, m_aligner->score());
-			}
 
 			return p_result_set->add_match(
 				p_matcher,

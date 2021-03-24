@@ -73,8 +73,8 @@ public:
 		m_open(p_vectors_cache.attr("open").cast<py::object>()) {
 	}
 
-	HandleRef open(const py::object &p_vectors_ref) const {
-		return std::make_unique<Handle>(m_open(p_vectors_ref));
+	inline HandleRef open(const py::object &p_vectors_ref, const size_t p_expected_size) const {
+		return std::make_unique<Handle>(m_open(p_vectors_ref, p_expected_size));
 	}
 };
 

@@ -28,6 +28,9 @@ public:
 		m_slice_id(slice_id),
 		m_s(s),
 		m_t(t) {
+
+		//std::cout << "ContextualEmbeddingSlice << " << slice_id << ": (" <<
+		//	m_s.offset << ", " << (m_s.offset + m_s.len) << ")\n" << std::flush;
 	}
 
 	size_t id() const {

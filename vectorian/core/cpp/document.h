@@ -42,7 +42,7 @@ public:
 		return 1;
 	}
 
-	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
+	inline int32_t bounded_len(const size_t p_index, const size_t p_size) const {
 		return std::min(p_size, m_size - p_index);
 	}
 
@@ -86,7 +86,7 @@ public:
 		return end(p_index) - start(p_index);
 	}
 
-	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
+	inline int32_t bounded_len(const size_t p_index, const size_t p_size) const {
 		const size_t i1 = std::min(p_index + p_size, m_offsets.size() - 1);
 		return start(i1) - start(p_index);
 	}
@@ -123,8 +123,10 @@ public:
 		return m_variable.has_value() ? (*m_variable).len(p_index) : (*m_fixed).len(p_index);
 	}
 
-	inline int32_t safe_len(const size_t p_index, const size_t p_size) const {
-		return m_variable.has_value() ? (*m_variable).safe_len(p_index, p_size) : (*m_fixed).safe_len(p_index, p_size);
+	inline int32_t bounded_len(const size_t p_index, const size_t p_size) const {
+		return m_variable.has_value() ?
+			(*m_variable).bounded_len(p_index, p_size) :
+			(*m_fixed).bounded_len(p_index, p_size);
 	}
 
 	inline Slice slice(const size_t p_index) const {
@@ -148,7 +150,7 @@ private:
 	const VocabularyRef m_vocab;
 
 	TokenVectorRef m_tokens;
-	py::dict m_py_tokens;
+	size_t m_num_dummy_tokens;
 	std::map<std::string, SpansRef> m_spans;
 
 	const py::dict m_metadata;
@@ -189,8 +191,8 @@ public:
 		return m_metadata;
 	}
 
-	inline py::dict py_tokens() const {
-		return m_py_tokens;
+	py::dict py_tokens() const {
+		return to_py_array(m_tokens);
 	}
 
 	inline const TokenVectorRef &tokens() const {
@@ -198,7 +200,7 @@ public:
 	}
 
 	inline size_t n_tokens() const {
-		return m_tokens->size();
+		return m_tokens->size() - m_num_dummy_tokens;
 	}
 
 	const SpansRef &spans(const std::string &p_name) const {

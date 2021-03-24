@@ -78,7 +78,7 @@ class MatcherImpl : public MatcherBase<Aligner> {
 
 		const Token *s_tokens = this->m_document->tokens()->data();
 		const Token *t_tokens = this->m_query->tokens()->data();
-		const int len_t = this->m_query->tokens()->size();
+		const auto len_t = this->m_query->tokens()->size();
 		if (len_t < 1) {
 			return; // no matches
 		}
@@ -89,7 +89,7 @@ class MatcherImpl : public MatcherBase<Aligner> {
 			slice_id < n_slices && !this->m_query->aborted();
 			slice_id += slice_strategy.window_step) {
 
-			const int len_s = spans->safe_len(
+			const auto len_s = spans->bounded_len(
 				slice_id, slice_strategy.window_size);
 
 			if (len_s < 1) {
@@ -100,14 +100,14 @@ class MatcherImpl : public MatcherBase<Aligner> {
 
 				const auto slice = m_slice_factory.create_slice(
 					slice_id,
-				    TokenSpan{s_tokens, static_cast<int32_t>(token_at), len_s},
-				    TokenSpan{t_tokens, 0, len_t});
+				    TokenSpan{s_tokens, static_cast<int32_t>(token_at), static_cast<int32_t>(len_s)},
+				    TokenSpan{t_tokens, 0, static_cast<int32_t>(len_t)});
 
 				return this->m_aligner.template make_match<Hook>(
 					matcher, slice, p_matches);
 			});
 
-			token_at += spans->safe_len(
+			token_at += spans->bounded_len(
 				slice_id, slice_strategy.window_step);
 		}
 	}
@@ -203,8 +203,6 @@ public:
 		const DocumentRef &p_document) const {
 
 		const auto token_filter = p_query->token_filter();
-
-		std::cout << "token_filter? " << int(token_filter.all()) << "\n" << std::flush;
 
 		if (token_filter.all()) {
 			return m_make_matcher(SliceFactory(m_make_slice));

@@ -48,12 +48,8 @@ Document::Document(
 	m_spans["token"] = std::make_shared<Spans>(
 		FixedSpans(m_tokens->size()));
 
+	m_num_dummy_tokens = 1;
 	add_dummy_token(*m_tokens.get());
-
-	{
-		py::gil_scoped_acquire acquire;
-		m_py_tokens = to_py_array(m_tokens);
-	}
 }
 
 ResultSetRef Document::find(const QueryRef &p_query) {

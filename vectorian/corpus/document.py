@@ -78,9 +78,9 @@ class TokenTable:
 
 	def extend(self, text, sent, tokens):
 		last_idx = sent["start"]
-		n_tokens = 0
+		picked = []
 
-		for token in tokens:
+		for i, token in enumerate(tokens):
 			idx = token["start"]
 			self._idx += len(text[last_idx:idx])
 			last_idx = idx
@@ -95,11 +95,11 @@ class TokenTable:
 				self._token_tag.append(token["tag"])
 
 				self._token_str.append(norm_text)
-				n_tokens += 1
+				picked.append(i)
 
 		self._idx += len(text[last_idx:sent["end"]])
 
-		return n_tokens
+		return picked
 
 	def to_pandas(self):
 		return pd.DataFrame({
@@ -295,6 +295,7 @@ class PreparedDocument:
 
 		token_count = sum(len(p['tokens']) for p in json['partitions'])
 		token_mask = np.zeros((token_count,), dtype=np.bool)
+		token_mask_offset = 0
 
 		for partition_i, partition in enumerate(json['partitions']):
 			text = partition["text"]
@@ -306,6 +307,7 @@ class PreparedDocument:
 			last_sent_end = None
 			for sent in sents:
 				sent_tokens = []
+				sent_text = text[sent["start"]:sent["end"]]
 
 				if last_sent_end is not None and sent["start"] > last_sent_end:
 					s = text[last_sent_end:sent["start"]]
@@ -326,17 +328,22 @@ class PreparedDocument:
 				for i in range(token_i, token_j):
 					t = token_mapper(tokens[i])
 					if t:
-						token_mask[i] = True
-						sent_tokens.append(t)
+						sent_tokens.append((i, t))
 
 				token_i = token_j
 
-				sent_text = text[sent["start"]:sent["end"]]
 				if sent_text.strip() and sent_tokens:
-					n_tokens = token_table.extend(text, sent, sent_tokens)
-					sentence_table.extend(loc, n_tokens)
+					picked = token_table.extend(text, sent, [t for _, t in sent_tokens])
+					sentence_table.extend(loc, len(picked))
 					texts.append(sent_text)
+					picked_indices = np.array([sent_tokens[i][0] for i in picked], dtype=np.int32)
+					token_mask[token_mask_offset + picked_indices] = True
+
 				last_sent_end = sent["end"]
+
+			token_mask_offset += len(tokens)
+
+		assert np.sum(token_mask) == len(token_table)
 
 		self._text = "".join(texts)
 		self._spans = {

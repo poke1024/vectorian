@@ -11,13 +11,12 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 	const DocumentRef &p_document) {
 
 	const auto embedding_name = m_query->vocabulary()->embedding_manager()->get_py_name(m_embedding_index);
-
 	const auto &cache = m_query->vectors_cache();
 
 	const HandleRef s_vectors = cache.open(
-		p_document->get_contextual_embedding_vectors(embedding_name));
+		p_document->get_contextual_embedding_vectors(embedding_name), p_document->n_tokens());
 	const HandleRef t_vectors = cache.open(
-		m_query->get_contextual_embedding_vectors(embedding_name));
+		m_query->get_contextual_embedding_vectors(embedding_name), m_query->len());
 
 	// compute a n x m matrix, (n: number of tokens in document, m: number of tokens in needle)
 	// might offload this to GPU. use this as basis for ContextualEmbeddingSlice.

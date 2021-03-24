@@ -560,11 +560,11 @@ class OnDiskVectors:
 
 	@property
 	def size(self):
-		return self.unmodified.shape[0]
+		return self.shape[0]
 
 	@property
 	def shape(self):
-		return self.unmodified.shape
+		return self._hf["unmodified"].shape
 
 	@property
 	def unmodified(self):
@@ -580,9 +580,11 @@ class OnDiskVectors:
 
 
 class VectorsCache:
-	def open(self, vectors_ref):
-		# add caching for mmap vectors here.
-		return vectors_ref.open()
+	def open(self, vectors_ref, expected_size):
+		v = vectors_ref.open()
+		if v.size != expected_size:
+			raise RuntimeError(f"matrix size mismatch: {v.size} != {expected_size}")
+		return v
 
 
 class VectorsRef:
