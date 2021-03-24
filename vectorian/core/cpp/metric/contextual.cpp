@@ -30,9 +30,6 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 
 	m_metric.vector_metric(s_vectors->get(), t_vectors->get(), sim_matrix->m_similarity);
 
-	s_vectors->close();
-	t_vectors->close();
-
 	return sim_matrix;
 }
 

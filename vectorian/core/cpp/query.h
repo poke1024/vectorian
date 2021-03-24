@@ -58,11 +58,8 @@ public:
 		return m_object;
 	}
 
-	inline void close() {
-		m_object.attr("close")();
-	}
-
 	inline ~Handle() {
+		m_object.attr("close")();
 	}
 };
 
