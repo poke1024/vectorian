@@ -137,8 +137,27 @@ class Document:
 		self._json = json
 		self._contextual_embeddings = contextual_embeddings or {}
 
+	@property
+	def contextual_embeddings(self):
+		return self._contextual_embeddings
+
 	def has_contextual_embedding(self, name):
 		return name in self._contextual_embeddings
+
+	def compress_embeddings(self, n_dims, embeddings=None):
+		if embeddings is None:
+			names = set(self._contextual_embeddings.keys())
+		else:
+			names = set(e.name for e in embeddings)
+
+		def compressed(k, v):
+			if k in names:
+				return k, v.compress(n_dims)
+			else:
+				return k, v
+
+		self._contextual_embeddings = dict(
+			compressed(k, v) for k, v in self._contextual_embeddings.items())
 
 	@staticmethod
 	def load(path):

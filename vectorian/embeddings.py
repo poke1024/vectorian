@@ -123,7 +123,8 @@ class AbstractVectors:
 	def compress(self, n_dims):
 		pca = sklearn.decomposition.PCA(n_components=n_dims)
 		pca.fit(self.unmodified)
-		return CompressedVectors(pca.transform(self.unmodified), pca)
+		return CompressedVectors(
+			Vectors(pca.transform(self.unmodified)), pca)
 
 	def close(self):
 		raise NotImplementedError()
@@ -229,11 +230,19 @@ class MaskedVectors(AbstractVectors):
 	def magnitudes(self):
 		return self._vectors.magnitudes[self._mask]
 
+	def transform(self, vectors):
+		return self._vectors.transform(vectors)
+
 
 class StackedVectors(AbstractVectors):
 	def __init__(self, sources, indices):
 		self._sources = sources
 		self._indices = indices
+
+		if not all(isinstance(s, Vectors) for s in sources):
+			# does not support CompressedVectors and others
+			# that provide a custom transform() operation
+			raise RuntimeError("unsupported stacked source")
 
 	def close(self):
 		for x in self._sources:
@@ -654,6 +663,22 @@ class VectorsRef:
 			v.save(path)
 		finally:
 			v.close()
+
+	def compress(self, n_dims):
+		v = self.open()
+		try:
+			r = ProxyVectorsRef(v.compress(n_dims))
+		finally:
+			v.close()
+		return r
+
+
+class ProxyVectorsRef(VectorsRef):
+	def __init__(self, vectors):
+		self._vectors = vectors
+
+	def open(self):
+		return self._vectors
 
 
 class InMemoryVectorsRef(VectorsRef):
