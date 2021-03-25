@@ -82,7 +82,7 @@ class TextNormalizer:
 			('sub', pattern, replacement),
 			lambda s: c_pattern.sub(replacement, s))
 
-	def sel(self, k):
+	def filter(self, k):
 		self.add(f'filter_{k}', lambda s: s if getattr(s, k)() else None)
 
 
@@ -133,7 +133,7 @@ def default_normalizers():
 
 	txt = TextNormalizer()
 	txt.sub(r"\W", "")
-	txt.sel("isalpha")
+	txt.filter("isalpha")
 
 	tok = SimpleTokenNormalizer(
 		rewrite={
