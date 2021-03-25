@@ -458,6 +458,10 @@ public:
 		return m_tokens->size();
 	}
 
+	inline token_t token_to_id(const std::string &p_s) const {
+		return m_tokens->to_id(p_s);
+	}
+
 	inline const std::string &id_to_token(const token_t p_token) const {
 		return m_tokens->to_str(p_token);
 	}

@@ -204,13 +204,13 @@ public:
 
 		const auto token_filter = p_query->token_filter();
 
-		if (token_filter.all()) {
-			return m_make_matcher(SliceFactory(m_make_slice));
-		} else {
+		if (token_filter.get()) {
 			return m_make_matcher(FilteredSliceFactory(
 				p_query,
 				SliceFactory(m_make_slice),
 				p_document, token_filter));
+		} else {
+			return m_make_matcher(SliceFactory(m_make_slice));
 		}
 	}
 };

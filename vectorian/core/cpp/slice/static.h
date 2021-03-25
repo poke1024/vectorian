@@ -367,7 +367,7 @@ public:
 
 private:
 	const Factory m_factory;
-	const TokenFilter m_filter;
+	const TokenFilterRef m_filter;
 
 	mutable std::vector<Index> m_s_map;
 
@@ -376,12 +376,12 @@ public:
 		const QueryRef &p_query,
 		const Factory &p_factory,
 		const DocumentRef &p_document,
-		const TokenFilter &p_filter) :
+		const TokenFilterRef &p_filter) :
 
 		m_factory(p_factory),
 		m_filter(p_filter) {
 
-		PPK_ASSERT(!m_filter.all());
+		PPK_ASSERT(m_filter.get());
 
 		const auto &slice_strategy = p_query->slice_strategy();
 		m_s_map.resize(p_document->spans(
@@ -399,9 +399,10 @@ public:
 	    Index *new_s = m_s_map.data();
         PPK_ASSERT(static_cast<size_t>(len_s) <= m_s_map.size());
 
+		const auto &f = *m_filter;
 	    ssize_t new_len_s = 0;
         for (ssize_t i = 0; i < len_s; i++) {
-            if (m_filter(s[i])) {
+            if (f.pass(s[i])) {
                 new_s[new_len_s++] = i;
             }
         }

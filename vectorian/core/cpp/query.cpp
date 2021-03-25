@@ -85,14 +85,7 @@ void Query::initialize(
         p_kwargs["bidirectional"].cast<bool>() :
         false;
 
-	m_token_filter.pos = parse_filter_mask(p_kwargs, "pos_filter",
-		[this] (const std::string &s) -> int {
-			return m_vocab->base()->unsafe_pos_id(s);
-		});
-	m_token_filter.tag = parse_filter_mask(p_kwargs, "tag_filter",
-		[this] (const std::string &s) -> int {
-			return m_vocab->base()->unsafe_tag_id(s);
-		});
+    m_token_filter = make_token_filter(p_kwargs);
 
 	m_max_matches = (p_kwargs && p_kwargs.contains("max_matches")) ?
 		p_kwargs["max_matches"].cast<size_t>() :
@@ -224,5 +217,44 @@ Query::Strategy Query::create_strategy(
 				throw std::runtime_error("unsupported embedding type");
 			}
 		}
+	}
+}
+
+TokenFilterRef Query::make_token_filter(const py::kwargs &p_kwargs) const {
+	const auto pos_mask = parse_filter_mask(p_kwargs, "pos_filter",
+		[this] (const std::string &s) -> int {
+			return m_vocab->base()->unsafe_pos_id(s);
+		});
+	const auto tag_mask = parse_filter_mask(p_kwargs, "tag_filter",
+		[this] (const std::string &s) -> int {
+			return m_vocab->base()->unsafe_tag_id(s);
+		});
+
+	py::list tokens;
+	if (p_kwargs && p_kwargs.contains("token_filter")) {
+		tokens = p_kwargs["token_filter"].cast<py::list>();
+	}
+
+	if (pos_mask == 0 && tag_mask == 0 && tokens.size() == 0) {
+		return TokenFilterRef();
+	} else {
+		auto tf = std::make_shared<TokenFilter>(pos_mask, tag_mask);
+
+		if (tokens.size() > 0) {
+
+			tf->vocab = xt::xtensor<bool, 1>();
+			auto &mask = *(tf->vocab);
+			mask.resize({m_vocab->size()});
+			mask.fill(true);
+
+			for (const auto &t : tokens) {
+				const auto k = m_vocab->token_to_id(t.cast<py::str>());
+				if (k >= 0) {
+					mask(k) = false;
+				}
+			}
+		}
+
+		return tf;
 	}
 }

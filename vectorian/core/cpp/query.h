@@ -7,17 +7,29 @@
 #include "embedding/vectors.h"
 
 struct TokenFilter {
+	// token filters are intended as a fast way to add additional
+	// filters dynamically between queries. they are not as fast
+	// or efficient as using filters when creating the session.
+
 	uint64_t pos;
 	uint64_t tag;
+	std::optional<xt::xtensor<bool, 1>> vocab;
 
-	inline bool all() const {
-		return !(pos || tag);
+	inline TokenFilter(const uint64_t p_pos, const uint64_t p_tag) :
+		pos(p_pos), tag(p_tag) {
 	}
 
-	inline bool operator()(const Token &t) const {
+	inline bool pass(const Token &t) const {
+		if (vocab.has_value() && !(*vocab)(t.id)) {
+			return false;
+		}
+
 		return !(((pos >> t.pos) & 1) || ((tag >> t.tag) & 1));
 	}
 };
+
+typedef std::shared_ptr<TokenFilter> TokenFilterRef;
+
 
 template<typename Lookup>
 uint64_t parse_filter_mask(
@@ -90,7 +102,7 @@ class Query :
 	py::dict m_py_t_tokens;
 	float m_submatch_weight;
 	bool m_bidirectional;
-	TokenFilter m_token_filter;
+	TokenFilterRef m_token_filter;
 	bool m_aborted;
 	size_t m_max_matches;
 	float m_min_score;
@@ -162,7 +174,7 @@ public:
 		return m_bidirectional;
 	}
 
-	inline const TokenFilter &token_filter() const {
+	inline const TokenFilterRef &token_filter() const {
 	    return m_token_filter;
 	}
 
@@ -234,6 +246,9 @@ public:
 	inline const VectorsCache &vectors_cache() const {
 		return m_vectors_cache;
 	}
+
+	TokenFilterRef make_token_filter(
+		const py::kwargs &p_kwargs) const;
 };
 
 typedef std::shared_ptr<Query> QueryRef;

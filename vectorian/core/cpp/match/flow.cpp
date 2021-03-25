@@ -46,15 +46,15 @@ py::list Flow<Index>::py_regions(
 
 	//const int32_t n = static_cast<int32_t>(match.size());
 
-	const TokenFilter &token_filter = p_match->query()->token_filter();
+	const TokenFilterRef token_filter = p_match->query()->token_filter();
 	std::vector<Index> index_map;
-	if (!token_filter.all()) {
+	if (token_filter.get()) {
 		size_t k = 0;
 		const auto len = p_match->slice().len;
 		index_map.resize(len);
 		for (ssize_t i = 0; i < len; i++) {
 			index_map[k] = i;
-			if (token_filter(s_tokens.at(token_at + i))) {
+			if (token_filter->pass(s_tokens.at(token_at + i))) {
 				k++;
 			}
 		}
