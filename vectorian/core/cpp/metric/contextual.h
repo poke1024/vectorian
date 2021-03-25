@@ -14,11 +14,17 @@ public:
 	}
 };
 
+typedef std::shared_ptr<ContextualSimilarityMatrix> ContextualSimilarityMatrixRef;
+
+
 class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const QueryRef m_query;
 	const WordMetricDef m_metric;
 	const MatcherFactoryRef m_matcher_factory;
 	const size_t m_embedding_index;
+
+	const py::str PY_SIZE;
+	const py::str PY_MAGNITUDES;
 
 	SimilarityMatrixRef build_similarity_matrix(
 		const std::vector<StaticEmbeddingRef> &p_embeddings);
@@ -35,13 +41,7 @@ public:
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
 		const MatcherFactoryRef &p_matcher_factory,
-		const size_t p_embedding_index) :
-
-		m_query(p_query),
-		m_metric(p_metric),
-		m_matcher_factory(p_matcher_factory),
-		m_embedding_index(p_embedding_index) {
-	}
+		const size_t p_embedding_index);
 
 	virtual SimilarityMatrixRef create(
 		const EmbeddingType p_embedding_type,

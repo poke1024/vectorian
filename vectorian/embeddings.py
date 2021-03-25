@@ -11,6 +11,7 @@ import sys
 import download
 import compress_fasttext
 import h5py
+import sklearn
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -598,6 +599,14 @@ class VectorsRef:
 				hf.create_dataset("unmodified", data=v.unmodified)
 				hf.create_dataset("normalized", data=v.normalized)
 				hf.create_dataset("magnitudes", data=v.magnitudes)
+		finally:
+			v.close()
+
+	def compress(self, n_dims):
+		v = self.open()
+		try:
+			pca = sklearn.decomposition.PCA(n_components=n_dims)
+			pca.fit(v.unmodified)
 		finally:
 			v.close()
 

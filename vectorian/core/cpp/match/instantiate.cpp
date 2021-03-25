@@ -101,16 +101,17 @@ public:
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
-		const SimilarityMatrixRef matrix = metric->matrix_factory()->create(CONTEXTUAL, p_document);
+		const ContextualSimilarityMatrixRef matrix = std::static_pointer_cast<ContextualSimilarityMatrix>(
+			metric->matrix_factory()->create(CONTEXTUAL, p_document));
 
 		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix] (
 			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
 
-	        return ContextualEmbeddingSlice<Index>(
-	            matrix->m_similarity, slice_id, s, t);
-		});
+			return ContextualEmbeddingSlice<Index>(
+				*matrix, slice_id, s, t);
+			});
 	};
 };
 

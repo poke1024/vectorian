@@ -78,6 +78,9 @@ class StaticEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 		const std::vector<StaticEmbeddingRef> &p_embeddings,
 		const SimilarityMatrixRef &p_matrix);
 
+	void fill_magnitudes_t(
+		const SimilarityMatrixRef &p_matrix);
+
 public:
 	StaticEmbeddingSimilarityMatrixFactory(
 		const QueryRef &p_query,

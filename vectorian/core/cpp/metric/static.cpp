@@ -77,18 +77,32 @@ void StaticEmbeddingSimilarityMatrixFactory::compute_magnitudes(
 	const QueryVocabularyRef vocab = m_query->vocabulary();
 	const Needle needle(m_query);
 
-	p_matrix->m_magnitudes.resize({static_cast<ssize_t>(vocab->size())});
+	p_matrix->m_magnitudes_s.resize({static_cast<ssize_t>(vocab->size())});
 	size_t offset = 0;
 	for (const auto &embedding : p_embeddings) {
 		const auto &vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
 		const auto magnitudes = vectors.attr("magnitudes").cast<xt::pytensor<float, 1>>();
-		xt::strided_view(p_matrix->m_magnitudes, {xt::range(offset, offset + size)}) = magnitudes;
+		xt::strided_view(p_matrix->m_magnitudes_s, {xt::range(offset, offset + size)}) = magnitudes;
 
 		offset += size;
 	}
 	PPK_ASSERT(offset == vocab->size());
+
+	fill_magnitudes_t(p_matrix);
+}
+
+void StaticEmbeddingSimilarityMatrixFactory::fill_magnitudes_t(
+	const SimilarityMatrixRef &p_matrix) {
+
+	const Needle needle(m_query);
+	const auto &static_mag = m_static_matrix->m_magnitudes_s;
+	auto &mag_t = p_matrix->m_magnitudes_t;
+	mag_t.resize({ssize_t(needle.size())});
+	for (size_t i = 0; i < needle.size(); i++) {
+		mag_t(i) = static_mag(needle.token_id(i));
+	}
 }
 
 StaticEmbeddingSimilarityMatrixFactory::StaticEmbeddingSimilarityMatrixFactory(
@@ -138,14 +152,15 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 			}
 
 			if (m_matcher_factory->needs_magnitudes()) {
-				const auto &static_mag = m_static_matrix->m_magnitudes;
-				auto &contextual_mag = matrix->m_magnitudes;
+				const auto &static_mag = m_static_matrix->m_magnitudes_s;
+				auto &contextual_mag_s = matrix->m_magnitudes_s;
 
-				contextual_mag.resize({ssize_t(n_tokens)});
-
+				contextual_mag_s.resize({ssize_t(n_tokens)});
 				for (size_t i = 0; i < n_tokens; i++) {
-					contextual_mag(i) = static_mag(tokens[i].id);
+					contextual_mag_s(i) = static_mag(tokens[i].id);
 				}
+
+				fill_magnitudes_t(matrix);
 			}
 
 			return matrix;
@@ -183,8 +198,9 @@ void StaticSimilarityMatrix::call_hook(
 
 	py::dict data;
 	data["similarity"] = m_similarity;
-	if (m_magnitudes.shape(0) > 0) {
-		data["magnitudes"] = m_magnitudes;
+	if (m_magnitudes_s.shape(0) > 0) {
+		data["magnitudes_s"] = m_magnitudes_s;
+		data["magnitudes_t"] = m_magnitudes_t;
 	}
 	data["rows"] = gen_rows;
 	data["columns"] = gen_columns;

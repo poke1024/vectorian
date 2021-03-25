@@ -11,7 +11,7 @@ public:
 	typedef ContextualEmbeddingTokenIdEncoder Encoder;
 
 private:
-	const xt::pytensor<float, 2> &m_matrix;
+	const SimilarityMatrix &m_matrix;
 	const size_t m_slice_id;
 	const TokenSpan m_s;
 	const TokenSpan m_t;
@@ -19,7 +19,7 @@ private:
 
 public:
 	inline ContextualEmbeddingSlice(
-		const xt::pytensor<float, 2> &matrix,
+		const SimilarityMatrix &matrix,
 		const size_t slice_id,
 		const TokenSpan &s,
 		const TokenSpan &t) :
@@ -62,7 +62,7 @@ public:
 	}
 
 	inline float similarity(Index i, Index j) const {
-		return m_matrix(m_s.offset + i, m_t.offset + j);
+		return m_matrix.m_similarity(m_s.offset + i, m_t.offset + j);
 	}
 
 	inline float unmodified_similarity(Index i, Index j) const {
@@ -70,15 +70,15 @@ public:
 	}
 
 	inline float magnitude_s(Index i) const {
-		return 1.0f; // FIXME m_magnitudes_s(i);
+		return m_matrix.m_magnitudes_s(m_s.offset + i);
 	}
 
 	inline float magnitude_t(Index i) const {
-		return 1.0f; // FIXME m_magnitudes_t(i);
+		return m_matrix.m_magnitudes_t(m_t.offset + i);
 	}
 
 	inline void assert_has_magnitudes() const {
-		PPK_ASSERT(false);
+		PPK_ASSERT(m_matrix.m_magnitudes_s.shape(0) > 0);
 	}
 
 	inline float max_similarity_for_t(Index i) const {

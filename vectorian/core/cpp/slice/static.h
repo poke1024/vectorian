@@ -35,6 +35,8 @@ public:
 		m_len_s(s.len),
 		t_tokens(t.tokens + t.offset),
 		m_len_t(t.len) {
+
+		// PPK_ASSERT(t.offset == 0);
 	}
 
 	size_t id() const {
@@ -77,12 +79,11 @@ public:
 
 	inline float magnitude_s(Index i) const {
 		const Token &s = s_tokens[i];
-		return m_matrix.m_magnitudes(m_encoder.to_embedding(0, i, s));
+		return m_matrix.m_magnitudes_s(m_encoder.to_embedding(0, i, s));
 	}
 
 	inline float magnitude_t(Index i) const {
-		const Token &t = t_tokens[i];
-		return m_matrix.m_magnitudes(m_encoder.to_embedding(1, i, t));
+		return m_matrix.m_magnitudes_t(i);
 	}
 
 	inline void assert_has_magnitudes() const {

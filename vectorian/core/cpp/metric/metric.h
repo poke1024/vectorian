@@ -9,30 +9,36 @@ typedef std::shared_ptr<SimilarityMatrix> SimilarityMatrixRef;
 class SimilarityMatrix {
 public:
 	xt::pytensor<float, 2> m_similarity;
-	xt::pytensor<float, 1> m_magnitudes;
-	bool m_needs_magnitudes;
+	xt::pytensor<float, 1> m_magnitudes_s;
+	xt::pytensor<float, 1> m_magnitudes_t;
+	//bool m_needs_magnitudes;
 
-	inline SimilarityMatrix() :
+	inline SimilarityMatrix() {
+		//m_needs_magnitudes(false) {
 
-		m_needs_magnitudes(false) {
-
-		m_magnitudes.resize({0});
-		PPK_ASSERT(m_magnitudes.shape(0) == 0);
+		m_magnitudes_s.resize({0});
+		m_magnitudes_t.resize({0});
+		PPK_ASSERT(m_magnitudes_s.shape(0) == 0);
+		PPK_ASSERT(m_magnitudes_t.shape(0) == 0);
 	}
 
 	virtual ~SimilarityMatrix() {
 	}
 
-	inline const xt::pytensor<float, 2> &similarity() const {
+	inline const xt::pytensor<float, 2> &sim() const {
 		return m_similarity;
 	}
 
-	inline const xt::pytensor<float, 1> &magnitudes() const {
-		return m_magnitudes;
+	inline const xt::pytensor<float, 1> &mag_s() const {
+		return m_magnitudes_s;
+	}
+
+	inline const xt::pytensor<float, 1> &mag_t() const {
+		return m_magnitudes_t;
 	}
 
 	inline void assert_has_magnitudes() const {
-		PPK_ASSERT(m_magnitudes.shape(0) > 0);
+		PPK_ASSERT(m_magnitudes_s.shape(0) > 0);
 	}
 
 	virtual void call_hook(

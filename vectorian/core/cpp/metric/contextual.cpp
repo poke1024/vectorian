@@ -7,6 +7,21 @@
 #include "metric/factory.h"
 #include "slice/contextual.h"
 
+ContextualEmbeddingSimilarityMatrixFactory::ContextualEmbeddingSimilarityMatrixFactory(
+	const QueryRef &p_query,
+	const WordMetricDef &p_metric,
+	const MatcherFactoryRef &p_matcher_factory,
+	const size_t p_embedding_index) :
+
+	m_query(p_query),
+	m_metric(p_metric),
+	m_matcher_factory(p_matcher_factory),
+	m_embedding_index(p_embedding_index),
+
+	PY_SIZE("size"),
+	PY_MAGNITUDES("magnitudes") {
+}
+
 SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_context(
 	const DocumentRef &p_document) {
 
@@ -24,10 +39,17 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 	const auto sim_matrix = std::make_shared<ContextualSimilarityMatrix>();
 
 	sim_matrix->m_similarity.resize({
-		s_vectors->get().attr("size").cast<ssize_t>(),
-		t_vectors->get().attr("size").cast<ssize_t>()});
+		s_vectors->get().attr(PY_SIZE).cast<ssize_t>(),
+		t_vectors->get().attr(PY_SIZE).cast<ssize_t>()});
 
 	m_metric.vector_metric(s_vectors->get(), t_vectors->get(), sim_matrix->m_similarity);
+
+	if (m_matcher_factory->needs_magnitudes()) {
+		sim_matrix->m_magnitudes_s = xt::pyarray<float>(
+			s_vectors->get().attr(PY_MAGNITUDES).cast<py::array_t<float>>());
+		sim_matrix->m_magnitudes_t = xt::pyarray<float>(
+			t_vectors->get().attr(PY_MAGNITUDES).cast<py::array_t<float>>());
+	}
 
 	if (m_query->debug_hook().has_value()) {
 		sim_matrix->call_hook(m_query);
@@ -63,8 +85,9 @@ void ContextualSimilarityMatrix::call_hook(
 
 	py::dict data;
 	data["similarity"] = m_similarity;
-	if (m_magnitudes.shape(0) > 0) {
-		data["magnitudes"] = m_magnitudes;
+	if (m_magnitudes_s.shape(0) > 0) {
+		data["magnitudes_s"] = m_magnitudes_s;
+		data["magnitudes_t"] = m_magnitudes_t;
 	}
 	data["columns"] = gen_columns;
 

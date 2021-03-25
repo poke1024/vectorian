@@ -26,6 +26,10 @@ public:
 	inline const TokenIdArray &token_ids() const {
 		return m_token_ids;
 	}
+
+	inline token_t token_id(const size_t i) const {
+		return m_token_ids(i);
+	}
 };
 
 class StaticEmbedding : public Embedding {
