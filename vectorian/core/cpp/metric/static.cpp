@@ -1,4 +1,5 @@
 #include "metric/static.h"
+#include "metric/contextual.h"
 #include "slice/static.h"
 #include "query.h"
 #include "match/matcher_impl.h"
@@ -14,15 +15,15 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 	const auto matrix = std::make_shared<StaticSimilarityMatrix>();
 
 	const size_t vocab_size = vocab->size();
-	const size_t needle_size = static_cast<size_t>(needle.size());
-	matrix->m_similarity.resize({ssize_t(vocab_size), ssize_t(needle_size)});
+	const ssize_t needle_size = needle.size();
+	matrix->m_similarity.resize({ssize_t(vocab_size), needle_size});
 
 	const auto &needle_tokens = needle.token_ids();
 	py::list sources;
-	py::array_t<size_t> indices{static_cast<py::ssize_t>(needle_size)};
+	py::array_t<size_t> indices{needle_size};
 	auto mutable_indices = indices.mutable_unchecked<1>();
 
-	for (size_t j = 0; j < needle_size; j++) { // for each token in needle
+	for (ssize_t j = 0; j < needle_size; j++) { // for each token in needle
 		const auto t = needle_tokens[j];
 		size_t t_rel;
 		const auto &t_vectors = pick_vectors(p_embeddings, t, t_rel);
@@ -49,7 +50,7 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 	}
 	PPK_ASSERT(offset == vocab_size);
 
-	for (size_t j = 0; j < needle.size(); j++) { // for each token in needle
+	for (ssize_t j = 0; j < needle_size; j++) { // for each token in needle
 
 		// since the j-th needle token is a specific vocabulary token, we always
 		// set that specific vocabulary token similarity to 1 (regardless of the
@@ -120,7 +121,34 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 		} break;
 
 		case CONTEXTUAL: {
-			throw std::runtime_error("illegal embedding type");
+			const Needle needle(m_query);
+			const auto matrix = std::make_shared<ContextualSimilarityMatrix>();
+
+			const auto &static_sim = m_static_matrix->m_similarity;
+			auto &contextual_sim = matrix->m_similarity;
+
+			const size_t n_tokens = p_document->n_tokens();
+			const auto &tokens = *p_document->tokens();
+
+			contextual_sim.resize({
+				ssize_t(n_tokens), ssize_t(needle.size())});
+			for (size_t i = 0; i < n_tokens; i++) {
+				xt::strided_view(contextual_sim, {i, xt::all()}) =
+					xt::strided_view(static_sim, {tokens[i].id, xt::all()});
+			}
+
+			if (m_matcher_factory->needs_magnitudes()) {
+				const auto &static_mag = m_static_matrix->m_magnitudes;
+				auto &contextual_mag = matrix->m_magnitudes;
+
+				contextual_mag.resize({ssize_t(n_tokens)});
+
+				for (size_t i = 0; i < n_tokens; i++) {
+					contextual_mag(i) = static_mag(tokens[i].id);
+				}
+			}
+
+			return matrix;
 		} break;
 
 		default: {
