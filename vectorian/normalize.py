@@ -83,7 +83,7 @@ class TextNormalizer:
 			lambda s: c_pattern.sub(replacement, s))
 
 	def filter(self, k):
-		self.add(f'filter_{k}', lambda s: s if getattr(s, k)() else None)
+		self.add(('filter', k), lambda s: s if getattr(s, k)() else None)
 
 
 class TokenNormalizer:
