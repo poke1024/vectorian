@@ -54,6 +54,18 @@ def alpha():
 	return CachableCallable('alpha', lambda s: s if s.isalpha() else None)
 
 
+class RemoveTokens:
+	def __init__(self, tokens):
+		self._tokens = set(tokens)
+
+	def __call__(self, s):
+		return None if s in self._tokens else s
+
+
+def stop_words(words):
+	return CachableCallable('stop', RemoveTokens(words))
+
+
 def rewrite(rules):
 	def f(t):
 		t_new = t.copy()
