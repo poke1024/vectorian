@@ -7,7 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 from collections import namedtuple
 
-from vectorian.embeddings import ContextualEmbedding, InMemoryVectorsRef
+from vectorian.embeddings import ContextualEmbedding, Vectors, ProxyVectorsRef
 
 
 def normalize_dashes(s):
@@ -74,8 +74,19 @@ class Importer:
 
 		from vectorian.corpus import Document
 
+		emb_by_name = dict((e.name, e) for e in self._embeddings)
+
+		def compressed(k, v):
+			v = Vectors(np.vstack(v))
+
+			embedding = emb_by_name[k]
+			if embedding.compression:
+				v = embedding.compression.apply(v)
+
+			return ProxyVectorsRef(v)
+
 		contextual_embeddings = dict(
-			(k, InMemoryVectorsRef(np.vstack(v))) for k, v in contextual_vectors.items())
+			(k, compressed(k, v)) for k, v in contextual_vectors.items())
 
 		return Document(json, contextual_embeddings)
 

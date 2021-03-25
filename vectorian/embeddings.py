@@ -120,12 +120,6 @@ class AbstractVectors:
 			hf.create_dataset("normalized", data=self.normalized)
 			hf.create_dataset("magnitudes", data=self.magnitudes)
 
-	def compress(self, n_dims):
-		pca = sklearn.decomposition.PCA(n_components=n_dims)
-		pca.fit(self.unmodified)
-		return CompressedVectors(
-			Vectors(pca.transform(self.unmodified)), pca)
-
 	def close(self):
 		raise NotImplementedError()
 
@@ -552,7 +546,38 @@ class StackedEmbedding:
 		return self._name
 
 
+class Compression:
+	def apply(self, vectors):
+		raise NotImplementedError
+
+	@property
+	def name(self):
+		raise NotImplementedError
+
+
+class PCACompression(Compression):
+	def __init__(self, n_dims):
+		self._n_dims = n_dims
+
+	def apply(self, vectors):
+		pca = sklearn.decomposition.PCA(n_components=self._n_dims)
+		pca.fit(vectors.unmodified)
+		return CompressedVectors(
+			Vectors(pca.transform(vectors.unmodified)), pca)
+
+	@property
+	def name(self):
+		return f'pca:{self._n_dims}'
+
+
 class ContextualEmbedding(Embedding):
+	def __init__(self, compression=None):
+		self._compression = compression
+
+	@property
+	def compression(self):
+		return self._compression
+
 	@property
 	def is_contextual(self):
 		return True
@@ -573,8 +598,12 @@ class ContextualEmbedding(Embedding):
 
 
 class SpacyTransformerEmbedding(ContextualEmbedding):
-	def __init__(self, nlp):
+	def __init__(self, nlp, compression=None):
+		super().__init__(compression)
 		self._nlp = nlp
+
+	def compressed(self, n_dims):
+		return SpacyTransformerEmbedding(self._nlp, PCACompression(n_dims))
 
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
@@ -604,7 +633,9 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 	@cached_property
 	def name(self):
-		return '/'.join(['spacy', self._nlp.meta['name'], self._nlp.meta['version']])
+		return '/'.join([
+			'spacy', self._nlp.meta['name'], self._nlp.meta['version']
+		] + ([] if self._compression is None else [self._compression.name]))
 
 
 class OnDiskVectors:
@@ -679,14 +710,6 @@ class ProxyVectorsRef(VectorsRef):
 
 	def open(self):
 		return self._vectors
-
-
-class InMemoryVectorsRef(VectorsRef):
-	def __init__(self, vectors):
-		self._vectors = np.array(vectors, dtype=np.float32)
-
-	def open(self):
-		return Vectors(self._vectors)
 
 
 class OnDiskVectorsRef(VectorsRef):

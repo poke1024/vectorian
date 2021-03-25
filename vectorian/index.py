@@ -13,7 +13,7 @@ from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
 from vectorian.corpus.document import TokenTable
-from vectorian.embeddings import InMemoryVectorsRef
+from vectorian.embeddings import Vectors, ProxyVectorsRef
 
 
 class Query:
@@ -67,7 +67,7 @@ class PreparedQuery:
 					(k, v[mask, :]) for k, v in contextual_embeddings.items())
 
 		self._contextual_embeddings = dict(
-			(k, InMemoryVectorsRef(v)) for k, v in contextual_embeddings.items())
+			(k, ProxyVectorsRef(Vectors(v))) for k, v in contextual_embeddings.items())
 
 		token_table = TokenTable(self.index.session.token_mapper('tokenizer'))
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
