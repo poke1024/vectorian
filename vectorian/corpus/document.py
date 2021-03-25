@@ -55,7 +55,7 @@ class SpansTable:
 
 
 class TokenTable:
-	def __init__(self, normalizer):
+	def __init__(self, normalizers):
 		self._idx = 0
 
 		self._token_idx = []
@@ -64,7 +64,8 @@ class TokenTable:
 		self._token_tag = []  # tag_ from spacy's Token
 		self._token_str = []
 
-		self._normalizer = normalizer
+		self._make_text = normalizers['token'].token_to_text
+		self._norm_text = normalizers['text'].to_callable()
 
 	@property
 	def normalized_tokens(self):
@@ -85,11 +86,10 @@ class TokenTable:
 			self._idx += len(text[last_idx:idx])
 			last_idx = idx
 
-			token_text = text[token["start"]:token["end"]]
-			norm_text = self._normalizer(token_text) or ""
+			norm_text = self._norm_text(self._make_text(text, token)) or ""
 			if len(norm_text.strip()) > 0:
 				self._token_idx.append(self._idx)
-				self._token_len.append(len(token_text))
+				self._token_len.append(len(text[token["start"]:token["end"]]))
 
 				self._token_pos.append(token["pos"])
 				self._token_tag.append(token["tag"])
@@ -290,11 +290,11 @@ class PreparedDocument:
 	def __init__(self, session, json, contextual_embeddings):
 		self._session = session
 
-		token_mapper = session.token_mapper('tagger')
+		token_mapper = session.normalizer('token').token_to_token
 
 		texts = []
 
-		token_table = TokenTable(self._session.token_mapper('tokenizer'))
+		token_table = TokenTable(self._session.normalizers)
 		sentence_table = SpansTable(json['loc_keys'])
 
 		token_count = sum(len(p['tokens']) for p in json['partitions'])

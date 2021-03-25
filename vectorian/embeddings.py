@@ -12,6 +12,7 @@ import download
 import compress_fasttext
 import h5py
 import sklearn
+import time
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -287,6 +288,37 @@ class StaticEmbeddingInstance:
 
 
 class CachedWordEmbedding(StaticEmbedding):
+	class Cache:
+		def __init__(self):
+			import sqlite3
+
+			self._cache_path = _make_cache_path() / 'cache'
+			self._cache_path.mkdir(exist_ok=True, parents=True)
+
+			self._conn = sqlite3.connect(self._cache_path / 'info.db')
+			self._conn.execute("create table if not exists cache (key varchar primary key, path varchar)")
+
+		def get(self, key):
+			cur = self._conn.cursor()
+			try:
+				cur.execute('select path from cache where key=?', (key, ))
+				r = cur.fetchone()
+			finally:
+				cur.close()
+
+			if r is None:
+				return None
+			else:
+				return self._cache_path / Path(r[0])
+
+		def create_new_data_path(self):
+			return self._cache_path / f"{time.time_ns()}.dat"
+
+		def put(self, key, path):
+			with self._conn:
+				self._conn.execute("insert into cache(key, path) values (?, ?)", (
+					key, str(path.relative_to(self._cache_path))))
+
 	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, tokens, vectors):
 			self._name = name
@@ -324,8 +356,9 @@ class CachedWordEmbedding(StaticEmbedding):
 
 	def __init__(self, embedding_sampling):
 		self._loaded = {}
-		self._cache_path = _make_cache_path()
 		self._embedding_sampling = embedding_sampling
+		self._cache = CachedWordEmbedding.Cache()
+		self._cache_path = _make_cache_path()
 
 	def _load(self):
 		raise NotImplementedError()
@@ -339,17 +372,22 @@ class CachedWordEmbedding(StaticEmbedding):
 		raise NotImplementedError()
 
 	def create_instance(self, session):
-		normalizer = session.token_mapper('tokenizer')
+		normalizer = session.normalizer('text').to_callable()
+		key = json.dumps({
+			'emb': self.unique_name,
+			'nrm': normalizer.ident,
+			'sampling': self._embedding_sampling
+		})
 
-		loaded = self._loaded.get(normalizer.name)
+		loaded = self._loaded.get(key)
 		if loaded is None:
 			name = self.unique_name
 
-			normalized_cache_path = self._cache_path / 'cache'
-			normalized_cache_path.mkdir(exist_ok=True, parents=True)
-			dat_path = normalized_cache_path / f"{name}-{normalizer.name}-{self._embedding_sampling}.dat"
+			dat_path = self._cache.get(key)
 
-			if dat_path.exists():
+			#dat_path = normalized_cache_path / f"{name}-{normalizer.name}-{self._embedding_sampling}.dat"
+
+			if dat_path and dat_path.exists():
 				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
 					with open(dat_path.with_suffix('.json'), 'r') as f:
 						data = json.loads(f.read())
@@ -362,6 +400,8 @@ class CachedWordEmbedding(StaticEmbedding):
 				tokens, vectors = _normalize_word2vec(
 					tokens, vectors, normalizer.unpack(), self._embedding_sampling)
 
+				dat_path = self._cache.create_new_data_path()
+
 				vectors_mmap = np.memmap(
 					dat_path, dtype=np.float32, mode='w+', shape=vectors.shape)
 				vectors_mmap[:, :] = vectors[:, :]
@@ -373,8 +413,10 @@ class CachedWordEmbedding(StaticEmbedding):
 						'shape': tuple(vectors_mmap.shape)
 					}))
 
+				self._cache.put(key, dat_path)
+
 			loaded = CachedWordEmbedding.Instance(name, tokens, vectors_mmap)
-			self._loaded[normalizer.name] = loaded
+			self._loaded[key] = loaded
 
 		return loaded
 

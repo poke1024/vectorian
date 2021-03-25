@@ -69,7 +69,7 @@ class PreparedQuery:
 		self._contextual_embeddings = dict(
 			(k, ProxyVectorsRef(Vectors(v))) for k, v in contextual_embeddings.items())
 
-		token_table = TokenTable(self.index.session.token_mapper('tokenizer'))
+		token_table = TokenTable(self.index.session.normalizers)
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
 		self._token_table = token_table.to_arrow()

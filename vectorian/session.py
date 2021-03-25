@@ -1,5 +1,5 @@
 import vectorian.core as core
-import vectorian.utils as utils
+import vectorian.normalize as normalize
 import logging
 
 from cached_property import cached_property
@@ -122,24 +122,21 @@ class Partition:
 
 
 class Session:
-	def __init__(self, docs, embeddings=None, token_mappings=None):
+	def __init__(self, docs, embeddings=None, normalizers=None):
 		if embeddings is None:
 			embeddings = []
 
-		if token_mappings == "default":
-			token_mappings = utils.default_token_mappings()
+		if normalizers == "default":
+			normalizers = normalize.default_normalizers()
 
 		self._embedding_manager = core.EmbeddingManager()
 
-		if any(e.is_static for e in embeddings) and not token_mappings:
-			logging.warning("got static embeddings but not token mappings.")
+		if any(e.is_static for e in embeddings) and not normalizers:
+			logging.warning("got static embeddings but no normalizers.")
 
-		if token_mappings is None:
-			token_mappings = {}
-		self._token_mappings = token_mappings
-
-		if any(k not in ("tokenizer", "tagger") for k in token_mappings):
-			raise ValueError(token_mappings)
+		if normalizers is None:
+			normalizers = {}
+		self._normalizers = normalize.normalizer_dict(normalizers)
 
 		self._embeddings = tuple(embeddings)
 
@@ -213,14 +210,12 @@ class Session:
 			window_step = window_size
 		return Partition(self, level, window_size, window_step)
 
-	def token_mapper(self, stage):
-		if stage not in ('tokenizer', 'tagger'):
-			raise ValueError(stage)
-		if stage == 'tokenizer':
-			return utils.CachableCallable.chain(
-				self._token_mappings.get('tokenizer', []))
-		else:
-			return utils.chain(self._token_mappings.get(stage, []))
+	@property
+	def normalizers(self):
+		return self._normalizers
+
+	def normalizer(self, stage):
+		return self._normalizers[stage]
 
 
 class LabResult(Result):
