@@ -25,6 +25,7 @@ class ContextualEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactor
 
 	const py::str PY_SIZE;
 	const py::str PY_MAGNITUDES;
+	const py::str PY_TRANSFORM;
 
 	SimilarityMatrixRef build_similarity_matrix(
 		const std::vector<StaticEmbeddingRef> &p_embeddings);

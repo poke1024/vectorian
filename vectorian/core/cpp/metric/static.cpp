@@ -32,16 +32,17 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 	}
 
 	const auto py_embeddings = py::module_::import("vectorian.embeddings");
-	const auto needle_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
+	const auto t_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
 
 	size_t offset = 0;
 	for (const auto &embedding : p_embeddings) {
-		const auto &vectors = embedding->vectors();
+		const py::object s_vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
+		const py::object tfm_t_vectors = s_vectors.attr(PY_TRANSFORM)(t_vectors);
 		m_metric.vector_metric(
-			vectors,
-			needle_vectors,
+			s_vectors,
+			tfm_t_vectors,
 			xt::strided_view(matrix->m_similarity, {xt::range(offset, offset + size), xt::all()}));
 
 		PPK_ASSERT(offset + size <= vocab_size);
@@ -80,10 +81,10 @@ void StaticEmbeddingSimilarityMatrixFactory::compute_magnitudes(
 	p_matrix->m_magnitudes_s.resize({static_cast<ssize_t>(vocab->size())});
 	size_t offset = 0;
 	for (const auto &embedding : p_embeddings) {
-		const auto &vectors = embedding->vectors();
+		const py::object s_vectors = embedding->vectors();
 		const size_t size = embedding->size();
 
-		const auto magnitudes = vectors.attr("magnitudes").cast<xt::pytensor<float, 1>>();
+		const auto magnitudes = s_vectors.attr(PY_MAGNITUDES).cast<xt::pytensor<float, 1>>();
 		xt::strided_view(p_matrix->m_magnitudes_s, {xt::range(offset, offset + size)}) = magnitudes;
 
 		offset += size;
@@ -114,7 +115,10 @@ StaticEmbeddingSimilarityMatrixFactory::StaticEmbeddingSimilarityMatrixFactory(
 	m_query(p_query),
 	m_metric(p_metric),
 	m_matcher_factory(p_matcher_factory),
-	m_embedding_index(p_embedding_index) {
+	m_embedding_index(p_embedding_index),
+
+	PY_TRANSFORM("transform"),
+	PY_MAGNITUDES("magnitudes") {
 
 	const QueryVocabularyRef vocab = m_query->vocabulary();
 	const auto embeddings = vocab->get_compiled_embeddings(m_embedding_index);

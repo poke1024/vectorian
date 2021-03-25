@@ -19,7 +19,8 @@ ContextualEmbeddingSimilarityMatrixFactory::ContextualEmbeddingSimilarityMatrixF
 	m_embedding_index(p_embedding_index),
 
 	PY_SIZE("size"),
-	PY_MAGNITUDES("magnitudes") {
+	PY_MAGNITUDES("magnitudes"),
+	PY_TRANSFORM("transform") {
 }
 
 SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_context(
@@ -42,13 +43,14 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 		s_vectors->get().attr(PY_SIZE).cast<ssize_t>(),
 		t_vectors->get().attr(PY_SIZE).cast<ssize_t>()});
 
-	m_metric.vector_metric(s_vectors->get(), t_vectors->get(), sim_matrix->m_similarity);
+	const py::object tfm_vectors_t = s_vectors->get().attr(PY_TRANSFORM)(t_vectors->get());
+	m_metric.vector_metric(s_vectors->get(), tfm_vectors_t, sim_matrix->m_similarity);
 
 	if (m_matcher_factory->needs_magnitudes()) {
 		sim_matrix->m_magnitudes_s = xt::pyarray<float>(
 			s_vectors->get().attr(PY_MAGNITUDES).cast<py::array_t<float>>());
 		sim_matrix->m_magnitudes_t = xt::pyarray<float>(
-			t_vectors->get().attr(PY_MAGNITUDES).cast<py::array_t<float>>());
+			tfm_vectors_t.attr(PY_MAGNITUDES).cast<py::array_t<float>>());
 	}
 
 	if (m_query->debug_hook().has_value()) {

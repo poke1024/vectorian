@@ -71,6 +71,9 @@ class StaticEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const size_t m_embedding_index;
 	SimilarityMatrixRef m_static_matrix;
 
+	py::str PY_TRANSFORM;
+	py::str PY_MAGNITUDES;
+
 	SimilarityMatrixRef build_static_similarity_matrix(
 		const std::vector<StaticEmbeddingRef> &p_embeddings);
 

@@ -113,20 +113,39 @@ class StaticEmbedding(Embedding):
 		raise NotImplementedError()
 
 
-class Vectors:  # future: CudaVectors
+class AbstractVectors:
+	def save(self, path):
+		with h5py.File(path.with_suffix(".h5"), "w") as hf:
+			hf.create_dataset("unmodified", data=self.unmodified)
+			hf.create_dataset("normalized", data=self.normalized)
+			hf.create_dataset("magnitudes", data=self.magnitudes)
+
+	def compress(self, n_dims):
+		pca = sklearn.decomposition.PCA(n_components=n_dims)
+		pca.fit(self.unmodified)
+		return CompressedVectors(pca.transform(self.unmodified), pca)
+
+	def close(self):
+		raise NotImplementedError()
+
+	@property
+	def memory_usage(self):
+		return sys.getsizeof(self.unmodified)
+
+	@property
+	def size(self):
+		return self.shape[0]
+
+	def transform(self, vectors):
+		return vectors
+
+
+class Vectors(AbstractVectors):
 	def __init__(self, unmodified):
 		self._unmodified = unmodified
 
 	def close(self):
 		pass  # a no op
-
-	@property
-	def memory_usage(self):
-		return sys.getsizeof(self._unmodified)
-
-	@property
-	def size(self):
-		return self._unmodified.shape[0]
 
 	@property
 	def shape(self):
@@ -154,7 +173,35 @@ class Vectors:  # future: CudaVectors
 		return data
 
 
-class MaskedVectors:
+class CompressedVectors(AbstractVectors):
+	def __init__(self, vectors, pca):
+		self._vectors = vectors
+		self._pca = pca
+
+	def close(self):
+		self._vectors.close()
+
+	@property
+	def shape(self):
+		return self._vectors.shape
+
+	@property
+	def unmodified(self):
+		return self._vectors.unmodified
+
+	@property
+	def normalized(self):
+		return self._vectors.normalized
+
+	@property
+	def magnitudes(self):
+		return self._vectors.magnitudes
+
+	def transform(self, vectors):
+		return Vectors(self._pca.transform(vectors.unmodified))
+
+
+class MaskedVectors(AbstractVectors):
 	def __init__(self, vectors, mask):
 		self._vectors = vectors
 		self._mask = mask
@@ -183,14 +230,14 @@ class MaskedVectors:
 		return self._vectors.magnitudes[self._mask]
 
 
-class StackedVectors:
+class StackedVectors(AbstractVectors):
 	def __init__(self, sources, indices):
 		self._sources = sources
 		self._indices = indices
 
-	@cached_property
-	def size(self):
-		return self.unmodified.shape[0]
+	def close(self):
+		for x in self._sources:
+			x.close()
 
 	@cached_property
 	def shape(self):
@@ -581,8 +628,17 @@ class OnDiskVectors:
 
 
 class VectorsCache:
+	def __init__(self):
+		self._cache = dict()
+
 	def open(self, vectors_ref, expected_size):
-		v = vectors_ref.open()
+		cached = None  #self._cache.get(id(vectors_ref))
+		if cached is not None:
+			_, v = cached
+		else:
+			v = vectors_ref.open()
+			# self._cache[id(vectors_ref)] = (vectors_ref, v)
+
 		if v.size != expected_size:
 			raise RuntimeError(f"matrix size mismatch: {v.size} != {expected_size}")
 		return v
@@ -595,18 +651,7 @@ class VectorsRef:
 	def save(self, path):
 		v = self.open()
 		try:
-			with h5py.File(path.with_suffix(".h5"), "w") as hf:
-				hf.create_dataset("unmodified", data=v.unmodified)
-				hf.create_dataset("normalized", data=v.normalized)
-				hf.create_dataset("magnitudes", data=v.magnitudes)
-		finally:
-			v.close()
-
-	def compress(self, n_dims):
-		v = self.open()
-		try:
-			pca = sklearn.decomposition.PCA(n_components=n_dims)
-			pca.fit(v.unmodified)
+			v.save(path)
 		finally:
 			v.close()
 
