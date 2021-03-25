@@ -137,7 +137,8 @@ void Query::initialize(
 
 		switch (strategy.type) {
 			case STATIC: {
-				const auto matrix = strategy.matrix_factory->create(DocumentRef());
+				const auto matrix = strategy.matrix_factory->create(
+					STATIC, DocumentRef());
 				if (debug_hook().has_value()) {
 					matrix->call_hook(shared_from_this());
 				}
@@ -169,21 +170,19 @@ Query::Strategy Query::create_strategy(
 	if (p_token_metric.attr("is_modifier").cast<bool>()) {
 
 		std::vector<SimilarityMatrixFactoryRef> operands;
-		std::optional<EmbeddingType> type;
+		EmbeddingType type = STATIC;
 
 		for (const auto &operand : p_token_metric.attr("operands").cast<py::list>()) {
 			auto strategy = create_strategy(
 				p_matcher_factory, operand.cast<py::object>());
-			if (!type.has_value()) {
-				type = strategy.type;
-			} else if (*type != strategy.type) {
-				throw std::runtime_error("cannot mix embedding types in operands");
+			if (strategy.type == CONTEXTUAL) {
+				type = CONTEXTUAL;
 			}
 			operands.push_back(strategy.matrix_factory);
 		}
 
 		return Strategy{
-			*type,
+			type,
 			p_token_metric.attr("name").cast<py::str>(),
 			std::make_shared<ModifiedSimilarityMatrixFactory>(
 				p_token_metric, operands)

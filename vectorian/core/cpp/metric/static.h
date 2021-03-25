@@ -69,8 +69,9 @@ class StaticEmbeddingSimilarityMatrixFactory : public SimilarityMatrixFactory {
 	const WordMetricDef m_metric;
 	const MatcherFactoryRef m_matcher_factory;
 	const size_t m_embedding_index;
+	SimilarityMatrixRef m_static_matrix;
 
-	SimilarityMatrixRef build_similarity_matrix(
+	SimilarityMatrixRef build_static_similarity_matrix(
 		const std::vector<StaticEmbeddingRef> &p_embeddings);
 
 	void compute_magnitudes(
@@ -82,15 +83,10 @@ public:
 		const QueryRef &p_query,
 		const WordMetricDef &p_metric,
 		const MatcherFactoryRef &p_matcher_factory,
-		const size_t p_embedding_index) :
-
-		m_query(p_query),
-		m_metric(p_metric),
-		m_matcher_factory(p_matcher_factory),
-		m_embedding_index(p_embedding_index) {
-	}
+		const size_t p_embedding_index);
 
 	virtual SimilarityMatrixRef create(
+		const EmbeddingType p_embedding_type,
 		const DocumentRef &p_document);
 };
 

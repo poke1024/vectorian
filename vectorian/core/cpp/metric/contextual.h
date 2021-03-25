@@ -44,6 +44,7 @@ public:
 	}
 
 	virtual SimilarityMatrixRef create(
+		const EmbeddingType p_embedding_type,
 		const DocumentRef &p_document);
 };
 

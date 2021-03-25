@@ -5,7 +5,7 @@
 #include "metric/alignment.h"
 #include "metric/factory.h"
 
-SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_similarity_matrix(
+SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similarity_matrix(
 	const std::vector<StaticEmbeddingRef> &p_embeddings) {
 
 	const QueryVocabularyRef vocab = m_query->vocabulary();
@@ -60,6 +60,12 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_similarity_mat
 		}
 	}
 
+	if (m_matcher_factory->needs_magnitudes()) {
+		compute_magnitudes(
+			p_embeddings,
+			matrix);
+	}
+
 	return matrix;
 }
 
@@ -84,21 +90,43 @@ void StaticEmbeddingSimilarityMatrixFactory::compute_magnitudes(
 	PPK_ASSERT(offset == vocab->size());
 }
 
-SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
-	const DocumentRef&) {
+StaticEmbeddingSimilarityMatrixFactory::StaticEmbeddingSimilarityMatrixFactory(
+	const QueryRef &p_query,
+	const WordMetricDef &p_metric,
+	const MatcherFactoryRef &p_matcher_factory,
+	const size_t p_embedding_index) :
+
+	m_query(p_query),
+	m_metric(p_metric),
+	m_matcher_factory(p_matcher_factory),
+	m_embedding_index(p_embedding_index) {
 
 	const QueryVocabularyRef vocab = m_query->vocabulary();
 	const auto embeddings = vocab->get_compiled_embeddings(m_embedding_index);
 
-	const auto matrix = build_similarity_matrix(embeddings);
+	m_static_matrix = build_static_similarity_matrix(embeddings);
+}
 
-	if (m_matcher_factory->needs_magnitudes()) {
-		compute_magnitudes(
-			embeddings,
-			matrix);
+SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
+	const EmbeddingType p_embedding_type,
+	const DocumentRef &p_document) {
+
+	const QueryVocabularyRef vocab = m_query->vocabulary();
+	const auto embeddings = vocab->get_compiled_embeddings(m_embedding_index);
+
+	switch (p_embedding_type) {
+		case STATIC: {
+			return m_static_matrix;
+		} break;
+
+		case CONTEXTUAL: {
+			throw std::runtime_error("illegal embedding type");
+		} break;
+
+		default: {
+			throw std::runtime_error("illegal embedding type");
+		} break;
 	}
-
-	return matrix;
 }
 
 void StaticSimilarityMatrix::call_hook(

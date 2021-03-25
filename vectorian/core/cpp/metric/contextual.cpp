@@ -37,7 +37,12 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 }
 
 SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create(
+	const EmbeddingType p_embedding_type,
 	const DocumentRef &p_document) {
+
+	if (p_embedding_type != CONTEXTUAL) {
+		throw std::runtime_error("wrong embedding type for contextual embedding similarity matrix");
+	}
 
 	py::gil_scoped_acquire acquire;
 	return create_with_py_context(p_document);

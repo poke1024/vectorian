@@ -101,9 +101,7 @@ public:
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
-		const SimilarityMatrixRef matrix = metric->matrix_factory()->create(p_document);
-
-		// FIXME might check for correct dimensions of matrix here.
+		const SimilarityMatrixRef matrix = metric->matrix_factory()->create(CONTEXTUAL, p_document);
 
 		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix] (
 			const size_t slice_id,

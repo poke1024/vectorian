@@ -47,7 +47,9 @@ public:
 	virtual ~SimilarityMatrixFactory() {
 	}
 
-	virtual SimilarityMatrixRef create(const DocumentRef &p_document) = 0;
+	virtual SimilarityMatrixRef create(
+		const EmbeddingType p_embedding_type,
+		const DocumentRef &p_document) = 0;
 };
 
 typedef std::shared_ptr<SimilarityMatrixFactory> SimilarityMatrixFactoryRef;

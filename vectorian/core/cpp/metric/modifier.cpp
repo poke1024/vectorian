@@ -4,6 +4,7 @@
 #include "metric/modifier.h"
 
 SimilarityMatrixRef ModifiedSimilarityMatrixFactory::create(
+	const EmbeddingType p_embedding_type,
 	const DocumentRef &p_document) {
 
 	py::list args;
@@ -11,7 +12,8 @@ SimilarityMatrixRef ModifiedSimilarityMatrixFactory::create(
 
 	std::vector<SimilarityMatrixRef> operands;
 	for (const auto &factory : m_operands) {
-		operands.push_back(factory->create(p_document));
+		operands.push_back(factory->create(
+			p_embedding_type, p_document));
 	}
 
 	PPK_ASSERT(m_operands.size() > 0);
