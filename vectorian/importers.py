@@ -76,17 +76,17 @@ class Importer:
 
 		emb_by_name = dict((e.name, e) for e in self._embeddings)
 
-		def compressed(k, v):
+		def transformed(k, v):
 			v = Vectors(np.vstack(v))
 
 			embedding = emb_by_name[k]
-			if embedding.compression:
-				v = embedding.compression.apply(v)
+			if embedding.transform:
+				v = embedding.transform.apply(v)
 
 			return ProxyVectorsRef(v)
 
 		contextual_embeddings = dict(
-			(k, compressed(k, v)) for k, v in contextual_vectors.items())
+			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
 		return Document(json, contextual_embeddings)
 

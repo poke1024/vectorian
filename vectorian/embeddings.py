@@ -114,11 +114,15 @@ class StaticEmbedding(Embedding):
 
 
 class AbstractVectors:
+	def _save_transform(self, hf):
+		pass
+
 	def save(self, path):
 		with h5py.File(path.with_suffix(".h5"), "w") as hf:
 			hf.create_dataset("unmodified", data=self.unmodified)
 			hf.create_dataset("normalized", data=self.normalized)
 			hf.create_dataset("magnitudes", data=self.magnitudes)
+			self._save_transform(hf)
 
 	def close(self):
 		raise NotImplementedError()
@@ -168,10 +172,23 @@ class Vectors(AbstractVectors):
 		return data
 
 
-class CompressedVectors(AbstractVectors):
-	def __init__(self, vectors, pca):
+class TransformedVectors(AbstractVectors):
+	# https://scikit-learn.org/stable/modules/model_persistence.html
+	# http://onnx.ai/sklearn-onnx/index.html
+	# https://github.com/onnx/sklearn-onnx/blob/master/tests/test_sklearn_pca_converter.py
+	# http://onnx.ai/sklearn-onnx/auto_examples/plot_benchmark_pipeline.html
+
+	def __init__(self, vectors, onx_spec):
 		self._vectors = vectors
-		self._pca = pca
+
+		import onnxruntime as rt
+		self._sess = rt.InferenceSession(onx_spec)
+		self._onx_spec = onx_spec
+
+	def _save_transform(self, hf):
+		hf.create_dataset(
+			'transform',
+			data=np.frombuffer(self._onx_spec, np.uint8))
 
 	def close(self):
 		self._vectors.close()
@@ -193,7 +210,9 @@ class CompressedVectors(AbstractVectors):
 		return self._vectors.magnitudes
 
 	def transform(self, vectors):
-		return Vectors(self._pca.transform(vectors.unmodified))
+		tfm = self._sess.run(
+			None, {'input': vectors.unmodified.astype(np.float32)})[0]
+		return Vectors(tfm)
 
 
 class MaskedVectors(AbstractVectors):
@@ -234,8 +253,8 @@ class StackedVectors(AbstractVectors):
 		self._indices = indices
 
 		if not all(isinstance(s, Vectors) for s in sources):
-			# does not support CompressedVectors and others
-			# that provide a custom transform() operation
+			# does not support TransformedVectors that
+			# provide a custom transform() operation
 			raise RuntimeError("unsupported stacked source")
 
 	def close(self):
@@ -546,7 +565,7 @@ class StackedEmbedding:
 		return self._name
 
 
-class Compression:
+class Transform:
 	def apply(self, vectors):
 		raise NotImplementedError
 
@@ -555,15 +574,24 @@ class Compression:
 		raise NotImplementedError
 
 
-class PCACompression(Compression):
+class PCACompression(Transform):
 	def __init__(self, n_dims):
 		self._n_dims = n_dims
 
 	def apply(self, vectors):
 		pca = sklearn.decomposition.PCA(n_components=self._n_dims)
 		pca.fit(vectors.unmodified)
-		return CompressedVectors(
-			Vectors(pca.transform(vectors.unmodified)), pca)
+
+		from skl2onnx import convert_sklearn
+		from skl2onnx.common.data_types import FloatTensorType
+
+		onx = convert_sklearn(
+			pca, initial_types=[
+				("input", FloatTensorType([None, vectors.shape[1]]))])
+
+		return TransformedVectors(
+			Vectors(pca.transform(vectors.unmodified)),
+			onx.SerializeToString())
 
 	@property
 	def name(self):
@@ -571,12 +599,12 @@ class PCACompression(Compression):
 
 
 class ContextualEmbedding(Embedding):
-	def __init__(self, compression=None):
-		self._compression = compression
+	def __init__(self, transform=None):
+		self._transform = transform
 
 	@property
-	def compression(self):
-		return self._compression
+	def transform(self):
+		return self._transform
 
 	@property
 	def is_contextual(self):
@@ -598,8 +626,8 @@ class ContextualEmbedding(Embedding):
 
 
 class SpacyTransformerEmbedding(ContextualEmbedding):
-	def __init__(self, nlp, compression=None):
-		super().__init__(compression)
+	def __init__(self, nlp, transform=None):
+		super().__init__(transform)
 		self._nlp = nlp
 
 	def compressed(self, n_dims):
@@ -635,13 +663,24 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 	def name(self):
 		return '/'.join([
 			'spacy', self._nlp.meta['name'], self._nlp.meta['version']
-		] + ([] if self._compression is None else [self._compression.name]))
+		] + ([] if self._transform is None else [self._transform.name]))
 
 
 class OnDiskVectors:
-	def __init__(self, path):
-		self._path = path
-		self._hf = h5py.File(self._path.with_suffix(".h5"), "r")
+	@staticmethod
+	def load(path):
+		hf = h5py.File(path.with_suffix(".h5"), "r")
+		v = OnDiskVectors(hf)
+
+		transform = hf.get("transform")
+		if transform:
+			return TransformedVectors(
+				v, np.array(transform).tobytes())
+		else:
+			return v
+
+	def __init__(self, hf):
+		self._hf = hf
 
 	def close(self):
 		self._hf.close()
@@ -665,6 +704,9 @@ class OnDiskVectors:
 	@cached_property
 	def magnitudes(self):
 		return np.array(self._hf["magnitudes"])
+
+	def transform(self, vectors):
+		raise vectors
 
 
 class VectorsCache:
@@ -717,7 +759,7 @@ class OnDiskVectorsRef(VectorsRef):
 		self._path = path
 
 	def open(self):
-		return OnDiskVectors(self._path)
+		return OnDiskVectors.load(self._path)
 
 
 class MaskedVectorsRef(VectorsRef):
