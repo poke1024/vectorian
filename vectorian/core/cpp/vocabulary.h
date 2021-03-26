@@ -431,12 +431,28 @@ public:
 
 private:
 	const VocabularyRef m_vocab;
+
 	xt::pytensor<freq_t, 1> m_tf;
 	xt::pytensor<freq_t, 1> m_df;
 	xt::pytensor<float, 1> m_tf_idf;
+	bool m_tf_idf_valid;
+	size_t m_n_docs;
+
+	void compute_tf_idf() {
+		if (m_tf_idf_valid) {
+			return;
+		}
+		xt::pytensor<float, 1> idf;
+		idf.resize({static_cast<ssize_t>(m_tf.shape(0))});
+		idf = xt::log(m_n_docs / xt::cast<float>(1 + m_df));
+		m_tf_idf = m_tf * idf;
+		m_tf_idf_valid = true;
+	}
 
 public:
-	inline Frequencies(const VocabularyRef &p_vocab) : m_vocab(p_vocab) {
+	inline Frequencies(const VocabularyRef &p_vocab) :
+		m_vocab(p_vocab), m_n_docs(0) {
+
 		const ssize_t size = static_cast<ssize_t>(p_vocab->size());
 
 		m_tf.resize({size});
@@ -445,27 +461,24 @@ public:
 		m_df.resize({size});
 		m_df.fill(0);
 
-		//m_tf_idf.resize({size});
+		m_tf_idf_valid = false;
 	}
 
 	void add(const DocumentRef &p_doc);
 
 	freq_t tf(const std::string &p_term) const {
 		const token_t i = m_vocab->token_to_id(p_term);
-		if (i >= 0) {
-			return m_tf(i);
-		} else {
-			return 0;
-		}
+		return i >= 0 ? m_tf(i) : 0;
 	}
 
 	freq_t df(const std::string &p_term) const {
 		const token_t i = m_vocab->token_to_id(p_term);
-		if (i >= 0) {
-			return m_df(i);
-		} else {
-			return 0;
-		}
+		return i >= 0 ? m_df(i) : 0;
+	}
+
+	freq_t tf_idf(const std::string &p_term) {
+		const token_t i = m_vocab->token_to_id(p_term);
+		return i >= 0 ? tf_idf_tensor()(i) : 0;
 	}
 
 	const xt::pytensor<freq_t, 1> &tf_tensor() const {
@@ -474,6 +487,11 @@ public:
 
 	const xt::pytensor<freq_t, 1> &df_tensor() const {
 		return m_df;
+	}
+
+	const xt::pytensor<float, 1> &tf_idf_tensor() {
+		compute_tf_idf();
+		return m_tf_idf;
 	}
 };
 

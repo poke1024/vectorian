@@ -85,4 +85,6 @@ void Frequencies::add(const DocumentRef &p_doc) {
 			m_df(id) += 1;
 		}
 	}
+
+	m_n_docs += 1;
 }
