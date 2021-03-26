@@ -264,12 +264,12 @@ class Document:
 	def title(self):
 		return self.metadata['title']
 
-	def prepare(self, session):
+	def prepare(self, session, doc_index):
 		names = [e.name for e in session.embeddings if e.is_contextual]
 		contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 		return PreparedDocument(
-			session, self._storage, contextual_embeddings)
+			session, doc_index, self._storage, contextual_embeddings)
 
 
 class Token:
@@ -333,7 +333,7 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, session, storage, contextual_embeddings):
+	def __init__(self, session, doc_index, storage, contextual_embeddings):
 		self._session = session
 
 		token_mapper = session.normalizer('token').token_to_token
@@ -401,13 +401,22 @@ class PreparedDocument:
 		self._spans = {
 			'sentence': sentence_table.to_arrow()
 		}
-		self._token_table = token_table.to_arrow()
-		self._token_str = token_table.normalized_tokens
 
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())
 
 		self._metadata = storage.metadata
+
+		self._token_table = token_table.to_arrow()
+
+		self._compiled = core.Document(
+			doc_index,
+			session.vocab,
+			self._spans,
+			self._token_table,
+			token_table.normalized_tokens,
+			self._metadata,
+			self._contextual_embeddings)
 
 	def _save_tokens(self, path):
 		with open(path, "w") as f:
@@ -490,12 +499,6 @@ class PreparedDocument:
 			info[k] = col[i].as_py()
 		return info
 
-	def to_core(self, index, vocab):
-		return core.Document(
-			index,
-			vocab,
-			self._spans,
-			self._token_table,
-			self._token_str,
-			self._metadata,
-			self._contextual_embeddings)
+	@property
+	def compiled(self):
+		return self._compiled

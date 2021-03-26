@@ -8,7 +8,7 @@ from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSentenceSimilarity, SentenceSimilarity
-from vectorian.embeddings import StaticEmbedding, VectorsCache
+from vectorian.embeddings import VectorsCache
 
 
 class Result:
@@ -45,28 +45,12 @@ class Result:
 		return self._duration
 
 
-class CompiledDoc:
-	def __init__(self, p_doc, args):
-		self._p_doc = p_doc
-		self._args = args
-
-	@property
-	def p_doc(self):
-		return self._p_doc
-
-	@cached_property
-	def c_doc(self):
-		return self._p_doc.to_core(*self._args)
-
-
 class Collection:
 	def __init__(self, session, vocab, corpus):
 		self._vocab = vocab
 		self._docs = []
-		for doc in corpus:
-			p_doc = doc.prepare(session)
-			self._docs.append(CompiledDoc(
-				p_doc, (len(self._docs), self._vocab)))
+		for i, doc in enumerate(corpus):
+			self._docs.append(doc.prepare(session, i))
 
 	@property
 	def documents(self):
@@ -74,7 +58,7 @@ class Collection:
 
 	@lru_cache(16)
 	def max_len(self, level, window_size):
-		return max([doc.c_doc.max_len(level, window_size) for doc in self._docs])
+		return max([doc.compiled.max_len(level, window_size) for doc in self._docs])
 
 
 class Partition:
@@ -157,10 +141,6 @@ class Session:
 		self._collection = Collection(
 			self, self._vocab, docs)
 
-		# make sure all core.Documents are instantiated at this point so that
-		# the interval vocabulary is setup and complete.
-		self.c_documents
-
 		self._vocab.compile_embeddings()  # i.e. static embeddings
 		self._embedding_manager.compile_contextual()
 
@@ -173,8 +153,8 @@ class Session:
 	@cached_property
 	def freq(self):
 		freq = core.Frequencies(self._vocab)
-		for c_doc in self.c_documents:
-			freq.add(c_doc)
+		for doc in self._collection.documents:
+			freq.add(doc.compiled)
 		return freq
 
 	def default_metric(self):
@@ -185,11 +165,11 @@ class Session:
 
 	@cached_property
 	def documents(self):
-		return [x.p_doc for x in self._collection.documents]
+		return self._collection.documents
 
 	@cached_property
 	def c_documents(self):
-		return [x.c_doc for x in self._collection.documents]
+		return [x.compiled for x in self.documents]
 
 	@property
 	def embeddings(self):
