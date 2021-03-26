@@ -72,7 +72,7 @@ class Importer:
 			'loc_keys': loc_keys
 		}
 
-		from vectorian.corpus import Document
+		from vectorian.corpus.document import Document, InMemoryDocumentStorage
 
 		emb_by_name = dict((e.name, e) for e in self._embeddings)
 
@@ -88,7 +88,7 @@ class Importer:
 		contextual_embeddings = dict(
 			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
-		return Document(json, contextual_embeddings)
+		return Document(InMemoryDocumentStorage(json), contextual_embeddings)
 
 
 class TextImporter(Importer):

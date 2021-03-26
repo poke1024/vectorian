@@ -166,6 +166,17 @@ class Session:
 
 		self._vectors_cache = VectorsCache()
 
+	@property
+	def vocab(self):
+		return self._vocab
+
+	@cached_property
+	def freq(self):
+		freq = core.Frequencies(self._vocab)
+		for c_doc in self.c_documents:
+			freq.add(c_doc)
+		return freq
+
 	def default_metric(self):
 		embedding = self._embeddings[0]
 		return AlignmentSentenceSimilarity(
@@ -186,10 +197,6 @@ class Session:
 
 	def get_embedding_instance(self, embedding):
 		return self._embedding_instances[embedding.name]
-
-	@property
-	def vocab(self):
-		return self._vocab
 
 	@property
 	def vectors_cache(self):

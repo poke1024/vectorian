@@ -1,6 +1,6 @@
 # This is a sample Python script.
 
-import vectorian.utils as utils
+import vectorian.normalize as normalize
 
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, MixedTokenSimilarity, AlignmentSentenceSimilarity
 from vectorian.alignment import WordMoversDistance, WordRotatorsDistance
@@ -38,19 +38,10 @@ if __name__ == '__main__':
     corpus.add(doc)
     corpus.save("/Users/arbeit/Desktop/my-corpus")
 
-    token_mappings = {
-        "tokenizer": [],
-        "tagger": []
-    }
-
-    #token_mappings["tokenizer"].append(utils.lowercase())
-    token_mappings["tokenizer"].append(utils.erase("W"))
-    token_mappings["tokenizer"].append(utils.alpha())
-
     session = Session(
         corpus,
         [fasttext, glove],
-        token_mappings)
+        "default")
 
     #doc.save("/Users/arbeit/temp.json")
     #cdoc = doc.to_core(0, vocab)

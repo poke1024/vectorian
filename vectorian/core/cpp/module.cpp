@@ -92,6 +92,14 @@ PYBIND11_MODULE(core, m) {
 	vocabulary.def("id_to_token", &Vocabulary::id_to_token);
 	vocabulary.def("compile_embeddings", &Vocabulary::compile_embeddings);
 
+	py::class_<Frequencies, FrequenciesRef> frequencies(m, "Frequencies");
+	frequencies.def(py::init<const VocabularyRef&>());
+	frequencies.def("add", &Frequencies::add);
+	frequencies.def("tf", &Frequencies::tf);
+	frequencies.def("df", &Frequencies::df);
+	frequencies.def("tf_tensor", &Frequencies::tf_tensor);
+	frequencies.def("df_tensor", &Frequencies::df_tensor);
+
 	py::class_<Query, QueryRef> query(m, "Query");
 	query.def(py::init<const py::object&, VocabularyRef, const py::dict&>());
 	query.def("initialize", &Query::initialize);

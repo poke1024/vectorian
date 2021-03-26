@@ -345,8 +345,6 @@ protected:
 public:
 	// basically a mapping from token -> int
 
-	std::recursive_mutex m_mutex;
-
 	Vocabulary(const EmbeddingManagerRef &p_embedding_manager) :
 		m_embedding_manager(p_embedding_manager),
 		m_tokens(std::make_shared<Lexicon<token_t>>()),
@@ -425,6 +423,61 @@ public:
 };
 
 typedef std::shared_ptr<Vocabulary> VocabularyRef;
+
+
+class Frequencies {
+public:
+	typedef int32_t freq_t;
+
+private:
+	const VocabularyRef m_vocab;
+	xt::pytensor<freq_t, 1> m_tf;
+	xt::pytensor<freq_t, 1> m_df;
+	xt::pytensor<float, 1> m_tf_idf;
+
+public:
+	inline Frequencies(const VocabularyRef &p_vocab) : m_vocab(p_vocab) {
+		const ssize_t size = static_cast<ssize_t>(p_vocab->size());
+
+		m_tf.resize({size});
+		m_tf.fill(0);
+
+		m_df.resize({size});
+		m_df.fill(0);
+
+		//m_tf_idf.resize({size});
+	}
+
+	void add(const DocumentRef &p_doc);
+
+	freq_t tf(const std::string &p_term) const {
+		const token_t i = m_vocab->token_to_id(p_term);
+		if (i >= 0) {
+			return m_tf(i);
+		} else {
+			return 0;
+		}
+	}
+
+	freq_t df(const std::string &p_term) const {
+		const token_t i = m_vocab->token_to_id(p_term);
+		if (i >= 0) {
+			return m_df(i);
+		} else {
+			return 0;
+		}
+	}
+
+	const xt::pytensor<freq_t, 1> &tf_tensor() const {
+		return m_tf;
+	}
+
+	const xt::pytensor<freq_t, 1> &df_tensor() const {
+		return m_df;
+	}
+};
+
+typedef std::shared_ptr<Frequencies> FrequenciesRef;
 
 
 class QueryVocabulary {

@@ -61,6 +61,15 @@ public:
 typedef std::shared_ptr<SimilarityMatrixFactory> SimilarityMatrixFactoryRef;
 
 
+class ComputationContext { // passed to python
+	const QueryRef m_query;
+	const DocumentRef m_doc;
+
+
+};
+
+typedef std::shared_ptr<ComputationContext> ComputationContextRef;
+
 class Metric : public std::enable_shared_from_this<Metric> {
 protected:
 	const std::string m_name;

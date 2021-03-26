@@ -4,6 +4,7 @@
 #include "metric/static.h"
 #include "metric/modifier.h"
 #include "query.h"
+#include "document.h"
 
 template<typename VocabularyRef>
 TokenVectorRef _unpack_tokens(
@@ -121,4 +122,21 @@ std::vector<StaticEmbeddingRef> QueryVocabulary::get_compiled_embeddings(const s
 	});
 
 	return static_embeddings;
+}
+
+void Frequencies::add(const DocumentRef &p_doc) {
+	const auto &tokens = *p_doc->tokens();
+	const auto n_tokens = p_doc->n_tokens();
+
+	std::unordered_set<token_t> seen;
+	seen.reserve(n_tokens);
+
+	for (size_t i = 0; i < n_tokens; i++) {
+		const auto id = tokens[i].id;
+		m_tf(id) += 1;
+		if (seen.find(id) == seen.end()) {
+			seen.insert(id);
+			m_df(id) += 1;
+		}
+	}
 }
