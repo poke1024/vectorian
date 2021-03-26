@@ -4,7 +4,6 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "embedding/vectors.h"
-#include "utils.h"
 #include <xtensor/xadapt.hpp>
 
 class Needle {

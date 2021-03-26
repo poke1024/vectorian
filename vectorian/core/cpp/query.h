@@ -2,7 +2,6 @@
 #define __VECTORIAN_QUERY_H__
 
 #include "common.h"
-#include "utils.h"
 #include "vocabulary.h"
 #include "embedding/vectors.h"
 

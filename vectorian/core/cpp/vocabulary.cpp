@@ -1,5 +1,4 @@
 #include "vocabulary.h"
-#include "utils.h"
 #include "embedding/static.h"
 #include "metric/static.h"
 #include "metric/modifier.h"

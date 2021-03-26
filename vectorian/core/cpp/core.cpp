@@ -1,6 +1,5 @@
 /*cppimport
 <%
-import pyarrow
 import numpy
 import os
 import platform
@@ -18,24 +17,15 @@ def compare_versions(v1, v2, cmp):
     return cmp(normalize_version(v1), normalize_version(v2))
 
 cfg['include_dirs'] = [
-	os.path.join(pyarrow.get_library_dirs()[0], 'include'),
 	numpy.get_include()]
-
-if platform.system() == 'Linux':
-	cfg['libraries'] = ['arrow', 'arrow_python']
-	cfg['linker_args'] = ['-L' + pyarrow.get_library_dirs()[0]]
 
 cfg['include_dirs'].append('../../../lib')
 cfg['include_dirs'].append('../../../lib/pyemd/pyemd/lib')
 cfg['include_dirs'].append('../../../lib/ppk_assert/src')
-x
-old_pyarrow = 1 if compare_versions(
-	pyarrow.__version__, '0.12.1', operator.le) else 0
 
 cfg['compiler_args'] = [
 	'-Wall',
-	'-std=c++17',
-	'-DPYARROW_0_12_1=%d' % old_pyarrow]
+	'-std=c++17']
 cfg['extra_link_args'] = []
 
 if platform.system() == 'Linux':
@@ -88,7 +78,6 @@ cfg['dependencies'] = [
 	'document.h',
 	'query.h',
 	'result_set.h',
-	'utils.h',
 	'vocabulary.h'
 ]
 

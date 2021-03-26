@@ -13,10 +13,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
-#include <arrow/api.h>
-#include <arrow/io/api.h>
-#include <arrow/python/pyarrow.h>
-
 #include <vector>
 #include <set>
 

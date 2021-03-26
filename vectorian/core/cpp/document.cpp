@@ -1,18 +1,18 @@
 #include "document.h"
-#include "utils.h"
 #include "query.h"
 
-std::vector<int32_t> unpack_spans(const std::shared_ptr<arrow::Table> &p_table) {
-	const auto n_tokens_values = numeric_column<arrow::UInt16Type, uint16_t>(p_table, "n_tokens");
+std::vector<int32_t> unpack_spans(const py::dict &p_table) {
+	const auto n_tokens_array = p_table["n_tokens"].cast<py::array_t<uint16_t>>();
+	const auto n_tokens_read = n_tokens_array.unchecked<1>();
 
-	const size_t n = n_tokens_values.size();
+	const size_t n = n_tokens_array.shape(0);
 	std::vector<int32_t> offsets;
 	offsets.reserve(n + 1);
 
 	size_t token_at = 0;
 	offsets.push_back(token_at);
 	for (size_t i = 0; i < n; i++) {
-		token_at += n_tokens_values[i];
+		token_at += n_tokens_read(i);
 		offsets.push_back(token_at);
 	}
 
@@ -36,9 +36,8 @@ Document::Document(
 	}
 
 	for (auto item : p_spans) {
-		const auto table = unwrap_table(item.second.cast<py::object>());
 		m_spans[item.first.cast<py::str>()] = std::make_shared<Spans>(
-			VariableSpans(unpack_spans(table)));
+			VariableSpans(unpack_spans(item.second.cast<py::dict>())));
 	}
 
 	m_tokens = unpack_tokens(p_vocab, p_tokens);

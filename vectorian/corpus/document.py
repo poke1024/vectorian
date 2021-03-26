@@ -1,6 +1,4 @@
 import json
-import pyarrow as pa
-import pandas as pd
 import vectorian.core as core
 import collections
 import html
@@ -16,13 +14,14 @@ from vectorian.embeddings import MaskedVectorsRef, OnDiskVectorsRef
 
 class SpansTable:
 	_types = {
-		'token_at': 'uint32',
-		'n_tokens': 'uint16'
+		'token_at': np.uint32,
+		'n_tokens': np.uint16
 	}
 
 	def __init__(self, loc_keys):
 		self._loc = collections.defaultdict(list)
 		self._loc_keys = loc_keys
+		self._max_n_tokens = np.iinfo(SpansTable._types['n_tokens']).max
 
 	def extend(self, location, n_tokens):
 		if n_tokens < 1:
@@ -38,25 +37,29 @@ class SpansTable:
 		else:
 			token_at = 0
 
+		if n_tokens > self._max_n_tokens:
+			raise RuntimeError(f'n_tokens = {n_tokens} > {self._max_n_tokens}')
+
 		loc['n_tokens'].append(n_tokens)
 		loc['token_at'].append(token_at)
 
-	def to_pandas(self):
+	def to_dict(self):
 		data = dict()
 		for k, v in self._loc.items():
 			dtype = SpansTable._types.get(k)
 			if dtype is None:
-				series = pd.Series(v)
+				series = np.array(v)
 			else:
-				series = pd.Series(v, dtype=dtype)
+				series = np.array(v, dtype=dtype)
 			data[k] = series
-		return pd.DataFrame(data)
-
-	def to_arrow(self):
-		return pa.Table.from_pandas(self.to_pandas())
+		return data
 
 
-def convert_idx_to_utf8(idx):
+class Text:
+	pass
+
+
+def convert_idx_len_to_utf8(text, idx, len):
 	pass  # FIXME
 
 
@@ -115,12 +118,12 @@ class TokenTable:
 
 def xspan(idxs, lens, i0, window_size, window_step):
 	i = i0 * window_step
-	start = idxs[i].as_py()
+	start = idxs[i]
 	j = i + window_size
 	if j <= len(idxs) - 1:
-		end = idxs[j].as_py()
+		end = idxs[j]
 	else:
-		end = idxs[-1].as_py() + lens[-1].as_py()
+		end = idxs[-1] + lens[-1]
 	return start, end
 
 
@@ -389,7 +392,7 @@ class PreparedDocument:
 
 		self._text = "".join(texts)
 		self._spans = {
-			'sentence': sentence_table.to_arrow()
+			'sentence': sentence_table.to_dict()
 		}
 
 		self._contextual_embeddings = dict(
@@ -438,7 +441,7 @@ class PreparedDocument:
 		return self.compiled.n_tokens
 
 	def n_spans(self, partition):
-		n = self._spans[partition.level].num_rows
+		n = self._spans[partition.level]['token_at'].shape[0]
 		k = n // partition.window_step
 		if (k * partition.window_step) < n:
 			k += 1
@@ -457,8 +460,8 @@ class PreparedDocument:
 
 			return get
 		else:
-			col_token_at = self._spans[name].column('token_at')
-			col_n_tokens = self._spans[name].column('n_tokens')
+			col_token_at = self._spans[name]['token_at']
+			col_n_tokens = self._spans[name]['n_tokens']
 
 			def get(i):
 				start, end = xspan(
@@ -483,9 +486,8 @@ class PreparedDocument:
 			return info  # FIXME
 		table = self._spans[partition.level]
 		i = index * partition.window_step
-		for k in table.column_names:
-			col = table.column(k)
-			info[k] = col[i].as_py()
+		for k, v in table.items():
+			info[k] = v[i]
 		return info
 
 	@property

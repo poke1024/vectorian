@@ -1,4 +1,3 @@
-#include "utils.h"
 #include "document.h"
 #include "match/match.h"
 #include "match/match_impl.h"

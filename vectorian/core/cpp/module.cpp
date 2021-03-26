@@ -15,12 +15,6 @@
 
 namespace py = pybind11;
 
-void init_pyarrow() {
-	if (arrow::py::import_pyarrow() != 0) {
-		std::cerr << "error initializing pyarrow.\n";
-	}
-}
-
 py::str backend_build_time() {
 	return __TIMESTAMP__;
 }
@@ -31,7 +25,6 @@ py::str backend_build_time() {
 PYBIND11_MODULE(core, m) {
 	xt::import_numpy();
 
-	m.def("init_pyarrow", &init_pyarrow);
 	m.def("backend_build_time", &backend_build_time);
 
 	py::class_<Region, RegionRef> region(m, "Region");
