@@ -123,11 +123,11 @@ public:
 		return m_edges.at(p_index).slice().to_py();
 	}
 
-	const std::string &pos_s() const {
+	const std::string_view &pos_s() const {
 		return m_vocab->pos_str(m_s_token->pos);
 	}
 
-	const std::string &pos_t(const size_t p_index) const {
+	const std::string_view &pos_t(const size_t p_index) const {
 		return m_vocab->pos_str(m_edges.at(p_index).token()->pos);
 	}
 

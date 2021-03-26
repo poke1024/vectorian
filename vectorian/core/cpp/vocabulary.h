@@ -4,52 +4,17 @@
 #include "common.h"
 #include "embedding/embedding.h"
 #include "metric/metric.h"
+#include <list>
 #include <iostream>
-
-/*template<typename T>
-class StringLexicon {
-	std::unordered_map<std::string, T> m_to_int;
-	std::vector<std::string> m_to_str;
-
-public:
-	inline T add(const std::string &p_s) {
-		const auto r = m_to_int.insert({p_s, m_to_str.size()});
-		if (r.second) {
-			m_to_str.push_back(p_s);
-		}
-		return r.first->second;
-	}
-
-	inline T to_id(const std::string &p_s) const {
-		const auto i = m_to_int.find(p_s);
-		if (i != m_to_int.end()) {
-			return i->second;
-		} else {
-			return -1;
-		}
-	}
-
-	inline const std::string &to_str(T p_id) const {
-		return m_to_str.at(p_id);
-	}
-
-	inline void reserve(const size_t p_size) {
-		m_to_str.reserve(p_size);
-	}
-
-	inline size_t size() const {
-		return m_to_int.size();
-	}
-};*/
 
 template<typename T>
 class LexiconBase {
 public:
-	inline constexpr T to_id(const std::string &p_s) const {
+	inline constexpr T to_id(const std::string_view &p_s) const {
 		return -1;
 	}
 
-	inline const std::string &to_str(T p_id) const {
+	inline const std::string_view &to_str(T p_id) const {
 		std::ostringstream err;
 		err << "illegal call to LexiconBase::to_str() with id " << p_id;
 		throw std::runtime_error(err.str());
@@ -63,37 +28,83 @@ public:
 template<typename T>
 using LexiconBaseRef = std::shared_ptr<LexiconBase<T>>;
 
+class StringStorage {
+	const size_t m_chunk_size;
+
+	std::vector<std::vector<char>> m_small;
+	size_t m_offset;
+
+	std::list<std::string> m_large;
+
+	void add_chunk() {
+		m_small.emplace_back(std::vector<char>(m_chunk_size));
+		m_offset = 0;
+	}
+
+public:
+	StringStorage() : m_chunk_size(1LL << 16), m_offset(0) {
+		add_chunk();
+	}
+
+	std::string_view add(const std::string_view &p_str) {
+		const auto n = p_str.size();
+		if (n > m_chunk_size / 10) {
+			m_large.emplace_back(p_str);
+			return std::string_view{m_large.back()};
+		}
+
+		if (m_offset + n > m_small.back().size()) {
+			add_chunk();
+		}
+
+		char * const data = m_small.back().data() + m_offset;
+		std::memcpy(data, p_str.data(), n);
+		m_offset += n;
+
+		return std::string_view{data, n};
+	}
+};
+
 template<typename T, typename BaseRef>
 class LexiconImpl {
 	const BaseRef m_base;
 	const std::string m_unknown;
-	std::unordered_map<std::string, T> m_to_int;
-	std::vector<std::string> m_to_str;
+	const std::string_view m_unknown_ref;
+
+	StringStorage m_storage;
+	std::unordered_map<std::string_view, T> m_to_int;
+	std::vector<std::string_view> m_to_str;
 
 public:
-	LexiconImpl(const BaseRef p_base) : m_base(p_base), m_unknown("<unk>") {
+	LexiconImpl(const BaseRef p_base) : m_base(p_base), m_unknown("<unk>"), m_unknown_ref{m_unknown} {
 		//std::cout << "creating lexicon " << this << " base is at " << &m_base << "\n";
 		//std::cout << "base has " << m_base->size() << " items\n";
 	}
 
 	virtual ~LexiconImpl() {
+		m_to_int.clear();
+		m_to_str.clear();
 		//std::cout << "destroying lexicon " << this << "\n";
 	}
 
-	inline T add(const std::string &p_s) {
+	inline T add(const std::string_view &p_s) {
 		const T i = m_base->to_id(p_s);
 		if (i >= 0) {
 			return i;
 		}
-		const auto r = m_to_int.insert({
-			p_s, m_to_str.size() + m_base->size()});
-		if (r.second) {
-			m_to_str.push_back(p_s);
+		const auto found = m_to_int.find(p_s);
+		if (found != m_to_int.end()) {
+			return found->second;
+		} else {
+			const auto stored_s = m_storage.add(p_s);
+			const auto r = m_to_int.insert({
+				stored_s, m_to_str.size() + m_base->size()});
+			m_to_str.push_back(stored_s);
+			return r.first->second;
 		}
-		return r.first->second;
 	}
 
-	inline T to_id(const std::string &p_s) const {
+	inline T to_id(const std::string_view &p_s) const {
 		const auto i = m_to_int.find(p_s);
 		if (i != m_to_int.end()) {
 			return i->second;
@@ -102,9 +113,9 @@ public:
 		}
 	}
 
-	inline const std::string &to_str(T p_id) const {
+	inline const std::string_view &to_str(T p_id) const {
 		if (p_id < 0) {
-			return m_unknown;
+			return m_unknown_ref;
 		} if (static_cast<size_t>(p_id) < m_base->size()) {
 			return m_base->to_str(p_id);
 		} else {
@@ -126,7 +137,7 @@ public:
 		return m_base->size();
 	}
 
-	inline const std::vector<std::string>& inc_strings() const {
+	inline const std::vector<std::string_view>& inc_strings() const {
 		return m_to_str;
 	}
 };
@@ -365,7 +376,7 @@ public:
 	void compile_embeddings() {
 		py::list tokens;
 		for (const auto &s : m_tokens->inc_strings()) {
-			tokens.append(py::str(s));
+			tokens.append(s);
 		}
 		if (tokens.size() == 0) {
 			throw std::runtime_error("no tokens in vocabulary");
@@ -374,27 +385,27 @@ public:
 		m_embedding_manager->compile_static(tokens);
 	}
 
-	inline int add_pos(const std::string &p_name) {
+	inline int add_pos(const std::string_view &p_name) {
 		return m_pos->add(p_name);
 	}
 
-	inline int unsafe_pos_id(const std::string &p_name) const {
+	inline int unsafe_pos_id(const std::string_view &p_name) const {
 		return m_pos->to_id(p_name);
 	}
 
-	inline int add_tag(const std::string &p_name) {
+	inline int add_tag(const std::string_view &p_name) {
 		return m_tag->add(p_name);
 	}
 
-	inline int unsafe_tag_id(const std::string &p_name) const {
+	inline int unsafe_tag_id(const std::string_view &p_name) const {
 		return m_tag->to_id(p_name);
 	}
 
-	inline token_t token_to_id(const std::string &p_token) const {
+	inline token_t token_to_id(const std::string_view &p_token) const {
 		return m_tokens->to_id(p_token);
 	}
 
-	inline token_t add(const std::string &p_token) {
+	inline token_t add(const std::string_view &p_token) {
 		return m_tokens->add(p_token);
 	}
 
@@ -405,15 +416,15 @@ public:
 		return e.map;
 	}*/
 
-	inline const std::string &id_to_token(token_t p_token) const {
+	inline const std::string_view &id_to_token(token_t p_token) const {
 		return m_tokens->to_str(p_token);
 	}
 
-	inline const std::string &pos_str(int8_t p_pos_id) {
+	inline const std::string_view &pos_str(int8_t p_pos_id) {
 		return m_pos->to_str(p_pos_id);
 	}
 
-	inline const std::string &tag_str(int8_t p_tag_id) {
+	inline const std::string_view &tag_str(int8_t p_tag_id) {
 		return m_tag->to_str(p_tag_id);
 	}
 
@@ -533,18 +544,18 @@ public:
 		return m_tokens->to_id(p_s);
 	}
 
-	inline const std::string &id_to_token(const token_t p_token) const {
+	inline const std::string_view &id_to_token(const token_t p_token) const {
 		return m_tokens->to_str(p_token);
 	}
 
-	inline token_t add(const std::string &p_token) {
+	inline token_t add(const std::string_view &p_token) {
 		return m_tokens->add(p_token);
 	}
 
 	void compile_embeddings() {
 		py::list tokens;
 		for (const auto &s : m_tokens->inc_strings()) {
-			tokens.append(py::str(s));
+			tokens.append(s);
 		}
 
 		m_embedding_manager->compile_static(tokens);
@@ -557,19 +568,19 @@ public:
 		return e.extra_map;
 	}*/
 
-	inline int add_pos(const std::string &p_name) {
+	inline int add_pos(const std::string_view &p_name) {
 		return m_pos->add(p_name);
 	}
 
-	inline int add_tag(const std::string &p_name) {
+	inline int add_tag(const std::string_view &p_name) {
 		return m_tag->add(p_name);
 	}
 
-	inline const std::string &pos_str(int8_t p_pos_id) {
+	inline const std::string_view &pos_str(int8_t p_pos_id) {
 		return m_pos->to_str(p_pos_id);
 	}
 
-	inline const std::string &tag_str(int8_t p_tag_id) {
+	inline const std::string_view &tag_str(int8_t p_tag_id) {
 		return m_tag->to_str(p_tag_id);
 	}
 

@@ -30,13 +30,12 @@ TokenVectorRef _unpack_tokens(
     for (ssize_t i = 0; i < n; i++) {
         Token t;
 
-        const std::string token_text = str_array[i].cast<py::str>();
-        t.id = p_vocab->add(token_text);
+        t.id = p_vocab->add(str_array[i].cast<std::string_view>());
 
         t.idx = idx_array_r(i);
         t.len = len_array_r(i);
-        t.pos = p_vocab->add_pos(pos_array[i].cast<py::str>());
-        t.tag = p_vocab->add_tag(tag_array[i].cast<py::str>());
+        t.pos = p_vocab->add_pos(pos_array[i].cast<std::string_view>());
+        t.tag = p_vocab->add_tag(tag_array[i].cast<std::string_view>());
         tokens.push_back(t);
     }
 

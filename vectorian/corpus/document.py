@@ -56,6 +56,10 @@ class SpansTable:
 		return pa.Table.from_pandas(self.to_pandas())
 
 
+def convert_idx_to_utf8(idx):
+	pass  # FIXME
+
+
 class TokenTable:
 	def __init__(self, normalizers):
 		self._idx = 0
