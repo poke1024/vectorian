@@ -22,7 +22,11 @@ py::str backend_build_time() {
 // !!!
 // caution: name in PYBIND11_MODULE below needs to match filename
 // !!!
+#if VECTORIAN_SETUP_PY
+PYBIND11_MODULE(vectorian_core, m) {
+#else
 PYBIND11_MODULE(core, m) {
+#endif
 	xt::import_numpy();
 
 	m.def("backend_build_time", &backend_build_time);

@@ -136,6 +136,12 @@ class DocumentStorage:
 class InMemoryDocumentStorage(DocumentStorage):
 	def __init__(self, json):
 		self._json = json
+		'''
+		self._text = "".join(p["text"] for p in json["partitions"])
+		for p in json["partition"]:
+			p["text_len"] = len(p["text"])
+			del p["text"]
+		'''
 
 	@property
 	def metadata(self):
@@ -168,6 +174,14 @@ class OnDiskDocumentStorage(DocumentStorage):
 			if self._metadata is None:
 				self._load_metadata(zf)
 			yield json.loads(zf.read('data.json'))
+
+	@contextlib.contextmanager
+	def text(self):
+		text = Text(self._text_path)
+		try:
+			yield text
+		finally:
+			text.close()
 
 
 class Document:

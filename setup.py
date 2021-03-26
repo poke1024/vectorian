@@ -1,0 +1,40 @@
+import numpy as np
+
+from distutils.core import setup
+from pathlib import Path
+from setuptools import setup
+from pybind11.setup_helpers import Pybind11Extension, build_ext
+
+with open('requirements.txt') as f:
+	required = f.read().splitlines()
+
+sources = [str(x) for x in Path('vectorian/core/cpp').rglob('*.cpp')]
+sources += ['vectorian/core/lib/ppk_assert/src/ppk_assert.cpp']
+
+include_dirs = [np.get_include()]
+include_dirs += ['vectorian/core/lib/pyemd/pyemd/lib']
+include_dirs += ['vectorian/core/lib/ppk_assert/src']
+include_dirs += ['vectorian/core/cpp']
+
+ext_modules = [
+	Pybind11Extension(
+		"vectorian_core",
+		sorted(sources),
+		cxx_std=17,
+		define_macros=[('VECTORIAN_SETUP_PY', '1')],
+		include_dirs=include_dirs,
+	),
+]
+
+setup(
+	name='Vectorian',
+	version='0.1dev',
+	packages=['vectorian'],
+	license='GPLv2',
+	author='Bernhard Liebl',
+	author_email='poke1024@gmx.org',
+	long_description='',
+	ext_modules=ext_modules,
+	cmdclass={"build_ext": build_ext},
+	install_requires=required,
+)

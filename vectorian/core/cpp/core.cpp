@@ -19,9 +19,9 @@ def compare_versions(v1, v2, cmp):
 cfg['include_dirs'] = [
 	numpy.get_include()]
 
-cfg['include_dirs'].append('../../../lib')
-cfg['include_dirs'].append('../../../lib/pyemd/pyemd/lib')
-cfg['include_dirs'].append('../../../lib/ppk_assert/src')
+cfg['include_dirs'].append('../lib')
+cfg['include_dirs'].append('../lib/pyemd/pyemd/lib')
+cfg['include_dirs'].append('../lib/ppk_assert/src')
 
 cfg['compiler_args'] = [
 	'-Wall',
@@ -96,7 +96,7 @@ cfg['sources'] = [
 	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',
-	'../../../lib/ppk_assert/src/ppk_assert.cpp']
+	'../lib/ppk_assert/src/ppk_assert.cpp']
 
 if platform.system() == 'Darwin':  # >= macOS 10.14.6
 	cfg['compiler_args'].append("-stdlib=libc++")
