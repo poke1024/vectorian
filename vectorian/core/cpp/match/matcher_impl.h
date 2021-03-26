@@ -31,7 +31,7 @@ public:
 
 		m_aligner.init(
 			p_document->spans(slice_strategy.level)->max_len(slice_strategy.window_size),
-			m_query->len());
+			m_query->n_tokens());
 	}
 
 	virtual void initialize() {

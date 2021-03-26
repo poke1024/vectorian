@@ -69,10 +69,6 @@ class TokenTable:
 		self._make_text = normalizers['token'].token_to_text
 		self._norm_text = normalizers['text'].to_callable()
 
-	@property
-	def normalized_tokens(self):
-		return self._token_str
-
 	def __len__(self):
 		return len(self._token_idx)
 
@@ -103,24 +99,14 @@ class TokenTable:
 
 		return picked
 
-	def to_pandas(self):
-		return pd.DataFrame({
-			'idx': pd.Series(self._token_idx, dtype='uint32'),
-			'len': pd.Series(self._token_len, dtype='uint8'),
-			'pos': pd.Series(self._token_pos, dtype='category'),
-			'tag': pd.Series(self._token_tag, dtype='category')})
-
-	def to_arrow(self):
-		tokens_table_data = [
-			pa.array(self._token_idx, type=pa.uint32()),
-			pa.array(self._token_len, type=pa.uint8()),
-			pa.array(self._token_pos, type=pa.string()),
-			pa.array(self._token_tag, type=pa.string())
-		]
-
-		return pa.Table.from_arrays(
-			tokens_table_data,
-			['idx', 'len', 'pos', 'tag'])
+	def to_dict(self):
+		return {
+			'str': self._token_str,
+			'idx': np.array(self._token_idx, dtype=np.uint32),
+			'len': np.array(self._token_len, dtype=np.uint8),
+			'pos': self._token_pos,
+			'tag': self._token_tag
+		}
 
 
 def xspan(idxs, lens, i0, window_size, window_step):
@@ -282,8 +268,8 @@ class Token:
 		self._index = index
 
 	def to_slice(self):
-		offset = self._table["idx"][self._index].as_py()
-		return slice(offset, offset + self._table["len"][self._index].as_py())
+		offset = self._table["idx"][self._index]
+		return slice(offset, offset + self._table["len"][self._index])
 
 	@property
 	def text(self):
@@ -407,21 +393,20 @@ class PreparedDocument:
 
 		self._metadata = storage.metadata
 
-		self._token_table = token_table.to_arrow()
-
 		self._compiled = core.Document(
 			doc_index,
 			session.vocab,
 			self._spans,
-			self._token_table,
-			token_table.normalized_tokens,
+			token_table.to_dict(),
 			self._metadata,
 			self._contextual_embeddings)
 
+		self._tokens = self._compiled.tokens
+
 	def _save_tokens(self, path):
 		with open(path, "w") as f:
-			col_tok_idx = self._token_table["idx"].to_numpy()
-			col_tok_len = self._token_table["len"].to_numpy()
+			col_tok_idx = self._tokens["idx"]
+			col_tok_len = self._tokens["len"]
 			for idx, len_ in zip(col_tok_idx, col_tok_len):
 				f.write('"' + self._text[idx:idx + len_] + '"\n')
 
@@ -442,11 +427,11 @@ class PreparedDocument:
 		return self._text
 
 	def token(self, i):
-		return Token(self, self._token_table, i)
+		return Token(self, self._tokens, i)
 
 	@property
 	def n_tokens(self):
-		return self._token_table.num_rows
+		return self.compiled.n_tokens
 
 	def n_spans(self, partition):
 		n = self._spans[partition.level].num_rows
@@ -464,7 +449,7 @@ class PreparedDocument:
 		if name == "token":
 			def get(i):
 				pos = i * window_step
-				return Span(self, self._token_table, pos, pos + window_size)
+				return Span(self, self._tokens, pos, pos + window_size)
 
 			return get
 		else:
@@ -476,7 +461,7 @@ class PreparedDocument:
 					col_token_at, col_n_tokens, i,
 					window_size, window_step)
 
-				return Span(self, self._token_table, start, end)
+				return Span(self, self._tokens, start, end)
 
 			return get
 

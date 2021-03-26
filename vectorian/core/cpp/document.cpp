@@ -23,8 +23,7 @@ Document::Document(
 	const int64_t p_document_id,
 	VocabularyRef p_vocab,
 	const py::dict &p_spans,
-	const py::object &p_tokens_table,
-	const py::list &p_tokens_strings,
+	const py::dict &p_tokens,
 	const py::dict &p_metadata,
 	const py::dict &p_contextual_embeddings):
 
@@ -41,9 +40,8 @@ Document::Document(
 		m_spans[item.first.cast<py::str>()] = std::make_shared<Spans>(
 			VariableSpans(unpack_spans(table)));
 	}
-	const auto tokens_table = unwrap_table(p_tokens_table);
-	m_tokens = unpack_tokens(
-		p_vocab, tokens_table, p_tokens_strings);
+
+	m_tokens = unpack_tokens(p_vocab, p_tokens);
 
 	m_spans["token"] = std::make_shared<Spans>(
 		FixedSpans(m_tokens->size()));

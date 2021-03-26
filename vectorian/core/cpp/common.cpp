@@ -1,9 +1,11 @@
 #include "common.h"
 
-py::dict to_py_array(const TokenVectorRef &p_array) {
+py::dict to_py_array(
+	const TokenVectorRef &p_array,
+	const size_t p_size) {
 
 	const std::vector<ssize_t> shape = {
-		static_cast<ssize_t>(p_array->size())};
+		static_cast<ssize_t>(p_size)};
 	const uint8_t* const data =
 		reinterpret_cast<const uint8_t*>(p_array->data());
 

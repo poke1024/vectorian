@@ -72,8 +72,16 @@ class PreparedQuery:
 		token_table = TokenTable(self.index.session.normalizers)
 		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
-		self._token_table = token_table.to_arrow()
-		self._token_str = token_table.normalized_tokens
+		query = core.Query(
+			self.index,
+			self._vocab,
+			self._contextual_embeddings)
+		query.initialize(
+			token_table.to_dict(),
+			**self._query.options)
+
+		self._compiled = query
+		self._tokens = self._compiled.tokens
 
 	@property
 	def index(self):
@@ -89,12 +97,12 @@ class PreparedQuery:
 
 	@property
 	def n_tokens(self):
-		return self._token_table.num_rows
+		return self._compiled.n_tokens
 
 	@cached_property
 	def span(self):
 		from vectorian.corpus.document import Span
-		return Span(self, self._token_table, 0, self.n_tokens)
+		return Span(self, self._tokens, 0, self.n_tokens)
 
 	def __getitem__(self, i):
 		return self.span[i]
@@ -110,16 +118,9 @@ class PreparedQuery:
 		else:
 			return None
 
-	def to_core(self):
-		query = core.Query(
-			self.index,
-			self._vocab,
-			self._contextual_embeddings)
-		query.initialize(
-			self._token_table,
-			self._token_str,
-			**self._query.options)
-		return query
+	@property
+	def compiled(self):
+		return self._compiled
 
 
 Region = namedtuple('Region', [
@@ -408,7 +409,7 @@ class BruteForceIndex(Index):
 		if len(p_query) == 0:
 			return []
 
-		c_query = p_query.to_core()
+		c_query = p_query.compiled
 
 		def find_in_doc(x):
 			return x, x.find(c_query)

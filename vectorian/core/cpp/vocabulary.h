@@ -583,12 +583,10 @@ typedef std::shared_ptr<QueryVocabulary> QueryVocabularyRef;
 
 TokenVectorRef unpack_tokens(
 	const VocabularyRef &p_vocab,
-	const std::shared_ptr<arrow::Table> &p_table,
-	const py::list &p_token_strings);
+	const py::dict &p_tokens);
 
 TokenVectorRef unpack_tokens(
 	const QueryVocabularyRef &p_vocab,
-	const std::shared_ptr<arrow::Table> &p_table,
-	const py::list &p_token_strings);
+	const py::dict &p_tokens);
 
 #endif // __VECTORIAN_VOCABULARY_H__

@@ -161,8 +161,7 @@ public:
 		int64_t p_document_id,
 		VocabularyRef p_vocab,
 		const py::dict &p_spans,
-		const py::object &p_tokens_table,
-		const py::list &p_tokens_strings,
+		const py::dict &p_tokens,
 		const py::dict &p_metadata,
 		const py::dict &p_contextual_embeddings);
 
@@ -192,7 +191,7 @@ public:
 	}
 
 	py::dict py_tokens() const {
-		return to_py_array(m_tokens);
+		return to_py_array(m_tokens, n_tokens());
 	}
 
 	inline const TokenVectorRef &tokens() const {

@@ -138,8 +138,7 @@ public:
 	}
 
 	void initialize(
-		const py::object &p_tokens_table,
-		const py::list &p_tokens_strings,
+		const py::dict &p_tokens,
 		py::kwargs p_kwargs);
 
 	virtual ~Query() {
@@ -155,10 +154,10 @@ public:
 	}
 
 	inline py::dict py_tokens() const {
-		return to_py_array(m_t_tokens);
+		return to_py_array(m_t_tokens, n_tokens());
 	}
 
-	inline int len() const {
+	inline int n_tokens() const {
 		return m_t_tokens->size();
 	}
 

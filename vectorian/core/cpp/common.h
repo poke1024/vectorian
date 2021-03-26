@@ -112,7 +112,8 @@ public:
 	const py::object vector_metric; // e.g. cosine
 };
 
-py::dict to_py_array(const TokenVectorRef &p_array);
+py::dict to_py_array(
+	const TokenVectorRef &p_array, const size_t p_size);
 
 #define PY_ARRAY_MEMBER(STRUCT, MEMBER)                      \
 	py::array_t<decltype(STRUCT::MEMBER)>(                   \

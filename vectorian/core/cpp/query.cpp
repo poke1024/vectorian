@@ -29,21 +29,17 @@ ResultSetRef Query::match(
 }
 
 void Query::initialize(
-	const py::object &p_tokens_table,
-	const py::list &p_tokens_strings,
+	const py::dict &p_tokens,
 	py::kwargs p_kwargs) {
 
 	// FIXME: assert that we are in main thread here.
 
-	const std::shared_ptr<arrow::Table> table(
-	    unwrap_table(p_tokens_table.ptr()));
-
-	m_t_tokens = unpack_tokens(
-		m_vocab, table, p_tokens_strings);
+	m_t_tokens = unpack_tokens(m_vocab, p_tokens);
 
 	m_vocab->compile_embeddings();
 
-	m_py_t_tokens = to_py_array(m_t_tokens);
+	m_py_t_tokens = to_py_array(
+		m_t_tokens, m_t_tokens->size());
 
 	static const std::set<std::string> valid_options = {
 		"metric",
