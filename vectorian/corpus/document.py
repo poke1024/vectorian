@@ -158,18 +158,22 @@ class OnDiskDocumentStorage(DocumentStorage):
 		self._path = Path(path).with_suffix('.zip')
 		self._metadata = None
 
+	def _load_metadata(self, zf):
+		self._metadata = json.loads(zf.read('metadata.json'))
+		self._metadata['origin'] = str(self._path)
+
 	@property
 	def metadata(self):
 		if self._metadata is None:
 			with zipfile.ZipFile(self._path, 'r') as zf:
-				self._metadata = json.loads(zf.read('metadata.json'))
+				self._load_metadata(zf)
 		return self._metadata
 
 	@contextlib.contextmanager
 	def json(self):
 		with zipfile.ZipFile(self._path, 'r') as zf:
 			if self._metadata is None:
-				self._metadata = json.loads(zf.read('metadata.json'))
+				self._load_metadata(zf)
 			yield json.loads(zf.read('data.json'))
 
 
@@ -189,10 +193,6 @@ class Document:
 	def load(path):
 		path = Path(path)
 
-		with open(path.with_suffix(".json"), "r") as f:
-			data = json.loads(f.read())
-			data['metadata']['origin'] = path
-
 		contextual_embeddings = dict()
 		emb_path = path.with_suffix(".embeddings")
 		emb_json_path = emb_path / "info.json"
@@ -203,7 +203,7 @@ class Document:
 			for k, slug_name in emb_data.items():
 				contextual_embeddings[k] = OnDiskVectorsRef(emb_path / slug_name)
 
-		return Document(InMemoryDocumentStorage(data), contextual_embeddings)
+		return Document(OnDiskDocumentStorage(path), contextual_embeddings)
 
 	def save(self, path):
 		path = Path(path)
