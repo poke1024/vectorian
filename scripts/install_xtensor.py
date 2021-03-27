@@ -1,9 +1,12 @@
 import subprocess
 import sys
 import pathlib
+import pybind11
 
 lib_name = sys.argv[1]
 tag_name = sys.argv[2]
+
+pybind11.get_cmake_dir()
 
 repo_url = 'https://github.com/xtensor-stack/' + lib_name
 
