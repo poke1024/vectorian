@@ -1,9 +1,9 @@
 name: Build
 
 on:
-  push:
-    branches:
-      - main
+  #push:
+  #  branches:
+  #    - main
   # Manual run
   workflow_dispatch:
 
@@ -31,8 +31,9 @@ jobs:
 
       - name: Build wheels
         uses: joerick/cibuildwheel@v1.10.0
-        CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
-        CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
+        env:
+          CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
+          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
 
       - name: Store artifacts
         uses: actions/upload-artifact@v2
