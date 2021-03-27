@@ -59,18 +59,23 @@ class PreparedQuery:
 
 		tokens = doc.to_json()["tokens"]
 
-		for token_attr in ('pos', 'tag'):
-			mask = self._mask(tokens, f'{token_attr}_filter', 'pos')
+		for token_attr in ('pos', 'tag'):  # FIXME token_filter
+			mask = self._mask(tokens, f'{token_attr}_filter', token_attr)
 			if mask is not None:
 				tokens = [t for t, m in zip(tokens, mask) if m]
 				contextual_embeddings = dict(
 					(k, v[mask, :]) for k, v in contextual_embeddings.items())
 
+		token_mask = np.zeros((len(tokens),), dtype=np.bool)
+		token_table = TokenTable(self.text, self.index.session.normalizers)
+		for i, t in enumerate(tokens):
+			token_mask[i] = token_table.add(t)
+
+		contextual_embeddings = dict(
+			(k, v[token_mask, :]) for k, v in contextual_embeddings.items())
+
 		self._contextual_embeddings = dict(
 			(k, ProxyVectorsRef(Vectors(v))) for k, v in contextual_embeddings.items())
-
-		token_table = TokenTable(self.index.session.normalizers)
-		token_table.extend(self.text, {'start': 0, 'end': len(self.text)}, tokens)
 
 		query = core.Query(
 			self.index,
@@ -257,32 +262,33 @@ class CoreMatch(Match):
 		return omitted
 
 	def regions(self, context_size=10):
-		s_text = self.document.text
-		t_text = self.query.text
+		with self.document.text() as s_text_st:
+			s_text = s_text_st.get()
+			t_text = self.query.text
 
-		regions = []
-		for r in self._c_match.regions(context_size):
-			if r.matched:
-				edges = []
-				for i in range(r.num_edges):
-					edges.append(TokenMatchEdge(
-						t=t_text[slice(*r.t(i))],
-						pos_t=r.pos_t(i),
-						flow=r.flow(i),
-						distance=r.distance(i),
-						metric=r.metric(i)))
+			regions = []
+			for r in self._c_match.regions(context_size):
+				if r.matched:
+					edges = []
+					for i in range(r.num_edges):
+						edges.append(TokenMatchEdge(
+							t=t_text[slice(*r.t(i))],
+							pos_t=r.pos_t(i),
+							flow=r.flow(i),
+							distance=r.distance(i),
+							metric=r.metric(i)))
 
-				regions.append(Region(
-					s=s_text[slice(*r.s)],
-					match=TokenMatch(
-						pos_s=r.pos_s,
-						edges=edges),
-					gap_penalty=r.mismatch_penalty))
-			else:
-				regions.append(Region(
-					s=s_text[slice(*r.s)],
-					match=None,
-					gap_penalty=r.mismatch_penalty))
+					regions.append(Region(
+						s=s_text[slice(*r.s)],
+						match=TokenMatch(
+							pos_s=r.pos_s,
+							edges=edges),
+						gap_penalty=r.mismatch_penalty))
+				else:
+					regions.append(Region(
+						s=s_text[slice(*r.s)],
+						match=None,
+						gap_penalty=r.mismatch_penalty))
 
 		return regions
 

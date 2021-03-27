@@ -8,7 +8,6 @@ from pathlib import Path
 from collections import namedtuple
 
 from vectorian.embeddings import ContextualEmbedding, Vectors, ProxyVectorsRef
-from vectorian.corpus.span import SpansTable
 
 
 def normalize_dashes(s):
@@ -18,15 +17,20 @@ def normalize_dashes(s):
 
 
 def str_to_token_spans(spans, tokens):
+	n = len(spans['start'])
+
 	new_spans = {
 		'start': np.empty(n, dtype=np.int32),
 		'end': np.empty(n, dtype=np.int32),
-		'loc_ax': spans['loc_ax']
+		'loc': spans['loc']
 	}
 
 	token_i = 0
 
-	for start, end in zip(spans['start'], spans['end']):
+	new_start = new_spans['start']
+	new_end = new_spans['end']
+
+	for i, (start, end) in enumerate(zip(spans['start'], spans['end'])):
 		if start > tokens[token_i]['start']:
 			raise RuntimeError(
 				f"unexpected span start {start} vs. {tokens[token_i]['start']}")
@@ -37,7 +41,8 @@ def str_to_token_spans(spans, tokens):
 				break
 			token_j += 1
 
-		yield token_i, token_j
+		new_start[i] = token_i
+		new_end[i] = token_j
 
 		token_i = token_j
 
@@ -98,8 +103,11 @@ class Importer:
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=f'Importing {md.origin}'):
 			doc_json = doc.to_json()
 
-			# FIXME adjust start, end
-			tokens.extend(doc_json['tokens'])
+			partition_tokens = doc_json['tokens']
+			for token in partition_tokens:
+				token['start'] += text_len
+				token['end'] += text_len
+			tokens.extend(partition_tokens)
 
 			for sent in doc_json['sents']:
 				sents['start'].append(text_len + sent['start'])
@@ -265,14 +273,6 @@ class NovelImporter(Importer):
 class BodleianImporter(Importer):
 	# import for the TEI format files used in the Bodleian library.
 	pass
-
-'''
-
-         <div n="CI" type="chapter">
-            <head>VARIATION UNDER
-DOMESTICATION</head>
-
-'''
 
 
 class ShakespeareImporter(Importer):

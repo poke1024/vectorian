@@ -2,6 +2,7 @@ import json
 import vectorian.core as core
 import html
 import numpy as np
+import collections
 import contextlib
 import zipfile
 
@@ -9,15 +10,66 @@ from functools import lru_cache
 from slugify import slugify
 from pathlib import Path
 from vectorian.embeddings import MaskedVectorsRef, OnDiskVectorsRef
-from vectorian.corpus.span import SpansTable
 
 
 class Text:
-	pass
+	def get(self):
+		raise NotImplementedError()
+
+
+class InMemoryText(Text):
+	def __init__(self, text):
+		self._text = text
+
+	def get(self):
+		return self._text
 
 
 def convert_idx_len_to_utf8(text, idx, len):
 	pass  # FIXME
+
+
+class SpansTable:
+	_types = {
+		'token_at': np.uint32,
+		'n_tokens': np.uint16
+	}
+
+	def __init__(self, loc_keys):
+		self._loc = collections.defaultdict(list)
+		self._loc_keys = loc_keys
+		self._max_n_tokens = np.iinfo(SpansTable._types['n_tokens']).max
+
+	def extend(self, location, n_tokens):
+		if n_tokens < 1:
+			return
+
+		loc = self._loc
+
+		for k, v in zip(self._loc_keys, location):
+			loc[k].append(v)
+
+		if loc['token_at']:
+			token_at = loc['token_at'][-1] + loc['n_tokens'][-1]
+		else:
+			token_at = 0
+
+		if n_tokens > self._max_n_tokens:
+			raise RuntimeError(f'n_tokens = {n_tokens} > {self._max_n_tokens}')
+
+		loc['n_tokens'].append(n_tokens)
+		loc['token_at'].append(token_at)
+
+	def to_dict(self):
+		data = dict()
+		for k, v in self._loc.items():
+			dtype = SpansTable._types.get(k)
+			if dtype is None:
+				series = np.array(v)
+			else:
+				series = np.array(v, dtype=dtype)
+			data[k] = series
+		return data
 
 
 class TokenTable:
@@ -92,7 +144,7 @@ class InMemoryDocumentStorage(DocumentStorage):
 		yield self._json
 
 	@contextlib.contextmanager
-	def text(self):
+	def text(self, session):
 		yield InMemoryText(self._text)
 
 	@contextlib.contextmanager
@@ -124,7 +176,7 @@ class OnDiskDocumentStorage(DocumentStorage):
 			yield json.loads(zf.read('data.json'))
 
 	@contextlib.contextmanager
-	def text(self):
+	def text(self, session):
 		text = OnDiskText(self._path.with_suffix('.txt'))
 		try:
 			yield text
@@ -172,7 +224,7 @@ class Document:
 			for k, v in spans.items():
 				pass
 
-		with self._storage.text() as text:
+		with self._storage.text(None) as text:
 			with open(path.with_suffix(".txt"), "w") as f:
 				f.write(text.get())
 
@@ -250,7 +302,8 @@ class Token:
 
 	@property
 	def text(self):
-		return self._doc.text[self.to_slice()]
+		with self._doc.text() as text:
+			return text.get()[self.to_slice()]
 
 	def _repr_html_(self):
 		return Token._html_template.format(
@@ -286,7 +339,8 @@ class Span:
 			col_tok_idx, col_tok_len, self._start,
 			self._end - self._start, 1)
 
-		return self._doc.text[i0:i1]
+		with self._doc.text() as text:
+			return text.get()[i0:i1]
 
 	def _repr_html_(self):
 		tokens = []
@@ -298,11 +352,12 @@ class Span:
 class PreparedDocument:
 	def __init__(self, session, doc_index, storage, contextual_embeddings):
 		self._session = session
+		self._storage = storage
 
 		token_mapper = session.normalizer('token').token_to_token
 
 		with storage.json() as json:
-			with storage.text() as text:
+			with storage.text(self._session) as text:
 				token_table = TokenTable(text.get(), self._session.normalizers)
 
 				tokens = json['tokens']
@@ -311,8 +366,7 @@ class PreparedDocument:
 				for i, token in enumerate(tokens):
 					t = token_mapper(token)
 					if t:
-						if token_table.add(t):
-							token_mask[i] = True
+						token_mask[i] = token_table.add(t)
 
 			with storage.spans() as spans:
 				self._spans = dict()
@@ -338,6 +392,10 @@ class PreparedDocument:
 
 		self._tokens = self._compiled.tokens
 
+	@property
+	def session(self):
+		return self._session
+
 	def _save_tokens(self, path):
 		with open(path, "w") as f:
 			col_tok_idx = self._tokens["idx"]
@@ -357,9 +415,10 @@ class PreparedDocument:
 	def caching_name(self):
 		return slugify(self.unique_id)
 
-	@property
+	@contextlib.contextmanager
 	def text(self):
-		return self._text
+		with self._storage.text(self._session) as text:
+			yield text
 
 	def token(self, i):
 		return Token(self, self._tokens, i)
