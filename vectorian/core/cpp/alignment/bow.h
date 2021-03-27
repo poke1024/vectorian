@@ -190,9 +190,6 @@ public:
 	const TokenFactory m_token_factory;
 	std::vector<RefToken> m_tokens;
 
-	inline BOWBuilder() {
-	}
-
 	inline BOWBuilder(const TokenFactory &p_token_factory) :
 		m_token_factory(p_token_factory) {
 	}

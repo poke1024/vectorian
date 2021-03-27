@@ -396,7 +396,9 @@ public:
 	WordMoversDistance(
 		const WMDOptions &p_options) :
 
-		m_options(p_options) {
+		m_options(p_options),
+		m_untagged_builder(UntaggedTokenFactory()),
+		m_tagged_builder(TaggedTokenFactory()) {
 	}
 
 	void init(Index max_len_s, Index max_len_t) {

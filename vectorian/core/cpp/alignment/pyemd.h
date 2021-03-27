@@ -1,5 +1,9 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-compare"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 #include "EMD_DEFS.hpp"
 #include "flow_utils.hpp"
 //#include "emd_hat.hpp"
@@ -22,5 +26,7 @@ struct emd_hat {
 };
 
 #include "emd_hat_impl.hpp"
+
+#pragma GCC diagnostic pop
 
 #pragma clang diagnostic pop
