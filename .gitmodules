@@ -1,9 +1,0 @@
-[submodule "vectorian/core/lib/ppk_assert"]
-	path = vectorian/core/lib/ppk_assert
-	url = https://github.com/gpakosz/PPK_ASSERT
-[submodule "vectorian/core/lib/memory"]
-	path = vectorian/core/lib/memory
-	url = https://github.com/foonathan/memory
-[submodule "vectorian/core/lib/pyemd"]
-	path = vectorian/core/lib/pyemd
-	url = https://github.com/wmayner/pyemd
