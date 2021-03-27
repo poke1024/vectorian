@@ -27,7 +27,8 @@ public:
 		m_matrix(matrix),
 		m_slice_id(slice_id),
 		m_s(s),
-		m_t(t) {
+		m_t(t),
+		m_encoder(Encoder()) {
 
 		//std::cout << "ContextualEmbeddingSlice << " << slice_id << ": (" <<
 		//	m_s.offset << ", " << (m_s.offset + m_s.len) << ")\n" << std::flush;

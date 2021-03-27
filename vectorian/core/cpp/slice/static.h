@@ -34,7 +34,8 @@ public:
 		s_tokens(s.tokens + s.offset),
 		m_len_s(s.len),
 		t_tokens(t.tokens + t.offset),
-		m_len_t(t.len) {
+		m_len_t(t.len),
+		m_encoder(Encoder()) {
 
 		// PPK_ASSERT(t.offset == 0);
 	}
