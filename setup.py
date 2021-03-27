@@ -28,10 +28,10 @@ if os.environ.get("VECTORIAN_BLAS", False):
 ext_modules = [
 	Pybind11Extension(
 		"vectorian_core",
-		sorted(sources),
+		[str(x) for x in sorted(sources)],
 		cxx_std=17,
 		define_macros=macros,
-		include_dirs=include_dirs,
+		include_dirs=[str(x) for x in include_dirs],
 	),
 ]
 
