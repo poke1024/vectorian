@@ -1,9 +1,7 @@
 # manual installation
 
-conda create --name vectorian python=3.7
+conda create  -f environment.yml
 conda activate vectorian
-pip install pybind11
-conda install -c conda-forge xtl xtensor xsimd xtensor-blas xtensor-python
 python setup.py install
 
 python -m spacy download en_core_web_sm
