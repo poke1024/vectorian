@@ -2,9 +2,8 @@ import numpy as np
 import yaml
 import os
 
-from distutils.core import setup
 from pathlib import Path
-from setuptools import setup
+from setuptools import setup, find_packages
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
 with open('environment.yml') as f:
@@ -38,7 +37,7 @@ ext_modules = [
 setup(
 	name='Vectorian',
 	version='0.1dev',
-	packages=['vectorian'],
+	packages=find_packages(),
 	license='GPLv2',
 	author='Bernhard Liebl',
 	author_email='poke1024@gmx.org',
