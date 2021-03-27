@@ -1,6 +1,5 @@
 import json
 import vectorian.core as core
-import collections
 import html
 import numpy as np
 import contextlib
@@ -10,49 +9,7 @@ from functools import lru_cache
 from slugify import slugify
 from pathlib import Path
 from vectorian.embeddings import MaskedVectorsRef, OnDiskVectorsRef
-
-
-class SpansTable:
-	_types = {
-		'token_at': np.uint32,
-		'n_tokens': np.uint16
-	}
-
-	def __init__(self, loc_keys):
-		self._loc = collections.defaultdict(list)
-		self._loc_keys = loc_keys
-		self._max_n_tokens = np.iinfo(SpansTable._types['n_tokens']).max
-
-	def extend(self, location, n_tokens):
-		if n_tokens < 1:
-			return
-
-		loc = self._loc
-
-		for k, v in zip(self._loc_keys, location):
-			loc[k].append(v)
-
-		if loc['token_at']:
-			token_at = loc['token_at'][-1] + loc['n_tokens'][-1]
-		else:
-			token_at = 0
-
-		if n_tokens > self._max_n_tokens:
-			raise RuntimeError(f'n_tokens = {n_tokens} > {self._max_n_tokens}')
-
-		loc['n_tokens'].append(n_tokens)
-		loc['token_at'].append(token_at)
-
-	def to_dict(self):
-		data = dict()
-		for k, v in self._loc.items():
-			dtype = SpansTable._types.get(k)
-			if dtype is None:
-				series = np.array(v)
-			else:
-				series = np.array(v, dtype=dtype)
-			data[k] = series
-		return data
+from vectorian.corpus.span import SpansTable
 
 
 class Text:
@@ -64,8 +21,8 @@ def convert_idx_len_to_utf8(text, idx, len):
 
 
 class TokenTable:
-	def __init__(self, normalizers):
-		self._idx = 0
+	def __init__(self, text, normalizers):
+		self._text = text
 
 		self._token_idx = []
 		self._token_len = []
@@ -79,32 +36,19 @@ class TokenTable:
 	def __len__(self):
 		return len(self._token_idx)
 
-	def advance(self, n):
-		self._idx += n
+	def add(self, token):
+		norm_text = self._norm_text(self._make_text(self._text, token)) or ""
+		if len(norm_text.strip()) > 0:
+			self._token_idx.append(token["start"])
+			self._token_len.append(token["end"] - token["start"])
 
-	def extend(self, text, sent, tokens):
-		last_idx = sent["start"]
-		picked = []
+			self._token_pos.append(token["pos"])
+			self._token_tag.append(token["tag"])
 
-		for i, token in enumerate(tokens):
-			idx = token["start"]
-			self._idx += len(text[last_idx:idx])
-			last_idx = idx
-
-			norm_text = self._norm_text(self._make_text(text, token)) or ""
-			if len(norm_text.strip()) > 0:
-				self._token_idx.append(self._idx)
-				self._token_len.append(len(text[token["start"]:token["end"]]))
-
-				self._token_pos.append(token["pos"])
-				self._token_tag.append(token["tag"])
-
-				self._token_str.append(norm_text)
-				picked.append(i)
-
-		self._idx += len(text[last_idx:sent["end"]])
-
-		return picked
+			self._token_str.append(norm_text)
+			return True
+		else:
+			return False
 
 	def to_dict(self):
 		return {
@@ -134,14 +78,10 @@ class DocumentStorage:
 
 
 class InMemoryDocumentStorage(DocumentStorage):
-	def __init__(self, json):
+	def __init__(self, json, text, spans):
 		self._json = json
-		'''
-		self._text = "".join(p["text"] for p in json["partitions"])
-		for p in json["partition"]:
-			p["text_len"] = len(p["text"])
-			del p["text"]
-		'''
+		self._text = text
+		self._spans = spans
 
 	@property
 	def metadata(self):
@@ -151,10 +91,18 @@ class InMemoryDocumentStorage(DocumentStorage):
 	def json(self):
 		yield self._json
 
+	@contextlib.contextmanager
+	def text(self):
+		yield InMemoryText(self._text)
+
+	@contextlib.contextmanager
+	def spans(self):
+		yield self._spans
+
 
 class OnDiskDocumentStorage(DocumentStorage):
 	def __init__(self, path):
-		self._path = Path(path).with_suffix('.zip')
+		self._path = Path(path)
 		self._metadata = None
 
 	def _load_metadata(self, zf):
@@ -164,20 +112,20 @@ class OnDiskDocumentStorage(DocumentStorage):
 	@property
 	def metadata(self):
 		if self._metadata is None:
-			with zipfile.ZipFile(self._path, 'r') as zf:
+			with zipfile.ZipFile(self._path.with_suffix('.zip'), 'r') as zf:
 				self._load_metadata(zf)
 		return self._metadata
 
 	@contextlib.contextmanager
 	def json(self):
-		with zipfile.ZipFile(self._path, 'r') as zf:
+		with zipfile.ZipFile(self._path.with_suffix('.zip'), 'r') as zf:
 			if self._metadata is None:
 				self._load_metadata(zf)
 			yield json.loads(zf.read('data.json'))
 
 	@contextlib.contextmanager
 	def text(self):
-		text = Text(self._text_path)
+		text = OnDiskText(self._path.with_suffix('.txt'))
 		try:
 			yield text
 		finally:
@@ -219,6 +167,14 @@ class Document:
 			with zipfile.ZipFile(path.with_suffix(".zip"), "w") as zf:
 				zf.writestr("metadata.json", json.dumps(self.metadata))
 				zf.writestr("data.json", json.dumps(data))
+
+		with self._storage.spans() as spans:
+			for k, v in spans.items():
+				pass
+
+		with self._storage.text() as text:
+			with open(path.with_suffix(".txt"), "w") as f:
+				f.write(text.get())
 
 		if self._contextual_embeddings:
 			emb_data = dict()
@@ -345,69 +301,27 @@ class PreparedDocument:
 
 		token_mapper = session.normalizer('token').token_to_token
 
-		texts = []
-
 		with storage.json() as json:
+			with storage.text() as text:
+				token_table = TokenTable(text.get(), self._session.normalizers)
 
-			token_table = TokenTable(self._session.normalizers)
-			sentence_table = SpansTable(json['loc_keys'])
+				tokens = json['tokens']
+				token_mask = np.zeros((len(tokens),), dtype=np.bool)
 
-			token_count = sum(len(p['tokens']) for p in json['partitions'])
-			token_mask = np.zeros((token_count,), dtype=np.bool)
-			token_mask_offset = 0
+				for i, token in enumerate(tokens):
+					t = token_mapper(token)
+					if t:
+						if token_table.add(t):
+							token_mask[i] = True
 
-			for partition_i, partition in enumerate(json['partitions']):
-				text = partition["text"]
-				tokens = partition["tokens"]
-				sents = partition["sents"]
-				loc = partition["loc"]
+			with storage.spans() as spans:
+				self._spans = dict()
 
-				token_i = 0
-				last_sent_end = None
-				for sent in sents:
-					sent_tokens = []
-					sent_text = text[sent["start"]:sent["end"]]
-
-					if last_sent_end is not None and sent["start"] > last_sent_end:
-						s = text[last_sent_end:sent["start"]]
-						token_table.advance(len(s))
-						texts.append(s)
-
-					if sent["start"] > tokens[token_i]["start"]:
-						raise RuntimeError(
-							f"unexpected sentence start {sent['start']} vs. {token_i}, "
-							f"partition={partition_i}, tokens={tokens}, sents={sents}")
-
-					token_j = token_i + 1
-					while token_j < len(tokens):
-						if tokens[token_j]["start"] >= sent["end"]:
-							break
-						token_j += 1
-
-					for i in range(token_i, token_j):
-						t = token_mapper(tokens[i])
-						if t:
-							sent_tokens.append((i, t))
-
-					token_i = token_j
-
-					if sent_text.strip() and sent_tokens:
-						picked = token_table.extend(text, sent, [t for _, t in sent_tokens])
-						sentence_table.extend(loc, len(picked))
-						texts.append(sent_text)
-						picked_indices = np.array([sent_tokens[i][0] for i in picked], dtype=np.int32)
-						token_mask[token_mask_offset + picked_indices] = True
-
-					last_sent_end = sent["end"]
-
-				token_mask_offset += len(tokens)
-
-		assert np.sum(token_mask) == len(token_table)
-
-		self._text = "".join(texts)
-		self._spans = {
-			'sentence': sentence_table.to_dict()
-		}
+				for span_name, v in spans.items():
+					spans_table = SpansTable(json['loc_ax'])
+					for start, end, loc in zip(v['start'], v['end'], v['loc']):
+						spans_table.extend(loc, np.sum(token_mask[start:end]))
+					self._spans[span_name] = spans_table.to_dict()
 
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())

@@ -8,12 +8,40 @@ from pathlib import Path
 from collections import namedtuple
 
 from vectorian.embeddings import ContextualEmbedding, Vectors, ProxyVectorsRef
+from vectorian.corpus.span import SpansTable
 
 
 def normalize_dashes(s):
 	s = re.sub(r"(\w)\-(\s)", r"\1 -\2", s)
 	s = re.sub(r"(\s)\-(\w)", r"\1- \2", s)
 	return s
+
+
+def str_to_token_spans(spans, tokens):
+	new_spans = {
+		'start': np.empty(n, dtype=np.int32),
+		'end': np.empty(n, dtype=np.int32),
+		'loc_ax': spans['loc_ax']
+	}
+
+	token_i = 0
+
+	for start, end in zip(spans['start'], spans['end']):
+		if start > tokens[token_i]['start']:
+			raise RuntimeError(
+				f"unexpected span start {start} vs. {tokens[token_i]['start']}")
+
+		token_j = token_i + 1
+		while token_j < len(tokens):
+			if tokens[token_j]['start'] >= end:
+				break
+			token_j += 1
+
+		yield token_i, token_j
+
+		token_i = token_j
+
+	return new_spans
 
 
 Metadata = namedtuple(
@@ -49,27 +77,49 @@ class Importer:
 				text = Importer._t[x](text)
 		return text
 
-	def _make_doc(self, md, partitions, loc_keys, locations):
+	def _make_doc(self, md, partitions, loc_ax, locations):
 		pipe = self._nlp.pipe(
 			partitions,
 			batch_size=self._batch_size,
 			disable=['ner', 'lemmatizer'])  # check nlp.pipe_names
 
 		contextual_vectors = dict((e.name, []) for e in self._embeddings)
+		texts = []
+		tokens = []
 
-		json_partitions = []
+		sents = {
+			'start': [],
+			'end': [],
+			'loc': []
+		}
+
+		text_len = 0
+
 		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=f'Importing {md.origin}'):
 			doc_json = doc.to_json()
-			doc_json['loc'] = location
-			json_partitions.append(doc_json)
+
+			# FIXME adjust start, end
+			tokens.extend(doc_json['tokens'])
+
+			for sent in doc_json['sents']:
+				sents['start'].append(text_len + sent['start'])
+				sents['end'].append(text_len + sent['end'])
+				sents['loc'].append(location)
+
+			texts.append(doc_json['text'])
+			text_len += len(doc_json['text'])
 
 			for e in self._embeddings:
 				contextual_vectors[e.name].append(e.encode(doc))
 
+		spans = {
+			'sentence': str_to_token_spans(sents, tokens)
+		}
+
 		json = {
 			'metadata': md._asdict(),
-			'partitions': json_partitions,
-			'loc_keys': loc_keys
+			'tokens': tokens,
+			'loc_ax': loc_ax
 		}
 
 		from vectorian.corpus.document import Document, InMemoryDocumentStorage
@@ -88,7 +138,9 @@ class Importer:
 		contextual_embeddings = dict(
 			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
-		return Document(InMemoryDocumentStorage(json), contextual_embeddings)
+		return Document(
+			InMemoryDocumentStorage(json, ''.join(texts), spans),
+			contextual_embeddings)
 
 
 class TextImporter(Importer):
