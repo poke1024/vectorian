@@ -24,7 +24,7 @@ dependencies:
       - cached-property>=1.5.2
       - pyyaml>=5.4.1
       - gensim>=3.8.3, <4.0.0
-      - h5py>=3.2.1
+      - h5py~=2.10.0
       - scikit-learn>=0.24.1
       - skl2onnx>=1.8.0
       - onnxruntime>=1.7.0
