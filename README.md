@@ -7,6 +7,20 @@ conda install -c conda-forge xtl xtensor xsimd xtensor-blas xtensor-python
 python setup.py install
 python -m spacy download en_core_web_sm
 
+this will give you a fully functional version of the vectorian API.
+depending on what you want to use you also want to install:
+
+## jupyterlab
+
+jupyterlab>=3.0.7
+ipywidgets>=7.6.3
+matplotlib>=3.3.4
+
+## flow visualizations
+
+holoviews>=1.14.2
+bokeh>=2.3.0
+
 # more
 
 

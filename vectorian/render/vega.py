@@ -45,12 +45,3 @@ class VegaRenderer:
 						self._make_vega_spec(match).encode('utf8')).decode('utf8')
 				))
 
-				s = VegaRenderer.script_code.safe_substitute(
-					renderer='canvas',  # canvas or svg
-					div_id=div_id,
-					iframe_id=iframe_id,
-					vega_spec=base64.b64encode(
-						self._make_vega_spec(match).encode('utf8')).decode('utf8')
-				)
-				with open("/Users/arbeit/Desktop/temp.txt", "w") as f:
-					f.write(s)
