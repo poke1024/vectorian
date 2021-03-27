@@ -1,12 +1,13 @@
 import numpy as np
+import yaml
 
 from distutils.core import setup
 from pathlib import Path
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
-with open('requirements.txt') as f:
-	required = f.read().splitlines()
+with open('environment.yml') as f:
+	required = yaml.load(f.read())['dependencies'][-1]['pip']
 
 sources = [str(x) for x in Path('vectorian/core/cpp').rglob('*.cpp')]
 sources += ['vectorian/core/lib/ppk_assert/src/ppk_assert.cpp']
