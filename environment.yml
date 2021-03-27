@@ -1,0 +1,9 @@
+name: vectorian
+channels:
+  - conda-forge
+dependencies:
+  - xtl
+  - xtensor
+  - xsimd
+  - xtensor-blas
+  - xtensor-python
