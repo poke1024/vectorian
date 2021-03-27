@@ -8,15 +8,18 @@ from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
 with open('environment.yml') as f:
-	required = yaml.load(f.read())['dependencies'][-1]['pip']
+	required = yaml.safe_load(f.read())['dependencies'][-1]['pip']
 
-sources = [str(x) for x in Path('vectorian/core/cpp').rglob('*.cpp')]
-sources += ['vectorian/core/lib/ppk_assert/src/ppk_assert.cpp']
+base_path = Path('vectorian').resolve()
+assert base_path.exists()
+
+sources = [str(x) for x in (base_path / 'core/cpp').rglob('*.cpp')]
+sources += [base_path / 'core/lib/ppk_assert/src/ppk_assert.cpp']
 
 include_dirs = [np.get_include()]
-include_dirs += ['vectorian/core/lib/pyemd/pyemd/lib']
-include_dirs += ['vectorian/core/lib/ppk_assert/src']
-include_dirs += ['vectorian/core/cpp']
+include_dirs += [base_path / 'core/lib/pyemd/pyemd/lib']
+include_dirs += [base_path / 'core/lib/ppk_assert/src']
+include_dirs += [base_path / 'core/cpp']
 
 macros = [('VECTORIAN_SETUP_PY', '1')]
 if os.environ.get("VECTORIAN_BLAS", False):
