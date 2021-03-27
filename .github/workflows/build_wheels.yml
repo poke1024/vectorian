@@ -26,10 +26,18 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Python
+      - name: checkout submodules using a PAT
+        run: |
+          git config --file .gitmodules --get-regexp url | while read url; do
+            git config --file=.gitmodules $(echo "$url" | sed -E "s/git@github.com:|https:\/\/github.com\//https:\/\/${{ secrets.CI_PAT }}:${{ secrets.CI_PAT }}@github.com\//")
+          done
+          git submodule sync
+          git submodule update --init --recursive
+
+      - name: setup python
         uses: actions/setup-python@v2
 
-      - name: Build wheels
+      - name: build wheels
         uses: joerick/cibuildwheel@v1.10.0
         env:
           CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
@@ -37,7 +45,7 @@ jobs:
           CIBW_ARCHS: "auto64"
           CIBW_BEFORE_ALL_LINUX: bash scripts/prepare_for_build.sh
 
-      - name: Store artifacts
+      - name: store artifacts
         uses: actions/upload-artifact@v2
         with:
           path: wheelhouse/*.whl
