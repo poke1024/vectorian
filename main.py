@@ -106,7 +106,9 @@ if __name__ == '__main__':
     #index = session.index_for_metric("auto", nlp=nlp)
     #matches = index.find("company")
     with open("/Users/arbeit/Desktop/temp.json", "w") as f:
-        f.write(json.dumps(matches.to_json(10), indent=4))
+        x = matches.to_json(1)
+        print(x)
+        f.write(json.dumps(x, indent=4))
 
 
 

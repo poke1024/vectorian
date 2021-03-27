@@ -501,7 +501,7 @@ class PreparedDocument:
 		table = self._spans[partition.level]
 		i = index * partition.window_step
 		for k, v in table.items():
-			info[k] = v[i]
+			info[k] = int(v[i])
 		return info
 
 	@property
