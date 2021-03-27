@@ -1,5 +1,6 @@
-yum install -y conda
-conda config --set always_yes yes --set changeps1 no
-conda update -q conda
-conda info -a
-conda env create --file environment.yml
+yum install -y git cmake
+pip install pybind11
+python scripts/install_xtensor.py xtl 0.7.2
+python scripts/install_xtensor.py xtensor 0.23.4
+python scripts/install_xtensor.py xsimd 7.4.9
+python scripts/install_xtensor.py xtensor-python 0.25.1

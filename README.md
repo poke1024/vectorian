@@ -1,6 +1,6 @@
 # manual installation
 
-conda create  -f environment.yml
+conda create -f environment.yml
 conda activate vectorian
 python setup.py install
 

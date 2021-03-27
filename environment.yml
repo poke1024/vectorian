@@ -11,8 +11,8 @@ dependencies:
   - xtensor-python
   - pip
   - pip:
+      - pybind11~=2.6.2
       - smart-open>=3.0.0, <4.0.0
-      - pybind11>=2.6.2
       - tqdm>=4.56.2
       - spacy>=3.0.0
       - fasttext>=0.9.2
@@ -28,3 +28,5 @@ dependencies:
       - scikit-learn>=0.24.1
       - skl2onnx>=1.8.0
       - onnxruntime>=1.7.0
+variables:
+  VECTORIAN_BLAS: 1

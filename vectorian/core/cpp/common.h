@@ -6,9 +6,12 @@
 #include <xtensor/xview.hpp>
 #include <xtensor/xio.hpp>
 #include <xtensor/xnorm.hpp>
-#include <xtensor-blas/xlinalg.hpp>
 #include <xtensor-python/pyarray.hpp>
 #include <xtensor-python/pytensor.hpp>
+
+#if VECTORIAN_BLAS
+#include <xtensor-blas/xlinalg.hpp>
+#endif
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>

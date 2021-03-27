@@ -1,5 +1,6 @@
 import numpy as np
 import yaml
+import os
 
 from distutils.core import setup
 from pathlib import Path
@@ -17,12 +18,16 @@ include_dirs += ['vectorian/core/lib/pyemd/pyemd/lib']
 include_dirs += ['vectorian/core/lib/ppk_assert/src']
 include_dirs += ['vectorian/core/cpp']
 
+macros = [('VECTORIAN_SETUP_PY', '1')]
+if os.environ.get("VECTORIAN_BLAS", False):
+	macros += [('VECTORIAN_BLAS', '1')]
+
 ext_modules = [
 	Pybind11Extension(
 		"vectorian_core",
 		sorted(sources),
 		cxx_std=17,
-		define_macros=[('VECTORIAN_SETUP_PY', '1')],
+		define_macros=macros,
 		include_dirs=include_dirs,
 	),
 ]
