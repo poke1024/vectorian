@@ -16,34 +16,26 @@ jobs:
       matrix:
         os: [ubuntu-latest]  # , windows-latest, macos-latest
         python: [ 37 ]
-        bitness: [ 64 ]
         manylinux_image: [manylinux2014]
         include:
           - os: ubuntu-latest
-            bitness: 64
             platform_id: manylinux_x86_64
 
     steps:
       - uses: actions/checkout@v2
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: vectorian
-          python-version: ${{ matrix.python }}$
-          channels: conda-forge
+          submodules: true
 
-      - run: |
-          conda install -c conda-forge xtl xtensor xsimd xtensor-blas xtensor-python numpy
-
-      #- name: Setup Python
-      #  uses: actions/setup-python@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
 
       - name: Build wheels
         uses: joerick/cibuildwheel@v1.10.0
         env:
           CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
+          CIBW_ARCHS: "auto64"
+          CIBW_BEFORE_ALL_LINUX: bash scripts/prepare_for_build.sh
 
       - name: Store artifacts
         uses: actions/upload-artifact@v2

@@ -5,6 +5,7 @@ conda activate vectorian
 pip install pybind11
 conda install -c conda-forge xtl xtensor xsimd xtensor-blas xtensor-python
 python setup.py install
+
 python -m spacy download en_core_web_sm
 
 this will give you a fully functional version of the vectorian API.
