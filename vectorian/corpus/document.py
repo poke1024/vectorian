@@ -2,9 +2,9 @@ import json
 import vectorian.core as core
 import html
 import numpy as np
-import collections
 import contextlib
 import zipfile
+import h5py
 
 from functools import lru_cache
 from slugify import slugify
@@ -27,49 +27,6 @@ class InMemoryText(Text):
 
 def convert_idx_len_to_utf8(text, idx, len):
 	pass  # FIXME
-
-
-class SpansTable:
-	_types = {
-		'token_at': np.uint32,
-		'n_tokens': np.uint16
-	}
-
-	def __init__(self, loc_keys):
-		self._loc = collections.defaultdict(list)
-		self._loc_keys = loc_keys
-		self._max_n_tokens = np.iinfo(SpansTable._types['n_tokens']).max
-
-	def extend(self, location, n_tokens):
-		if n_tokens < 1:
-			return
-
-		loc = self._loc
-
-		for k, v in zip(self._loc_keys, location):
-			loc[k].append(v)
-
-		if loc['token_at']:
-			token_at = loc['token_at'][-1] + loc['n_tokens'][-1]
-		else:
-			token_at = 0
-
-		if n_tokens > self._max_n_tokens:
-			raise RuntimeError(f'n_tokens = {n_tokens} > {self._max_n_tokens}')
-
-		loc['n_tokens'].append(n_tokens)
-		loc['token_at'].append(token_at)
-
-	def to_dict(self):
-		data = dict()
-		for k, v in self._loc.items():
-			dtype = SpansTable._types.get(k)
-			if dtype is None:
-				series = np.array(v)
-			else:
-				series = np.array(v, dtype=dtype)
-			data[k] = series
-		return data
 
 
 class TokenTable:
@@ -103,6 +60,10 @@ class TokenTable:
 			return False
 
 	def to_dict(self):
+		max_len = np.iinfo(np.uint8).max
+		if any(x > max_len for x in self._token_len):
+			raise RuntimeError(f"token len > {max_len} is not supported")
+
 		return {
 			'str': self._token_str,
 			'idx': np.array(self._token_idx, dtype=np.uint32),
@@ -183,6 +144,17 @@ class OnDiskDocumentStorage(DocumentStorage):
 		finally:
 			text.close()
 
+	@contextlib.contextmanager
+	def spans(self):
+		with h5py.File(self._path.with_suffix(".spn.h5"), "w") as hf:
+			spans = dict()
+			for name in hf:
+				data = dict()
+				for k in hf[name]:
+					data[k] = hf[f'{g}/{k}']
+				spans[name] = data
+			yield spans
+
 
 class Document:
 	def __init__(self, storage, contextual_embeddings=None):
@@ -221,8 +193,11 @@ class Document:
 				zf.writestr("data.json", json.dumps(data))
 
 		with self._storage.spans() as spans:
-			for k, v in spans.items():
-				pass
+			with h5py.File(path.with_suffix(".spn.h5"), "w") as hf:
+				for name, data in spans.items():
+					g = hf.create_group(name)
+					for k, v in data.items():
+						g.create_dataset(k, data=v)
 
 		with self._storage.text(None) as text:
 			with open(path.with_suffix(".txt"), "w") as f:
@@ -369,13 +344,13 @@ class PreparedDocument:
 						token_mask[i] = token_table.add(t)
 
 			with storage.spans() as spans:
-				self._spans = dict()
+				reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
 
-				for span_name, v in spans.items():
-					spans_table = SpansTable(json['loc_ax'])
-					for start, end, loc in zip(v['start'], v['end'], v['loc']):
-						spans_table.extend(loc, np.sum(token_mask[start:end]))
-					self._spans[span_name] = spans_table.to_dict()
+				self._spans = dict()
+				for name, data in spans.items():
+					data['start'] = reindex[data['start']]
+					data['end'] = reindex[data['end']]
+					self._spans[name] = data
 
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())

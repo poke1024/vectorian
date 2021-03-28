@@ -1,22 +1,29 @@
 #include "document.h"
 #include "query.h"
 
-std::vector<int32_t> unpack_spans(const py::dict &p_table) {
-	const auto n_tokens_array = p_table["n_tokens"].cast<py::array_t<uint16_t>>();
-	const auto n_tokens_read = n_tokens_array.unchecked<1>();
+std::vector<VariableSpans::Span> unpack_spans(const py::dict &p_table) {
+	typedef VariableSpans::offset_t offset_t;
 
-	const size_t n = n_tokens_array.shape(0);
-	std::vector<int32_t> offsets;
-	offsets.reserve(n + 1);
+	const auto start_array = p_table["start"].cast<py::array_t<offset_t>>();
+	const auto end_array = p_table["end"].cast<py::array_t<offset_t>>();
 
-	size_t token_at = 0;
-	offsets.push_back(token_at);
-	for (size_t i = 0; i < n; i++) {
-		token_at += n_tokens_read(i);
-		offsets.push_back(token_at);
+	const ssize_t n = start_array.shape(0);
+	PPK_ASSERT(end_array.shape(0) == n);
+
+	std::vector<VariableSpans::Span> spans;
+	spans.reserve(n);
+
+	const auto start_read = start_array.unchecked<1>();
+	const auto end_read = end_array.unchecked<1>();
+
+	for (ssize_t i = 0; i < n; i++) {
+		spans.emplace_back(VariableSpans::Span{
+			start_read(i),
+			end_read(i)
+		});
 	}
 
-	return offsets;
+	return spans;
 }
 
 Document::Document(

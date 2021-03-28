@@ -16,14 +16,26 @@ def normalize_dashes(s):
 	return s
 
 
-def str_to_token_spans(spans, tokens):
+def to_min_dtype(array):
+	max = np.max(array)
+	for dtype in (np.int8, np.int16, np.int32, np.int64):
+		if max <= np.iinfo(dtype).max:
+			return array.astype(dtype)
+	raise ValueError(f"failed to map value {max} to numpy")
+
+
+def compile_spans(spans, tokens, loc_ax):
 	n = len(spans['start'])
 
 	new_spans = {
 		'start': np.empty(n, dtype=np.int32),
-		'end': np.empty(n, dtype=np.int32),
-		'loc': spans['loc']
+		'end': np.empty(n, dtype=np.int32)
 	}
+
+	loc = np.array(spans['loc'])
+	for i, k in enumerate(loc_ax):
+		assert k not in new_spans
+		new_spans[k] = to_min_dtype(loc[:, i])
 
 	token_i = 0
 
@@ -121,7 +133,7 @@ class Importer:
 				contextual_vectors[e.name].append(e.encode(doc))
 
 		spans = {
-			'sentence': str_to_token_spans(sents, tokens)
+			'sentence': compile_spans(sents, tokens, loc_ax)
 		}
 
 		json = {

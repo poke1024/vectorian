@@ -20,6 +20,44 @@ matplotlib>=3.3.4
 holoviews>=1.14.2
 bokeh>=2.3.0
 
+# design goals
+
+started out as a high-performance system for interactive searches
+
+allow interactive brute-force (index-free) searches using short
+queries over sentences in a larger number of documents. the design
+is geared towards high performance when search a large number of
+small units (sentences) as opposed to comparing whole documents.
+
+this is achieved by
+(1) a highly optimized C++ core
+(2) an efficient storage of document data that allows to load large
+number of document data into memory without the need for disk access
+
+# changes over last version
+
+## features (new)
+
+* full support for fasttext (ngram-based construction)
+* support for compressed fasttext embeddings
+* support for any gensim-based key-vector embeddings
+* support for contextual embeddings (spaCy transformers)
+* support for custom PCA-compressed contextual embeddings
+* custom vector space metrics in python
+* added word mover's distance in various variants
+* added word rotator's distance
+* added needleman-wunsch and waterman-smith
+* completely redesigned token normalization pipeline
+* completely redesigned document storage and caching architecture
+* support for text and matrix visualizations
+
+# technical (new)
+
+* switched from Eigen to xtensor
+* prospective support for GPU-based vector operations via cupy
+* removed pyarrow and the use of apache parquet in favor of h5py
+* support for prebuilt linux wheels
+
 # more
 
 

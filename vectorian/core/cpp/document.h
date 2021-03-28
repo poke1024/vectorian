@@ -53,45 +53,49 @@ public:
 
 
 class VariableSpans {
-	const std::vector<int32_t> m_offsets;
-	size_t m_max_len;
+public:
+	typedef int32_t offset_t;
+
+	struct Span {
+		offset_t start;
+		offset_t end;
+	};
+
+private:
+	const std::vector<Span> m_spans;
+	offset_t m_max_len;
 
 public:
-	VariableSpans(std::vector<int32_t> &&p_offsets) : m_offsets(p_offsets) {
-		size_t max_len = 0;
-		if (m_offsets.size() > 0) {
-			for (size_t i = 0; i < m_offsets.size() - 1; i++) {
-				max_len = std::max(
-					max_len,
-					size_t(m_offsets[i + 1] - m_offsets[i]));
-			}
+	VariableSpans(std::vector<Span> &&p_spans) : m_spans(p_spans) {
+		offset_t max_len = 0;
+		for (const auto &s : m_spans) {
+			max_len = std::max(max_len, s.end - s.start);
 		}
 		m_max_len = max_len;
 	}
 
 	inline size_t size() const {
-		// we model spans and have one more offset than spans.
-		return m_offsets.size() - 1;
+		return m_spans.size();
 	}
 
-	inline int32_t start(const size_t p_index) const {
-		return m_offsets[p_index];
+	inline offset_t start(const size_t p_index) const {
+		return m_spans[p_index].start;
 	}
 
-	inline int32_t end(const size_t p_index) const {
-		return m_offsets[p_index + 1];
+	inline offset_t end(const size_t p_index) const {
+		return m_spans[p_index].end;
 	}
 
-	inline int32_t len(const size_t p_index) const {
+	inline offset_t len(const size_t p_index) const {
 		return end(p_index) - start(p_index);
 	}
 
-	inline int32_t bounded_len(const size_t p_index, const size_t p_size) const {
-		const size_t i1 = std::min(p_index + p_size, m_offsets.size() - 1);
-		return start(i1) - start(p_index);
+	inline offset_t bounded_len(const size_t p_index, const size_t p_size) const {
+		const size_t i1 = std::min(p_index + p_size - 1, m_spans.size() - 1);
+		return end(i1) - start(p_index);
 	}
 
-	inline int32_t max_len(const size_t p_window_size) const {
+	inline offset_t max_len(const size_t p_window_size) const {
 		return m_max_len * p_window_size;
 	}
 };
