@@ -34,15 +34,30 @@ class CachableCallable:
 		return CachableCallable(ident, chain(unpacked))
 
 
+class RewrittenDict:
+	def __init__(self, base, chg):
+		self._base = base
+		self._chg = chg
+
+	def __getitem__(self, k):
+		v = self._chg.get(k)
+		if v is not None:
+			return v
+		else:
+			return self._base[k]
+
+
 def make_rewrite(rules):
 	if rules is None:
 		return lambda t: t
 
 	def f(t):
-		t_new = t.copy()
+		t_new = dict()
 		for k, v in rules.items():
-			t_new[k] = v.get(t[k], t[k])
-		return t_new
+			x = v.get(t[k])
+			if x is not None:
+				t_new[k] = x
+		return RewrittenDict(t, t_new) if t_new else t
 
 	return f
 

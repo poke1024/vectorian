@@ -109,10 +109,56 @@ class DocumentStorage:
 		raise NotImplementedError()
 
 
+class Tokens:
+	class TokenDict:
+		def __init__(self, data, index):
+			self._data = data
+			self._index = index
+
+		def copy_slow(self):
+			i = self._index
+			return dict((k, v[i]) for k, v in self._data.items())
+
+		def __getitem__(self, key):
+			array = self._data.get(key)
+			return None if array is None else array[self._index]
+
+	def __init__(self, tokens):
+		self._tokens = tokens
+		self._data = dict((k, v['data']) for k, v in tokens.items())
+
+	def __len__(self):
+		return len(self._tokens['start']['data'])
+
+	def __iter__(self):
+		for i in range(len(self)):
+			yield Tokens.TokenDict(self._data, i)
+
+	def items(self):
+		return self._tokens.items()
+
+	def save_to_h5(self, hf):
+		for k, v in self._tokens.items():
+			dtype = v['dtype']
+			data = v['data']
+			if dtype == 'int':
+				hf.create_dataset(k, data=data)
+			elif dtype == 'enum':
+				mapping = dict((k, i) for i, k in enumerate(set(data)))
+				dt = h5py.enum_dtype(mapping, basetype='i')
+				hf.create_dataset(k, dtype=dt, data=[mapping[x] for x in data])
+			elif dtype == 'str':
+				dt = h5py.string_dtype(encoding='utf-8')
+				hf.create_dataset(k, dtype=dt, data=data)
+			else:
+				raise ValueError(dtype)
+
+
 class InMemoryDocumentStorage(DocumentStorage):
-	def __init__(self, json, text, spans):
+	def __init__(self, json, text, tokens, spans):
 		self._json = json
 		self._text = text
+		self._tokens = Tokens(tokens)
 		self._spans = spans
 
 	@property
@@ -126,6 +172,10 @@ class InMemoryDocumentStorage(DocumentStorage):
 	@contextlib.contextmanager
 	def text(self, session):
 		yield InMemoryText(self._text)
+
+	@contextlib.contextmanager
+	def tokens(self):
+		yield self._tokens
 
 	@contextlib.contextmanager
 	def spans(self):
@@ -210,6 +260,10 @@ class Document:
 			with zipfile.ZipFile(path.with_suffix(".zip"), "w") as zf:
 				zf.writestr("metadata.json", json.dumps(self.metadata))
 				zf.writestr("data.json", json.dumps(data))
+
+		with self._storage.tokens() as tokens:
+			with h5py.File(path.with_suffix(".tok.h5"), "w") as hf:
+				tokens.save_to_h5(hf)
 
 		with self._storage.spans() as spans:
 			with h5py.File(path.with_suffix(".spn.h5"), "w") as hf:
@@ -350,11 +404,10 @@ class PreparedDocument:
 
 		token_mapper = session.normalizer('token').token_to_token
 
-		with storage.json() as json:
+		with storage.tokens() as tokens:
 			with storage.text(self._session) as text:
 				token_table = TokenTable(text.get(), self._session.normalizers)
 
-				tokens = json['tokens']
 				token_mask = np.zeros((len(tokens),), dtype=np.bool)
 
 				for i, token in enumerate(tokens):
@@ -362,15 +415,15 @@ class PreparedDocument:
 					if t:
 						token_mask[i] = token_table.add(t)
 
-			with storage.spans() as spans:
-				reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
+		with storage.spans() as spans:
+			reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
 
-				self._spans = dict()
-				for name, data in spans.items():
-					new_data = dict((k, np.array(v)) for k, v in data.items())
-					new_data['start'] = reindex[new_data['start']]
-					new_data['end'] = reindex[new_data['end']]
-					self._spans[name] = new_data
+			self._spans = dict()
+			for name, data in spans.items():
+				new_data = dict((k, np.array(v)) for k, v in data.items())
+				new_data['start'] = reindex[new_data['start']]
+				new_data['end'] = reindex[new_data['end']]
+				self._spans[name] = new_data
 
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())

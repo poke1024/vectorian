@@ -17,6 +17,7 @@ def normalize_dashes(s):
 
 
 def to_min_dtype(array):
+	# note that we do not check for min and assume it's 0 or -1
 	max = np.max(array)
 	for dtype in (np.int8, np.int16, np.int32, np.int64):
 		if max <= np.iinfo(dtype).max:
@@ -59,6 +60,35 @@ def compile_spans(spans, tokens, loc_ax):
 		token_i = token_j
 
 	return new_spans
+
+
+def make_tokens_dict(tokens):
+	dtypes = {
+		'id': 'int',
+		'start': 'int',
+		'end': 'int',
+		'head': 'int',
+		'tag': 'enum',
+		'pos': 'enum',
+		'dep': 'enum'
+	}
+
+	keys = set.union(*[set(t.keys()) for t in tokens])
+	res = dict()
+	for k in keys:
+		data = [t.get(k) for t in tokens]
+		dtype = dtypes.get(k, 'str')
+		if dtype == 'int':
+			res[k] = {
+				'dtype': 'int',
+				'data': to_min_dtype(np.array(data, dtype=np.int64))
+			}
+		else:
+			res[k] = {
+				'dtype': dtype,
+				'data': data
+			}
+	return res
 
 
 Metadata = namedtuple(
@@ -138,7 +168,6 @@ class Importer:
 
 		json = {
 			'metadata': md._asdict(),
-			'tokens': tokens,
 			'loc_ax': loc_ax
 		}
 
@@ -159,7 +188,7 @@ class Importer:
 			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
 		return Document(
-			InMemoryDocumentStorage(json, ''.join(texts), spans),
+			InMemoryDocumentStorage(json, ''.join(texts), make_tokens_dict(tokens), spans),
 			contextual_embeddings)
 
 

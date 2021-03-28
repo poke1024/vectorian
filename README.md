@@ -29,10 +29,16 @@ queries over sentences in a larger number of documents. the design
 is geared towards high performance when search a large number of
 small units (sentences) as opposed to comparing whole documents.
 
+it's geared towards:
+* fast loading of large corpus
+* interactive searches that can vary a larger amount of parameters
+without the need of anewed preprocessing the whole data
+
 this is achieved by
 (1) a highly optimized C++ core
 (2) an efficient storage of document data that allows to load large
 number of document data into memory without the need for disk access
+(using intelling caching)
 
 # changes over last version
 
