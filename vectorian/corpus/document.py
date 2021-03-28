@@ -110,12 +110,16 @@ class DocumentStorage:
 
 
 class Tokens:
-	class TokenDict:
+	pass
+
+
+class InternalMemoryTokens(Tokens):
+	class TokenData:
 		def __init__(self, data, index):
 			self._data = data
 			self._index = index
 
-		def copy_slow(self):
+		def copy(self):
 			i = self._index
 			return dict((k, v[i]) for k, v in self._data.items())
 
@@ -132,10 +136,7 @@ class Tokens:
 
 	def __iter__(self):
 		for i in range(len(self)):
-			yield Tokens.TokenDict(self._data, i)
-
-	def items(self):
-		return self._tokens.items()
+			yield InternalMemoryTokens.TokenData(self._data, i)
 
 	def save_to_h5(self, hf):
 		for k, v in self._tokens.items():
@@ -145,21 +146,70 @@ class Tokens:
 				hf.create_dataset(k, data=data)
 			elif dtype == 'enum':
 				mapping = dict((k, i) for i, k in enumerate(set(data)))
-				assert len(mapping) <= 0x7f
-				dt = h5py.enum_dtype(mapping, basetype='i8')
+				assert len(mapping) <= 0xff
+				dt = h5py.enum_dtype(mapping, basetype=np.uint8)
 				hf.create_dataset(k, dtype=dt, data=[mapping[x] for x in data])
 			elif dtype == 'str':
 				dt = h5py.string_dtype(encoding='utf-8')
-				hf.create_dataset(k, dtype=dt, data=['' if x is None else x for x in data])
+				hf.create_dataset(k, dtype=dt, data=['' if x is None else x for x in data], compression='lzf')
 			else:
 				raise ValueError(dtype)
+
+
+class ExternalMemoryTokens(Tokens):
+	class TokenData:
+		def __init__(self, hf, get, index):
+			self._hf = hf
+			self._get = get
+			self._index = index
+
+		def copy(self):
+			i = self._index
+			return dict((k, v[i]) for k, v in self._hf.items())
+
+		def items(self):
+			return self.copy().items()
+
+		def __getitem__(self, key):
+			array = self._get(key)
+			return None if array is None else array[self._index]
+
+	def __init__(self, path):
+		self._hf = h5py.File(path, 'r')
+		self._cache = dict()
+
+		for k, v in self._hf.items():
+			print(k, v.dtype)
+
+	def _column(self, k):
+		x = self._cache.get(k)
+		if x is not None:
+			return x
+		x = self._hf.get(k)
+		if x is not None:
+			r = np.array(x)
+		else:
+			r = None
+		self._cache[k] = r
+		return r
+
+	def __len__(self):
+		return self._hf['start'].shape[0]
+
+	def __iter__(self):
+		get = self._column
+		for i in range(len(self)):
+			yield ExternalMemoryTokens.TokenData(self._hf, get, i)
+
+	def close(self):
+		self._hf.close()
 
 
 class InternalMemoryDocumentStorage(DocumentStorage):
 	def __init__(self, json, text, tokens, spans):
 		self._json = json
 		self._text = text
-		self._tokens = Tokens(tokens)
+		self._tokens = InternalMemoryTokens(tokens)
 		self._spans = spans
 
 	@property
@@ -213,6 +263,20 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 			yield text
 		finally:
 			text.close()
+
+	@contextlib.contextmanager
+	def tokens(self):
+		tokens = ExternalMemoryTokens(self._path.with_suffix(".tok.h5"))
+
+		for t in tokens:
+			for k, v in t.items():
+				print(k, v)
+			sys.exit(0)
+
+		try:
+			yield tokens
+		finally:
+			tokens.close()
 
 	@contextlib.contextmanager
 	def spans(self):
