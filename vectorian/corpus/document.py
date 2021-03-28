@@ -165,7 +165,7 @@ class ExternalMemoryTokens(Tokens):
 
 		def copy(self):
 			i = self._index
-			return dict((k, v[i]) for k, v in self._hf.items())
+			return dict((k, self._get(k)[i]) for k in self._hf.keys())
 
 		def items(self):
 			return self.copy().items()
@@ -178,20 +178,27 @@ class ExternalMemoryTokens(Tokens):
 		self._hf = h5py.File(path, 'r')
 		self._cache = dict()
 
-		for k, v in self._hf.items():
-			print(k, v.dtype)
-
 	def _column(self, k):
-		x = self._cache.get(k)
-		if x is not None:
-			return x
-		x = self._hf.get(k)
-		if x is not None:
-			r = np.array(x)
+		cached_data = self._cache.get(k)
+		if cached_data is not None:
+			return cached_data
+
+		dset = self._hf.get(k)
+		if dset is not None:
+			if h5py.check_string_dtype(dset.dtype):
+				py_data = dset.asstr()
+			else:
+				enum_dict = h5py.check_enum_dtype(dset.dtype)
+				if enum_dict:
+					inv_enum_dict = dict((i, k) for k, i in enum_dict.items())
+					py_data = [inv_enum_dict[x] for x in np.array(dset)]
+				else:
+					py_data = np.array(dset)
 		else:
-			r = None
-		self._cache[k] = r
-		return r
+			py_data = None
+
+		self._cache[k] = py_data
+		return py_data
 
 	def __len__(self):
 		return self._hf['start'].shape[0]
@@ -267,11 +274,6 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 	@contextlib.contextmanager
 	def tokens(self):
 		tokens = ExternalMemoryTokens(self._path.with_suffix(".tok.h5"))
-
-		for t in tokens:
-			for k, v in t.items():
-				print(k, v)
-			sys.exit(0)
 
 		try:
 			yield tokens
