@@ -16,6 +16,9 @@ class Text:
 	def get(self):
 		raise NotImplementedError()
 
+	def close(self):
+		raise NotImplementedError()
+
 
 class InMemoryText(Text):
 	def __init__(self, text):
@@ -23,6 +26,22 @@ class InMemoryText(Text):
 
 	def get(self):
 		return self._text
+
+	def close(self):
+		pass
+
+
+class OnDiskText(Text):
+	def __init__(self, path):
+		self._f = open(path, "r")
+		self._text = self._f.read()
+		# FIXME
+
+	def get(self):
+		return self._text
+
+	def close(self):
+		self._f.close()
 
 
 def convert_idx_len_to_utf8(text, idx, len):
@@ -146,12 +165,12 @@ class OnDiskDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def spans(self):
-		with h5py.File(self._path.with_suffix(".spn.h5"), "w") as hf:
+		with h5py.File(self._path.with_suffix(".spn.h5"), "r") as hf:
 			spans = dict()
-			for name in hf:
+			for name in hf.keys():
 				data = dict()
-				for k in hf[name]:
-					data[k] = hf[f'{g}/{k}']
+				for k, v in hf[name].items():
+					data[k] = v
 				spans[name] = data
 			yield spans
 
@@ -348,9 +367,10 @@ class PreparedDocument:
 
 				self._spans = dict()
 				for name, data in spans.items():
-					data['start'] = reindex[data['start']]
-					data['end'] = reindex[data['end']]
-					self._spans[name] = data
+					new_data = dict((k, np.array(v)) for k, v in data.items())
+					new_data['start'] = reindex[new_data['start']]
+					new_data['end'] = reindex[new_data['end']]
+					self._spans[name] = new_data
 
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())
