@@ -9,7 +9,7 @@ import h5py
 from functools import lru_cache
 from slugify import slugify
 from pathlib import Path
-from vectorian.embeddings import MaskedVectorsRef, OnDiskVectorsRef
+from vectorian.embeddings import MaskedVectorsRef, ExternalMemoryVectorsRef
 
 
 class Text:
@@ -20,7 +20,7 @@ class Text:
 		raise NotImplementedError()
 
 
-class InMemoryText(Text):
+class InternalMemoryText(Text):
 	def __init__(self, text):
 		self._text = text
 
@@ -31,7 +31,7 @@ class InMemoryText(Text):
 		pass
 
 
-class OnDiskText(Text):
+class ExternalMemoryText(Text):
 	def __init__(self, path):
 		self._f = open(path, "r")
 		self._text = self._f.read()
@@ -145,16 +145,17 @@ class Tokens:
 				hf.create_dataset(k, data=data)
 			elif dtype == 'enum':
 				mapping = dict((k, i) for i, k in enumerate(set(data)))
-				dt = h5py.enum_dtype(mapping, basetype='i')
+				assert len(mapping) <= 0x7f
+				dt = h5py.enum_dtype(mapping, basetype='i8')
 				hf.create_dataset(k, dtype=dt, data=[mapping[x] for x in data])
 			elif dtype == 'str':
 				dt = h5py.string_dtype(encoding='utf-8')
-				hf.create_dataset(k, dtype=dt, data=data)
+				hf.create_dataset(k, dtype=dt, data=['' if x is None else x for x in data])
 			else:
 				raise ValueError(dtype)
 
 
-class InMemoryDocumentStorage(DocumentStorage):
+class InternalMemoryDocumentStorage(DocumentStorage):
 	def __init__(self, json, text, tokens, spans):
 		self._json = json
 		self._text = text
@@ -171,7 +172,7 @@ class InMemoryDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def text(self, session):
-		yield InMemoryText(self._text)
+		yield InternalMemoryText(self._text)
 
 	@contextlib.contextmanager
 	def tokens(self):
@@ -182,7 +183,7 @@ class InMemoryDocumentStorage(DocumentStorage):
 		yield self._spans
 
 
-class OnDiskDocumentStorage(DocumentStorage):
+class ExternalMemoryDocumentStorage(DocumentStorage):
 	def __init__(self, path):
 		self._path = Path(path)
 		self._metadata = None
@@ -207,7 +208,7 @@ class OnDiskDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def text(self, session):
-		text = OnDiskText(self._path.with_suffix('.txt'))
+		text = ExternalMemoryText(self._path.with_suffix('.txt'))
 		try:
 			yield text
 		finally:
@@ -249,9 +250,9 @@ class Document:
 				emb_data = json.loads(f.read())
 
 			for k, slug_name in emb_data.items():
-				contextual_embeddings[k] = OnDiskVectorsRef(emb_path / slug_name)
+				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / slug_name)
 
-		return Document(OnDiskDocumentStorage(path), contextual_embeddings)
+		return Document(ExternalMemoryDocumentStorage(path), contextual_embeddings)
 
 	def save(self, path):
 		path = Path(path)

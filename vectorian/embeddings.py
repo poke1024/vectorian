@@ -708,11 +708,11 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		] + ([] if self._transform is None else [self._transform.name]))
 
 
-class OnDiskVectors:
+class ExternalMemoryVectors:
 	@staticmethod
 	def load(path):
 		hf = h5py.File(path.with_suffix(".h5"), "r")
-		v = OnDiskVectors(hf)
+		v = ExternalMemoryVectors(hf)
 
 		transform = hf.get("transform")
 		if transform:
@@ -796,12 +796,12 @@ class ProxyVectorsRef(VectorsRef):
 		return self._vectors
 
 
-class OnDiskVectorsRef(VectorsRef):
+class ExternalMemoryVectorsRef(VectorsRef):
 	def __init__(self, path):
 		self._path = path
 
 	def open(self):
-		return OnDiskVectors.load(self._path)
+		return ExternalMemoryVectors.load(self._path)
 
 
 class MaskedVectorsRef(VectorsRef):

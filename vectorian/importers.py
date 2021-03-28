@@ -171,7 +171,7 @@ class Importer:
 			'loc_ax': loc_ax
 		}
 
-		from vectorian.corpus.document import Document, InMemoryDocumentStorage
+		from vectorian.corpus.document import Document, InternalMemoryDocumentStorage
 
 		emb_by_name = dict((e.name, e) for e in self._embeddings)
 
@@ -188,7 +188,7 @@ class Importer:
 			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
 		return Document(
-			InMemoryDocumentStorage(json, ''.join(texts), make_tokens_dict(tokens), spans),
+			InternalMemoryDocumentStorage(json, ''.join(texts), make_tokens_dict(tokens), spans),
 			contextual_embeddings)
 
 
