@@ -6,6 +6,19 @@
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 
+class VSM {
+public:
+	/*
+
+	idea:
+	build a fast (perfect?) hashmap for query (token id -> query token index)
+	scan over target s and check if token exists in query using hashmap
+	accumulate shared token ids via query token index
+	compute shared nbows
+
+	*/
+};
+
 template<typename Slice>
 inline float reference_score(
 	const QueryRef &p_query,
