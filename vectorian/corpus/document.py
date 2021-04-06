@@ -594,14 +594,13 @@ class PreparedDocument:
 	def span(self, partition, index):
 		return self._spans_getter(partition)(index)
 
-	def span_info(self, partition, index):
+	def span_info(self, partition, slice_id):
 		info = dict()
 		if partition.level == "token":
 			return info  # FIXME
 		table = self._spans[partition.level]
-		i = index * partition.window_step
 		for k, v in table.items():
-			info[k] = int(v[i])
+			info[k] = int(v[slice_id])
 		return info
 
 	@property
