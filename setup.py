@@ -36,7 +36,7 @@ ext_modules = [
 
 setup(
 	name='vectorian',
-	version='0.8.0dev',
+	version='0.8.0.dev1',
 	packages=find_packages(),
 	license='GPLv2',
 	author='Bernhard Liebl',
