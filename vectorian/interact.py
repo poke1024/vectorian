@@ -729,7 +729,6 @@ class MatchRenderWidget:
 		flags = [
 			'excerpt',
 			'+annotations',
-			'flow',
 			'matrix'
 		]
 
@@ -743,14 +742,11 @@ class MatchRenderWidget:
 			items.append(checkbox)
 		self._items = items
 
-		self._hbox = widgets.HBox([
-									  widgets.Label("")
-								  ] + items, layout=widgets.Layout(padding_top='4em'))
+		self._hbox = widgets.HBox(
+			[widgets.Label("Visualize:")] + items,
+			layout=widgets.Layout(padding_top='4em'))
 
 	def on_changed(self, change):
-		# change.owner.description
-		# print(change)
-
 		cmds = set()
 		for item in self._items:
 			if item.value:
