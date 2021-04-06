@@ -759,7 +759,7 @@ class MatchRenderWidget:
 		items = []
 		for f in flags:
 			checkbox = widgets.ToggleButton(
-				value=False,
+				value=f == 'excerpt',
 				description=f,
 				disabled=False)
 			checkbox.observe(self.on_changed, names='value')

@@ -595,13 +595,17 @@ class PreparedDocument:
 		return self._spans_getter(partition)(index)
 
 	def span_info(self, partition, slice_id):
-		info = dict()
+		# note that slice_id is already a multiple of
+		# partition.window_step, i.e. the final offset
 		if partition.level == "token":
-			return info  # FIXME
-		table = self._spans[partition.level]
-		for k, v in table.items():
-			info[k] = int(v[slice_id])
-		return info
+			return {
+				'start': slice_id,
+				'end': slice_id + partition.window_size
+			}
+		else:
+			table = self._spans[partition.level]
+			info = dict((k, int(v[slice_id])) for k, v in table.items())
+			return info
 
 	@property
 	def compiled(self):
