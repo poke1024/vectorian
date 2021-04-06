@@ -280,8 +280,10 @@ class LabSession(Session):
 		super().__init__(*args, **kwargs)
 		self._location_formatter = location_formatter or LocationFormatter()
 
-	def interact(self):
-		pass  # return InteractiveQuery(self)
+	def interact(self, nlp):
+		from vectorian.interact import InteractiveQuery
+		q = InteractiveQuery(self, nlp)
+		return q.widget
 
 	def make_result(self, *args, **kwargs):
 		return LabResult(
