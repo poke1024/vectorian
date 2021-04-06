@@ -7,13 +7,24 @@ import vectorian.metrics
 import vectorian.session
 
 
+ROOT_LEVEL_STYLE = {'description_width': '10em'}
+
+
+def make_root_label(s):
+	return widgets.Label(s, layout=widgets.Layout(width='10em', display='flex', justify_content='flex-end'))
+
+
 class FineTuneableWidget:
+	_level = 0
+
 	def __init__(self, iquery, fix_to=None):
 		kwargs = dict(
 			options=[x[0] for x in self._types],
 			value=self._default if fix_to is None else fix_to,
 			description=self._description,
-			disabled=fix_to is not None)
+			disabled=fix_to is not None,
+			layout={'width': '25em'},
+			style=ROOT_LEVEL_STYLE if self._level == 0 else {})
 
 		layout = self.layout
 		if layout is not None:
@@ -264,7 +275,8 @@ class TokenSimilarityMetricWidget:
 			value=self._options[0]['name'],
 			description='Similarity:',
 			disabled=False,
-			layout={'width': '18em'})
+			layout={'width': '20em'},
+			style=ROOT_LEVEL_STYLE)
 
 		self._operands_vbox = widgets.VBox([])
 
@@ -276,7 +288,8 @@ class TokenSimilarityMetricWidget:
 			step=0.1,
 			description='Falloff:',
 			disabled=False,
-			layout={'width': '20em'})
+			layout={'width': '20em'},
+			style=ROOT_LEVEL_STYLE)
 
 		self._vbox = widgets.VBox([
 			widgets.HBox([
@@ -432,6 +445,8 @@ class ExponentialGapCostWidget(SlidingGapCostWidget):
 
 
 class GapCostWidget(FineTuneableWidget):
+	_level = 1
+
 	_description = 'Gap Type:'
 
 	_types = [
@@ -446,15 +461,18 @@ class GapCostWidget(FineTuneableWidget):
 
 
 class AlignmentAlgorithmWidget:
-	def __init__(self, iquery, parameters):
+	def __init__(self, iquery, parameters, indent='5em'):
 		self._token_metric = TokenSimilarityMetricWidget(iquery)
 
 		if parameters is None:
 			self._vbox = widgets.VBox([
 				self._token_metric.widget])
 		else:
+			parameters.layout = widgets.Layout(margin=f'0 0 0 {indent}')
 			self._vbox = widgets.VBox([
-				self._token_metric.widget, parameters])
+				self._token_metric.widget,
+				make_root_label('Alignment Args:'),
+				parameters])
 
 	@property
 	def widget(self):
@@ -505,7 +523,8 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 			disabled=False)
 		super().__init__(
 			iquery,
-			widgets.VBox([self._gap_cost.widget, self._zero]))
+			widgets.VBox(
+				[self._gap_cost.widget, self._zero]))
 
 	def make(self):
 		return vectorian.alignment.WatermanSmithBeyer(
@@ -531,12 +550,13 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		self._extra_mass_penalty = widgets.FloatText(
 			value=-1,
 			description='Extra Mass Penalty:',
-			disabled=False)
+			disabled=False,
+			style={'description_width': 'initial'})
 
 		super().__init__(iquery, widgets.VBox([
 			self._variant,
 			self._extra_mass_penalty
-		]))
+		]), indent='10em')
 
 	def make(self):
 		variant = self._variant.value.split("/")
@@ -561,12 +581,13 @@ class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
 		self._extra_mass_penalty = widgets.FloatText(
 			value=-1,
 			description='Extra Mass Penalty:',
-			disabled=False)
+			disabled=False,
+			style={'description_width': 'initial'})
 
-		super().__init__(iquery, widgets.HBox([
+		super().__init__(iquery, widgets.VBox([
 			self._normalize_magnitudes,
 			self._extra_mass_penalty
-		]))
+		]), indent='10em')
 
 	def make(self):
 		return vectorian.alignment.WordRotatorsDistance(
@@ -686,7 +707,8 @@ class PartitionWidget:
 			options=['sentence', 'token'],
 			value='sentence',
 			description='Partition:',
-			disabled=False)
+			disabled=False,
+			style=ROOT_LEVEL_STYLE)
 
 		self._window_size = widgets.BoundedIntText(
 			value=1,
@@ -695,7 +717,8 @@ class PartitionWidget:
 			step=1,
 			description='Window Size:',
 			disabled=False,
-			layout={'width': '10em'})
+			layout={'width': '10em'},
+			style={'description_width': 'initial'})
 
 		self._window_step = widgets.BoundedIntText(
 			value=1,
@@ -704,7 +727,8 @@ class PartitionWidget:
 			step=1,
 			description='Window Step:',
 			disabled=False,
-			layout={'width': '10em'})
+			layout={'width': '10em'},
+			style={'description_width': 'initial'})
 
 		self._hbox = widgets.HBox([
 			self._level,
@@ -743,8 +767,8 @@ class MatchRenderWidget:
 		self._items = items
 
 		self._hbox = widgets.HBox(
-			[widgets.Label("Visualize:")] + items,
-			layout=widgets.Layout(padding_top='4em'))
+			[make_root_label('Visualize:')] + items,
+			style={'padding_top': '1em'})
 
 	def on_changed(self, change):
 		cmds = set()
@@ -775,7 +799,8 @@ class QueryWidget:
 			placeholder='Your Query',
 			description='Query:',
 			disabled=False,
-			layout={'width': '40em'})
+			layout={'width': '40em'},
+			style=ROOT_LEVEL_STYLE)
 		self._query.on_submit(self.on_search)
 
 		self._submit_query = widgets.Button(
