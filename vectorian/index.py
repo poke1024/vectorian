@@ -7,12 +7,13 @@ import bisect
 import json
 import yaml
 import collections
+import contextlib
 
 from cached_property import cached_property
 from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
-from vectorian.corpus.document import TokenTable
+from vectorian.corpus.document import TokenTable, InternalMemoryText
 from vectorian.embeddings import Vectors, ProxyVectorsRef
 
 
@@ -44,7 +45,7 @@ class PreparedQuery:
 		self._query = query
 		self._vocab = vocab
 
-		doc = nlp(self.text)
+		doc = nlp(self.text_str)
 
 		# FIXME gather contextual_embeddings actually used in this query
 		# by analyzing query
@@ -67,7 +68,7 @@ class PreparedQuery:
 					(k, v[mask, :]) for k, v in contextual_embeddings.items())
 
 		token_mask = np.zeros((len(tokens),), dtype=np.bool)
-		token_table = TokenTable(self.text, self.index.session.normalizers)
+		token_table = TokenTable(self.text_str, self.index.session.normalizers)
 		for i, t in enumerate(tokens):
 			token_mask[i] = token_table.add(t)
 
@@ -93,8 +94,12 @@ class PreparedQuery:
 		return self._query.index
 
 	@property
-	def text(self):
+	def text_str(self):
 		return self._query.text
+
+	@contextlib.contextmanager
+	def text(self):
+		yield InternalMemoryText(self.text_str)
 
 	@property
 	def options(self):
@@ -257,14 +262,14 @@ class CoreMatch(Match):
 
 	@property
 	def omitted(self):
-		t_text = self._query.text
+		t_text = self._query.text_str
 		omitted = [t_text[slice(*s)] for s in self._c_match.omitted]
 		return omitted
 
 	def regions(self, context_size=10):
 		with self.document.text() as s_text_st:
 			s_text = s_text_st.get()
-			t_text = self.query.text
+			t_text = self.query.text_str
 
 			regions = []
 			for r in self._c_match.regions(context_size):

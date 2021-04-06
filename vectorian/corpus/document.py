@@ -92,6 +92,18 @@ class TokenTable:
 		}
 
 
+class Lengths:
+	def __init__(self, start, end):
+		self._start = start
+		self._end = end
+
+	def __len__(self):
+		return self._start.shape[0]
+
+	def __getitem__(self, i):
+		return self._end[i] - self._start[i]
+
+
 def xspan(idxs, lens, i0, window_size, window_step):
 	i = i0 * window_step
 	start = idxs[i]
@@ -543,7 +555,7 @@ class PreparedDocument:
 		return self.compiled.n_tokens
 
 	def n_spans(self, partition):
-		n = self._spans[partition.level]['token_at'].shape[0]
+		n = self._spans[partition.level]['start'].shape[0]
 		k = n // partition.window_step
 		if (k * partition.window_step) < n:
 			k += 1
@@ -562,12 +574,12 @@ class PreparedDocument:
 
 			return get
 		else:
-			col_token_at = self._spans[name]['token_at']
-			col_n_tokens = self._spans[name]['n_tokens']
+			col_start = self._spans[name]['start']
+			col_len = Lengths(col_start, self._spans[name]['end'])
 
 			def get(i):
 				start, end = xspan(
-					col_token_at, col_n_tokens, i,
+					col_start, col_len, i,
 					window_size, window_step)
 
 				return Span(self, self._tokens, start, end)
