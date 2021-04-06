@@ -18,6 +18,10 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 	const ssize_t needle_size = needle.size();
 	matrix->m_similarity.resize({ssize_t(vocab_size), needle_size});
 
+	if (needle_size < 1) {
+		return matrix;
+	}
+
 	const auto &needle_tokens = needle.token_ids();
 	py::list sources;
 	py::array_t<size_t> indices{needle_size};

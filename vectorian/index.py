@@ -8,6 +8,7 @@ import json
 import yaml
 import collections
 import contextlib
+import logging
 
 from cached_property import cached_property
 from collections import namedtuple
@@ -82,6 +83,7 @@ class PreparedQuery:
 			self.index,
 			self._vocab,
 			self._contextual_embeddings)
+
 		query.initialize(
 			token_table.to_dict(),
 			**self._query.options)
@@ -354,6 +356,9 @@ class Index:
 	def __init__(self, partition, metric):
 		self._partition = partition
 		self._metric = metric
+
+		if not partition.contiguous:
+			logging.warning("the used partition is non-contiguous, you will miss parts of the content.")
 
 	@property
 	def partition(self):

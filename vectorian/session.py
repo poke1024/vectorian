@@ -69,6 +69,10 @@ class Partition:
 		self._window_step = window_step
 
 	@property
+	def contiguous(self):
+		return self._window_step <= self._window_size
+
+	@property
 	def session(self):
 		return self._session
 
@@ -282,6 +286,10 @@ class LabSession(Session):
 
 	def interact(self, nlp):
 		from vectorian.interact import InteractiveQuery
+
+		logger = logging.getLogger()
+		logger.setLevel(logging.WARNING)
+
 		q = InteractiveQuery(self, nlp)
 		return q.widget
 
