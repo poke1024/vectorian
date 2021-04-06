@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest]  # , windows-latest, macos-latest
+        os: [ubuntu-latest, macos-latest]  # , windows-latest
         python: [37]  # , 38
         manylinux_image: [manylinux2014]
         include:
@@ -35,9 +35,38 @@ jobs:
           CIBW_BUILD: cp${{ matrix.python }}-${{ matrix.platform_id }}
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
           CIBW_ARCHS: "auto64"
-          CIBW_BEFORE_ALL_LINUX: bash scripts/prepare_for_build.sh
+          CIBW_BEFORE_ALL_LINUX: bash scripts/prepare_for_build_linux.sh
+          CIBW_BEFORE_ALL_MACOS: bash scripts/prepare_for_build_macos.sh
 
       - name: store artifacts
         uses: actions/upload-artifact@v2
         with:
           path: wheelhouse/*.whl
+
+  build_sdist:
+    name: build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        name: install Python
+        with:
+          python-version: '3.7'
+
+      - name: build sdist
+        run: python setup.py sdist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: dist/*.tar.gz
+
+  upload_pypi:
+    needs: [ build_wheels, build_sdist ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/vectorian/
