@@ -36,11 +36,11 @@ ext_modules = [
 
 setup(
 	name='Vectorian',
-	version='0.1dev',
+	version='0.8dev',
 	packages=find_packages(),
 	license='GPLv2',
 	author='Bernhard Liebl',
-	author_email='poke1024@gmx.org',
+	author_email='liebl@informatik.uni-leipzig.de',
 	long_description='',
 	ext_modules=ext_modules,
 	cmdclass={"build_ext": build_ext},
