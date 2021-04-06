@@ -33,7 +33,7 @@ doc = im("/Users/arbeit/Wise Children Mini.txt")
 session = LabSession(
     [doc],
     embeddings=[my_embedding],
-    token_mappings="default")
+    normalizers="default")
 
 metric = AlignmentSentenceSimilarity(
     token_metric=TokenSimilarity(my_embedding, CosineSimilarity()),

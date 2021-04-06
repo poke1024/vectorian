@@ -98,11 +98,18 @@ void StaticEmbeddingSimilarityMatrixFactory::fill_magnitudes_t(
 	const SimilarityMatrixRef &p_matrix) {
 
 	const Needle needle(m_query);
-	const auto &static_mag = m_static_matrix->m_magnitudes_s;
+	PPK_ASSERT(p_matrix.get() != nullptr);
+	const auto &static_mag = p_matrix->m_magnitudes_s;
+	PPK_ASSERT(static_mag.shape(0) == static_cast<ssize_t>(m_query->vocabulary()->size()));
 	auto &mag_t = p_matrix->m_magnitudes_t;
 	mag_t.resize({ssize_t(needle.size())});
 	for (size_t i = 0; i < needle.size(); i++) {
-		mag_t(i) = static_mag(needle.token_id(i));
+		const auto t = needle.token_id(i);
+		if (t >= 0) {
+			mag_t(i) = static_mag(t);
+		} else {
+			mag_t(i) = 0.0f;
+		}
 	}
 }
 
@@ -139,6 +146,11 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 		} break;
 
 		case CONTEXTUAL: {
+			// we end up here if we use a static embedding in a contextual query,
+			// i.e. if we are asked to fill a contextual similarity matrix of the
+			// shape (n_tokens_in_doc, n_dims) to mix with similarities from other
+			// contextual embeddings.
+
 			const Needle needle(m_query);
 			const auto matrix = std::make_shared<ContextualSimilarityMatrix>();
 

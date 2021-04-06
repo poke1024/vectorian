@@ -52,7 +52,7 @@ if __name__ == '__main__':
     formatter = LocationFormatter()
 
     if False:
-        metric = AlignmentSentenceMetric(
+        metric = AlignmentSentenceSimilarity(
             TokenSimilarityMetric(
                 fasttext, CosineMetric()))
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
                 f.write("\n")
                 f.write("\n")
 
-            if True:
+            if False:
                 metric = MixedTokenSimilarity(
                     [
                         TokenSimilarity(fasttext, CosineSimilarity()),
@@ -95,8 +95,8 @@ if __name__ == '__main__':
                     token_metric=metric,
                     alignment=WordMoversDistance.wmd('kusner')), nlp=nlp)
             else:
-                index = session.partition("sentence").index(AlignmentSentenceMetric(
-                    token_metric=TokenSimilarityMetric(fasttext, CosineSimilarity()),
+                index = session.partition("sentence").index(AlignmentSentenceSimilarity(
+                    token_metric=TokenSimilarity(fasttext, CosineSimilarity()),
                     alignment=WordRotatorsDistance()), nlp=nlp)
 
             #matches = index.find("write female", n=3, debug=debug)
