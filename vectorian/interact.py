@@ -288,7 +288,7 @@ class TokenSimilarityMetricWidget:
 			step=0.1,
 			description='Falloff:',
 			disabled=False,
-			layout={'width': '20em'},
+			layout={'width': '30em'},
 			style=ROOT_LEVEL_STYLE)
 
 		self._vbox = widgets.VBox([
@@ -768,7 +768,7 @@ class MatchRenderWidget:
 
 		self._hbox = widgets.HBox(
 			[make_root_label('Visualize:')] + items,
-			style={'padding_top': '1em'})
+			layout=widgets.Layout(margin='1em 0 0 0'))
 
 	def on_changed(self, change):
 		cmds = set()
