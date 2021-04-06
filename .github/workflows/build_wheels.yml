@@ -73,9 +73,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v2
-          with:
-            name: artifact
-            path: dist
+        with:
+          name: artifact
+          path: dist
 
       - uses: pypa/gh-action-pypi-publish@master
         with:
