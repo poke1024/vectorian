@@ -104,7 +104,7 @@ void StaticEmbeddingSimilarityMatrixFactory::fill_magnitudes_t(
 	const Needle needle(m_query);
 	PPK_ASSERT(p_matrix.get() != nullptr);
 	const auto &static_mag = p_matrix->m_magnitudes_s;
-	PPK_ASSERT(static_mag.shape(0) == static_cast<ssize_t>(m_query->vocabulary()->size()));
+	PPK_ASSERT(static_mag.shape(0) == m_query->vocabulary()->size());
 	auto &mag_t = p_matrix->m_magnitudes_t;
 	mag_t.resize({ssize_t(needle.size())});
 	for (size_t i = 0; i < needle.size(); i++) {

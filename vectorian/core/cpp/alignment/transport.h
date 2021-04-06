@@ -18,25 +18,47 @@ class OptimalTransport {
 		std::vector<std::vector<T>> m_matrix;
 
 	public:
-		void allocate(const size_t max_rows, const size_t max_cols) {
-			m_matrix.reserve(max_rows);
-			for (size_t i = 0; i < max_rows; i++) {
-				m_cached_rows.emplace_back(std::vector<T>(max_cols));
+		void allocate(const size_t p_max_rows, const size_t p_max_cols) {
+			m_matrix.reserve(p_max_rows);
+			for (size_t i = 0; i < p_max_rows; i++) {
+				m_cached_rows.emplace_back(std::vector<T>(p_max_cols));
 			}
 		}
 
 		std::vector<std::vector<T>> &configure(
-			const size_t num_rows, const size_t num_cols) {
+			const size_t p_num_rows, const size_t p_num_cols) {
 
+			m_cached_rows.insert(m_cached_rows.end(),
+				std::make_move_iterator(m_matrix.begin()),
+                std::make_move_iterator(m_matrix.end()));
+
+			m_matrix.clear();
+
+			PPK_ASSERT(m_cached_rows.size() >= p_num_rows);
+
+			m_matrix.insert(m_matrix.end(),
+				std::make_move_iterator(m_cached_rows.end() - p_num_rows),
+                std::make_move_iterator(m_cached_rows.end()));
+
+            m_cached_rows.erase(
+                m_cached_rows.end() - p_num_rows, m_cached_rows.end());
+
+            for (auto &row : m_matrix) {
+                row.resize(p_num_cols);
+            }
+
+            return m_matrix;
 		}
 
 		template<typename Matrix>
 		std::vector<std::vector<T>> &configure(const Matrix &m) {
-			auto &rows = configure(m.shape(0), m.shape(1));
-			for (size_t i = 0; i < m.shape(0); i++) {
+			const auto n_rows = m.shape(0);
+			const auto n_cols = m.shape(1);
+			auto &rows = configure(n_rows, n_cols);
+			for (size_t i = 0; i < n_rows; i++) {
 				auto &row = rows[i];
-				for (size_t j = 0; j < m.shape(1); j++) {
-					row[j] = M(i, j);
+				for (size_t j = 0; j < n_cols; j++) {
+					row[j] = m(i, j);
 				}
 			}
 			return rows;
