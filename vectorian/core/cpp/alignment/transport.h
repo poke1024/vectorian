@@ -29,6 +29,18 @@ class OptimalTransport {
 			const size_t num_rows, const size_t num_cols) {
 
 		}
+
+		template<typename Matrix>
+		std::vector<std::vector<T>> &configure(const Matrix &m) {
+			auto &rows = configure(m.shape(0), m.shape(1));
+			for (size_t i = 0; i < m.shape(0); i++) {
+				auto &row = rows[i];
+				for (size_t j = 0; j < m.shape(1); j++) {
+					row[j] = M(i, j);
+				}
+			}
+			return rows;
+		}
 	};
 
 	xt::xtensor<float, 2> m_G_storage;
