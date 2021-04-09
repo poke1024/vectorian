@@ -1,0 +1,213 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "A re-orderable adjacency matrix.",
+  "width": 770,
+  "height": 770,
+  "padding": 2,
+
+  "signals": [
+    { "name": "cellSize", "value": $cell_size },
+    { "name": "count", "update": "length(data('source_nodes')) + length(data('target_nodes'))" },
+    { "name": "width", "update": "span(range('target_position'))" },
+    { "name": "height", "update": "span(range('source_position'))" },
+    {
+      "name": "src", "value": {},
+      "on": [
+        {"events": "text:mousedown", "update": "datum"},
+        {"events": "window:mouseup", "update": "{}"}
+      ]
+    },
+    {
+      "name": "dest", "value": -1,
+      "on": [
+        {
+          "events": "[@columns:mousedown, window:mouseup] > window:mousemove",
+          "update": "src.name && datum !== src ? (0.5 + count * clamp(x(), 0, width) / width) : dest"
+        },
+        {
+          "events": "[@rows:mousedown, window:mouseup] > window:mousemove",
+          "update": "src.name && datum !== src ? (0.5 + count * clamp(y(), 0, height) / height) : dest"
+        },
+        {"events": "window:mouseup", "update": "-1"}
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "source_nodes",
+      "values": $source_nodes_values,
+      "format": {"type": "json", "property": "source_nodes"},
+      "transform": [
+        {
+          "type": "formula", "as": "order",
+          "expr": "datum.group"
+        },
+        {
+          "type": "formula", "as": "score",
+          "expr": "dest >= 0 && datum === src ? dest : datum.order"
+        },
+        {
+          "type": "window", "sort": {"field": "score"},
+          "ops": ["row_number"], "as": ["order"]
+        }
+      ]
+    },
+    {
+      "name": "target_nodes",
+      "values": $target_nodes_values,
+      "format": {"type": "json", "property": "target_nodes"},
+      "transform": [
+        {
+          "type": "formula", "as": "order",
+          "expr": "datum.group"
+        },
+        {
+          "type": "formula", "as": "score",
+          "expr": "dest >= 0 && datum === src ? dest : datum.order"
+        },
+        {
+          "type": "window", "sort": {"field": "score"},
+          "ops": ["row_number"], "as": ["order"]
+        }
+      ]
+    },
+    {
+      "name": "edges",
+      "values": $links_values,
+      "format": {"type": "json", "property": "links"},
+      "transform": [
+        {
+          "type": "lookup", "from": "source_nodes", "key": "index",
+          "fields": ["source"], "as": ["sourceNode"]
+        },
+        {
+          "type": "lookup", "from": "target_nodes", "key": "index",
+          "fields": ["target"], "as": ["targetNode"]
+        },
+        {
+          "type": "formula", "as": "group",
+          "expr": "datum.sourceNode.group === datum.targetNode.group ? datum.sourceNode.group : count"
+        }
+      ]
+    },
+    {
+      "name": "cross",
+      "source": "source_nodes",
+      "transform": [
+        { "type": "cross" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "source_position",
+      "type": "band",
+      "domain": {"data": "source_nodes", "field": "order", "sort": true},
+      "range": {"step": {"signal": "cellSize"}}
+    },
+    {
+      "name": "target_position",
+      "type": "band",
+      "domain": {"data": "target_nodes", "field": "order", "sort": true},
+      "range": {"step": {"signal": "cellSize"}}
+    },
+    {
+      "name": "source_color",
+      "type": "ordinal",
+      "range": "category",
+      "domain": {
+        "fields": [
+          {"data": "source_nodes", "field": "group"},
+          {"signal": "count"}
+        ],
+        "sort": true
+      }
+    },
+    {
+      "name": "target_color",
+      "type": "ordinal",
+      "range": "category",
+      "domain": {
+        "fields": [
+          {"data": "target_nodes", "field": "group"},
+          {"signal": "count"}
+        ],
+        "sort": true
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "cross"},
+      "encode": {
+        "update": {
+          "x": {"scale": "target_position", "field": "a.order"},
+          "y": {"scale": "source_position", "field": "b.order"},
+          "width": {"scale": "target_position", "band": 1, "offset": -1},
+          "height": {"scale": "source_position", "band": 1, "offset": -1},
+          "fill": [
+            {"test": "datum.a === src || datum.b === src", "value": "#ddd"},
+            {"value": "#f5f5f5"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "edges"},
+      "encode": {
+        "update": {
+          "x": {"scale": "target_position", "field": "targetNode.order"},
+          "y": {"scale": "source_position", "field": "sourceNode.order"},
+          "width": {"scale": "target_position", "band": 1, "offset": -1},
+          "height": {"scale": "source_position", "band": 1, "offset": -1},
+          "fill": {"scale": "target_color", "field": "group"},
+          "fillOpacity": {"field": "value"}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "name": "columns",
+      "from": {"data": "target_nodes"},
+      "encode": {
+        "update": {
+          "x": {"scale": "target_position", "field": "order", "band": 0.5},
+          "y": {"offset": -2},
+          "text": {"field": "name"},
+          "fontSize": {"value": 10},
+          "angle": {"value": -90},
+          "align": {"value": "left"},
+          "baseline": {"value": "middle"},
+          "fill": [
+            {"test": "datum === src", "value": "steelblue"},
+            {"value": "black"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "text",
+      "name": "rows",
+      "from": {"data": "source_nodes"},
+      "encode": {
+        "update": {
+          "x": {"offset": -2},
+          "y": {"scale": "source_position", "field": "order", "band": 0.5},
+          "text": {"field": "name"},
+          "fontSize": {"value": 10},
+          "align": {"value": "right"},
+          "baseline": {"value": "middle"},
+          "fill": [
+            {"test": "datum === src", "value": "steelblue"},
+            {"value": "black"}
+          ]
+        }
+      }
+    }
+  ]
+}

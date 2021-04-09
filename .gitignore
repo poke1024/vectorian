@@ -1,0 +1,8 @@
+.idea
+.rendered.core.cpp
+core.cpython*.so
+__pycache__
+.ipynb_checkpoints
+.DS_Store
+Vectorian.egg-info
+/dist

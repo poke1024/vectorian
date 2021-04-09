@@ -1,0 +1,32 @@
+name: vectorian
+channels:
+  - default
+  - conda-forge
+dependencies:
+  - python=3.8
+  - xtl
+  - xtensor
+  - xsimd
+  - xtensor-blas
+  - xtensor-python
+  - pip
+  - pip:
+      - pybind11~=2.6.2
+      - smart-open>=3.0.0, <4.0.0
+      - tqdm>=4.56.2
+      - spacy>=3.0.0
+      - fasttext>=0.9.2
+      - compress_fasttext>=0.0.6
+      - awesome-slugify>=1.6.5
+      - roman>=3.3
+      - yattag>=1.14.0
+      - download>=0.3.5
+      - cached-property>=1.5.2
+      - pyyaml>=5.4.1
+      - gensim>=3.8.3, <4.0.0
+      - h5py~=2.10.0
+      - scikit-learn>=0.24.1
+      - skl2onnx>=1.8.0
+      - onnxruntime>=1.7.0
+variables:
+  VECTORIAN_BLAS: 1
