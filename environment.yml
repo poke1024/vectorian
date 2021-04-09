@@ -28,5 +28,6 @@ dependencies:
       - scikit-learn>=0.24.1
       - skl2onnx>=1.8.0
       - onnxruntime>=1.7.0
+      - matplotlib>=3.4.1
 variables:
   VECTORIAN_BLAS: 1
