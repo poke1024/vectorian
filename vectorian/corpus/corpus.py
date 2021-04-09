@@ -22,11 +22,13 @@ class Corpus:
 	@staticmethod
 	def load(path):
 		path = Path(path)
+		docs = []
 		for p in sorted(path.iterdir()):
-			if p.suffix == ".json":
+			if p.suffix == ".txt":
 				doc = Document.load(p)
-				doc["origin"] = p
-				yield doc
+				doc.metadata["origin"] = p
+				docs.append(doc)
+		return Corpus(docs)
 
 	def save(self, path):
 		path = Path(path)
