@@ -26,6 +26,15 @@ def to_min_dtype(array):
 	raise ValueError(f"failed to map value {max} to numpy")
 
 
+def compile_doc_spans(tokens):
+	doc_spans = {
+		'start': np.array([0], dtype=np.int32),
+		'end': np.array([len(tokens)], dtype=np.int32)
+	}
+
+	return doc_spans
+
+
 def compile_spans(spans, tokens, loc_ax):
 	n = len(spans['start'])
 
@@ -164,7 +173,8 @@ class Importer:
 				contextual_vectors[e.name].append(e.encode(doc))
 
 		spans = {
-			'sentence': compile_spans(sents, tokens, loc_ax)
+			'sentence': compile_spans(sents, tokens, loc_ax),
+			'document': compile_doc_spans(tokens)
 		}
 
 		json = {
