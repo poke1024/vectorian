@@ -95,9 +95,9 @@ PYBIND11_MODULE(core, m) {
 	frequencies.def("tf", &Frequencies::tf);
 	frequencies.def("df", &Frequencies::df);
 	frequencies.def("tf_idf", &Frequencies::tf_idf);
-	frequencies.def("tf_tensor", &Frequencies::tf_tensor);
-	frequencies.def("df_tensor", &Frequencies::df_tensor);
-	frequencies.def("tf_idf_tensor", &Frequencies::tf_idf_tensor);
+	frequencies.def_property_readonly("tf_tensor", &Frequencies::tf_tensor);
+	frequencies.def_property_readonly("df_tensor", &Frequencies::df_tensor);
+	frequencies.def_property_readonly("tf_idf_tensor", &Frequencies::tf_idf_tensor);
 
 	py::class_<Query, QueryRef> query(m, "Query");
 	query.def(py::init<const py::object&, VocabularyRef, const py::dict&>());

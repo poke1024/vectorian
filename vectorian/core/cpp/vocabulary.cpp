@@ -68,21 +68,48 @@ std::vector<StaticEmbeddingRef> QueryVocabulary::get_compiled_embeddings(const s
 	return static_embeddings;
 }
 
-void Frequencies::add(const DocumentRef &p_doc) {
-	const auto &tokens = *p_doc->tokens();
-	const auto n_tokens = p_doc->n_tokens();
+void Frequencies::add(
+	const DocumentRef &p_doc,
+	const py::dict &p_slice_strategy) {
 
+	SliceStrategy slice_strategy;
+	slice_strategy.level = p_slice_strategy["level"].cast<py::str>();
+	slice_strategy.window_size = p_slice_strategy["window_size"].cast<py::int_>();
+	slice_strategy.window_step = p_slice_strategy["window_step"].cast<py::int_>();
+
+	const auto spans = p_doc->spans(slice_strategy.level);
+
+	const size_t n_slices = spans->size();
+	size_t token_at = 0;
+
+	const Token *tokens = p_doc->tokens()->data();
 	std::unordered_set<token_t> seen;
-	seen.reserve(n_tokens);
+	seen.reserve(slice_strategy.window_size);
 
-	for (size_t i = 0; i < n_tokens; i++) {
-		const auto id = tokens[i].id;
-		m_tf(id) += 1;
-		if (seen.find(id) == seen.end()) {
-			seen.insert(id);
-			m_df(id) += 1;
+	for (size_t slice_id = 0;
+		slice_id < n_slices;
+		slice_id += slice_strategy.window_step) {
+
+		const auto len_s = spans->bounded_len(
+			slice_id, slice_strategy.window_size);
+
+		if (len_s < 1) {
+			continue;
 		}
-	}
 
-	m_n_docs += 1;
+		seen.clear();
+		for (ssize_t i = 0; i < len_s; i++) {
+			const auto id = tokens[token_at + i].id;
+			m_tf(id) += 1;
+			if (seen.find(id) == seen.end()) {
+				seen.insert(id);
+				m_df(id) += 1;
+			}
+		}
+
+		token_at += spans->bounded_len(
+			slice_id, slice_strategy.window_step);
+
+		m_n_docs += 1;
+	}
 }

@@ -99,6 +99,13 @@ class Partition:
 			'window_step': self._window_step
 		}
 
+	@cached_property
+	def freq(self):
+		freq = core.Frequencies(self._session.vocab)
+		for doc in self._session.documents:
+			freq.add(doc.compiled, self.to_args())
+		return freq
+
 	def max_len(self):
 		return self._session.max_len(self._level, self._window_size)
 
@@ -160,13 +167,6 @@ class Session:
 	@property
 	def vocab(self):
 		return self._vocab
-
-	@cached_property
-	def freq(self):
-		freq = core.Frequencies(self._vocab)
-		for doc in self._collection.documents:
-			freq.add(doc.compiled)
-		return freq
 
 	def default_metric(self):
 		embedding = self._embeddings[0]

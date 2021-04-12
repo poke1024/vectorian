@@ -475,7 +475,9 @@ public:
 		m_tf_idf_valid = false;
 	}
 
-	void add(const DocumentRef &p_doc);
+	void add(
+		const DocumentRef &p_doc,
+		const py::dict &p_slice_strategy);
 
 	freq_t tf(const std::string &p_term) const {
 		const token_t i = m_vocab->token_to_id(p_term);
@@ -504,6 +506,10 @@ public:
 		compute_tf_idf();
 		return m_tf_idf;
 	}
+
+	//xt::pytensor<float, 1> to_bow(const DocumentRef &p_doc);
+	//xt::pytensor<float, 1> to_nbow(const DocumentRef &p_doc);
+	//xt::pytensor<float, 1> to_tf_idf(const DocumentRef &p_doc);
 };
 
 typedef std::shared_ptr<Frequencies> FrequenciesRef;
