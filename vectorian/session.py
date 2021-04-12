@@ -1,6 +1,7 @@
 import vectorian.core as core
 import vectorian.normalize as normalize
 import logging
+import collections
 
 from cached_property import cached_property
 from functools import lru_cache
@@ -61,6 +62,9 @@ class Collection:
 		return max([doc.compiled.max_len(level, window_size) for doc in self._docs])
 
 
+Slice = collections.namedtuple('Slice', ['level', 'start', 'end'])
+
+
 class Partition:
 	def __init__(self, session, level, window_size, window_step):
 		self._session = session
@@ -107,6 +111,9 @@ class Partition:
 			kwargs['nlp'] = nlp
 
 		return metric.create_index(self, **kwargs)
+
+	def slice_id_to_slice(self, slice_id):
+		return Slice(self._level, self._window_step * slice_id, self._window_size)
 
 
 class Session:

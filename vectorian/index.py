@@ -153,20 +153,36 @@ PartitionData = namedtuple('PartitionData', [
 
 class Match:
 	@property
+	def index(self):
+		raise NotImplementedError()
+
+	@property
+	def partition(self):
+		return self.index.partition
+
+	@property
 	def doc_span(self):
-		return self.document.span(self.query.index.partition, self.slice_id)
+		return self.prepared_doc.span(self.query.index.partition, self.slice_id)
 
 	@property
 	def query(self):
 		raise NotImplementedError()
 
 	@property
-	def document(self):
+	def doc(self):
+		return self.prepared_doc.doc
+
+	@property
+	def prepared_doc(self):
 		raise NotImplementedError()
 
 	@property
 	def slice_id(self):
 		raise NotImplementedError()
+
+	@property
+	def slice(self):
+		return self.partition.slice_id_to_slice(self.slice_id)
 
 	@property
 	def score(self):
@@ -195,7 +211,7 @@ class Match:
 	def to_json(self, context_size=10):
 		regions = []
 
-		doc = self.document
+		doc = self.prepared_doc
 		partition = self.query.options["partition"]
 
 		span_info = doc.span_info(
@@ -236,18 +252,23 @@ class Match:
 
 
 class CoreMatch(Match):
-	def __init__(self, session, query, c_match):
-		self._session = session
+	def __init__(self, index, query, c_match):
+		self._index = index
+		self._session = index.session
 		self._query = query
 		self._c_match = c_match
 		self._level = "word"
+
+	@property
+	def index(self):
+		return self._index
 
 	@property
 	def query(self):
 		return self._query
 
 	@property
-	def document(self):
+	def prepared_doc(self):
 		return self._session.documents[self._c_match.document.id]
 
 	@property
@@ -269,7 +290,7 @@ class CoreMatch(Match):
 		return omitted
 
 	def regions(self, context_size=10):
-		with self.document.text() as s_text_st:
+		with self.prepared_doc.text() as s_text_st:
 			s_text = s_text_st.get()
 			t_text = self.query.text_str
 
@@ -309,7 +330,8 @@ class CoreMatch(Match):
 
 
 class PyMatch:
-	def __init__(self, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
+	def __init__(self, index, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
+		self._index = index
 		self._query = query
 		self._document = document
 		self._slice_id = slice_id
@@ -320,11 +342,15 @@ class PyMatch:
 		self._level = level
 
 	@property
+	def index(self):
+		return self._index
+
+	@property
 	def query(self):
 		return self._query
 
 	@property
-	def document(self):
+	def prepared_doc(self):
 		return self._document
 
 	@property
@@ -449,8 +475,7 @@ class BruteForceIndex(Index):
 				if progress:
 					progress(done / total)
 
-		session = self.session
-		return [CoreMatch(session, p_query, m) for m in results.best_n(-1)]
+		return [CoreMatch(self, p_query, m) for m in results.best_n(-1)]
 
 
 def chunks(x, n):
@@ -616,6 +641,7 @@ class SentenceEmbeddingIndex(Index):
 				match=None, gap_penalty=0)]
 
 			matches.append(PyMatch(
+				self,
 				query,
 				doc,
 				sent_index,

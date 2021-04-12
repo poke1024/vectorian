@@ -310,6 +310,10 @@ class Document:
 		self._contextual_embeddings = contextual_embeddings or {}
 
 	@property
+	def storage(self):
+		return self._storage
+
+	@property
 	def contextual_embeddings(self):
 		return self._contextual_embeddings
 
@@ -411,7 +415,7 @@ class Document:
 		contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 		return PreparedDocument(
-			session, doc_index, self._storage, contextual_embeddings)
+			self, session, doc_index, contextual_embeddings)
 
 
 class Token:
@@ -477,9 +481,11 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, session, doc_index, storage, contextual_embeddings):
+	def __init__(self, doc, session, doc_index, contextual_embeddings):
+		self._doc = doc
+		storage = doc.storage
+
 		self._session = session
-		self._storage = storage
 
 		token_mapper = session.normalizer('token').token_to_token
 
@@ -520,8 +526,16 @@ class PreparedDocument:
 		self._tokens = self._compiled.tokens
 
 	@property
+	def doc(self):
+		return self._doc
+
+	@property
 	def session(self):
 		return self._session
+
+	@property
+	def storage(self):
+		return self._doc.storage
 
 	def _save_tokens(self, path):
 		with open(path, "w") as f:
@@ -544,7 +558,7 @@ class PreparedDocument:
 
 	@contextlib.contextmanager
 	def text(self):
-		with self._storage.text(self._session) as text:
+		with self.storage.text(self._session) as text:
 			yield text
 
 	def token(self, i):

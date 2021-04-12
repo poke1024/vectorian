@@ -76,12 +76,14 @@ class Renderer:
 								with tag('div'):
 									text("slice: " + str(match.slice_id))
 
+			match_doc = match.prepared_doc
+
 			partition = match.query.options["partition"]
-			span_info = match.document.span_info(
+			span_info = match_doc.span_info(
 				PartitionData(**partition), match.slice_id)
 
-			metadata = match.document.metadata
-			loc = self._location_formatter(match.document, span_info)
+			metadata = match_doc.metadata
+			loc = self._location_formatter(match_doc, span_info)
 			if loc:
 				speaker, loc_desc = loc
 			else:
