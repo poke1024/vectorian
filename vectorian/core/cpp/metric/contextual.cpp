@@ -79,7 +79,7 @@ void ContextualSimilarityMatrix::call_hook(
 		const auto &vocab = p_query->vocabulary();
 
 		py::list col_tokens;
-		for (const auto &t : *p_query->tokens()) {
+		for (const auto &t : *p_query->tokens_vector()) {
 			col_tokens.append(vocab->id_to_token(t.id));
 		}
 		return col_tokens;

@@ -11,8 +11,8 @@ py::list Flow<Index>::py_regions(
 	const std::vector<Edge> &p_edges,
 	const int p_window_size) const {
 
-	const auto &s_tokens_ref = p_match->document()->tokens();
-	const auto &t_tokens_ref = p_match->query()->tokens();
+	const auto &s_tokens_ref = p_match->document()->tokens_vector();
+	const auto &t_tokens_ref = p_match->query()->tokens_vector();
 	const std::vector<Token> &s_tokens = *s_tokens_ref.get();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
 
@@ -155,7 +155,7 @@ py::list Flow<Index>::py_omitted(
 	const Match *p_match,
 	const std::vector<HalfEdge> &p_edges) const {
 
-	const auto &t_tokens_ref = p_match->query()->tokens();
+	const auto &t_tokens_ref = p_match->query()->tokens_vector();
 	const std::vector<Token> &t_tokens = *t_tokens_ref.get();
 
 	py::list not_used;

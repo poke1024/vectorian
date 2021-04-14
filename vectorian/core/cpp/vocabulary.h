@@ -449,35 +449,14 @@ private:
 	bool m_tf_idf_valid;
 	size_t m_n_docs;
 
-	void compute_tf_idf() {
-		if (m_tf_idf_valid) {
-			return;
-		}
-		xt::pytensor<float, 1> idf;
-		idf.resize({static_cast<ssize_t>(m_tf.shape(0))});
-		idf = xt::log(m_n_docs / xt::cast<float>(1 + m_df));
-		m_tf_idf = m_tf * idf;
-		m_tf_idf_valid = true;
-	}
+	void compute_tf_idf();
 
 public:
-	inline Frequencies(const VocabularyRef &p_vocab) :
-		m_vocab(p_vocab), m_n_docs(0) {
-
-		const ssize_t size = static_cast<ssize_t>(p_vocab->size());
-
-		m_tf.resize({size});
-		m_tf.fill(0);
-
-		m_df.resize({size});
-		m_df.fill(0);
-
-		m_tf_idf_valid = false;
-	}
+	Frequencies(const VocabularyRef &p_vocab);
 
 	void add(
 		const DocumentRef &p_doc,
-		const py::dict &p_slice_strategy);
+		const SliceStrategyRef &p_slice_strategy);
 
 	freq_t tf(const std::string &p_term) const {
 		const token_t i = m_vocab->token_to_id(p_term);
@@ -507,9 +486,12 @@ public:
 		return m_tf_idf;
 	}
 
-	//xt::pytensor<float, 1> to_bow(const DocumentRef &p_doc);
-	//xt::pytensor<float, 1> to_nbow(const DocumentRef &p_doc);
-	//xt::pytensor<float, 1> to_tf_idf(const DocumentRef &p_doc);
+	/*xt::pytensor<float, 2> bow(
+		const TokenContainerRef &p_container,
+		const SliceStrategyRef &p_slice_strategy);*/
+
+	//xt::pytensor<float, 1> nbow(const TokenContainerRef &p_container);
+	//xt::pytensor<float, 1> tf_idf(const TokenContainerRef &p_container);
 };
 
 typedef std::shared_ptr<Frequencies> FrequenciesRef;

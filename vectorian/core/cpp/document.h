@@ -140,6 +140,30 @@ public:
 	inline int32_t max_len(const size_t p_window_size) const {
 		return m_variable.has_value() ? (*m_variable).max_len(p_window_size) : (*m_fixed).max_len(p_window_size);
 	}
+
+	template<typename F>
+	void iterate(const SliceStrategy &p_slice_strategy, const F &p_callback) const {
+
+		const size_t n_slices = size();
+		size_t token_at = 0;
+
+		for (size_t slice_id = 0;
+			slice_id < n_slices;
+			slice_id += p_slice_strategy.window_step) {
+
+			const auto len_s = bounded_len(
+				slice_id, p_slice_strategy.window_size);
+
+			if (len_s >= 1) {
+				if (!p_callback(slice_id, token_at, len_s)) {
+					break;
+				}
+			}
+
+			token_at += bounded_len(
+				slice_id, p_slice_strategy.window_step);
+		}
+	}
 };
 
 typedef std::shared_ptr<Spans> SpansRef;
@@ -147,7 +171,8 @@ typedef std::shared_ptr<Spans> SpansRef;
 
 class Document :
 	public std::enable_shared_from_this<Document>,
-	public ContextualVectorsContainer {
+	public ContextualVectorsContainer,
+	public TokenContainer {
 
 private:
 	const int64_t m_id;
@@ -198,12 +223,16 @@ public:
 		return to_py_array(m_tokens, n_tokens());
 	}
 
-	inline const TokenVectorRef &tokens() const {
+	inline const TokenVectorRef &tokens_vector() const {
 		return m_tokens;
 	}
 
 	inline size_t n_tokens() const {
 		return m_tokens->size() - m_num_dummy_tokens;
+	}
+
+	virtual std::tuple<const Token*, size_t> tokens() const {
+		return std::make_tuple(tokens_vector()->data(), n_tokens());
 	}
 
 	const SpansRef &spans(const std::string &p_name) const {

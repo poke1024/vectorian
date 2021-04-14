@@ -52,11 +52,6 @@ uint64_t parse_filter_mask(
 	return filter;
 }
 
-struct SliceStrategy {
-	std::string level; // e.g. "sentence"
-	size_t window_size;
-	size_t window_step;
-};
 
 class Handle {
 	const py::object m_object;
@@ -91,7 +86,8 @@ public:
 
 class Query :
 	public std::enable_shared_from_this<Query>,
-	public ContextualVectorsContainer {
+	public ContextualVectorsContainer,
+	public TokenContainer {
 
 	const py::object m_index;
 	const QueryVocabularyRef m_vocab;
@@ -148,16 +144,20 @@ public:
 		return m_vocab;
 	}
 
-	inline const TokenVectorRef &tokens() const {
-		return m_t_tokens;
-	}
-
 	inline py::dict py_tokens() const {
 		return to_py_array(m_t_tokens, n_tokens());
 	}
 
-	inline int n_tokens() const {
+	inline const TokenVectorRef &tokens_vector() const {
+		return m_t_tokens;
+	}
+
+	inline size_t n_tokens() const {
 		return m_t_tokens->size();
+	}
+
+	virtual std::tuple<const Token*, size_t> tokens() const {
+		return std::make_tuple(tokens_vector()->data(), n_tokens());
 	}
 
 	inline const POSWMap &pos_weights() const {

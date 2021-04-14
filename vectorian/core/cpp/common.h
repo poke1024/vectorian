@@ -114,6 +114,7 @@ public:
 py::dict to_py_array(
 	const TokenVectorRef &p_array, const size_t p_size);
 
+
 #define PY_ARRAY_MEMBER(STRUCT, MEMBER)                      \
 	py::array_t<decltype(STRUCT::MEMBER)>(                   \
         shape,              /* shape */                      \
@@ -122,5 +123,30 @@ py::dict to_py_array(
             data + offsetof(STRUCT, MEMBER)))
 
 #define ALIGNER_SLIM 1
+
+
+class TokenContainer {
+public:
+	virtual ~TokenContainer() {
+	}
+
+	virtual std::tuple<const Token*, size_t> tokens() const = 0;
+};
+
+typedef std::shared_ptr<TokenContainer> TokenContainerRef;
+
+
+struct SliceStrategy {
+	inline SliceStrategy() {
+	}
+
+	SliceStrategy(const py::dict &p_slice_strategy);
+
+	std::string level; // e.g. "sentence"
+	size_t window_size;
+	size_t window_step;
+};
+
+typedef std::shared_ptr<SliceStrategy> SliceStrategyRef;
 
 #endif // __VECTORIAN_COMMON_H__

@@ -82,12 +82,12 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'match/instantiate.cpp',
 	'vocabulary.cpp',
 	'metric/contextual.cpp',
 	'metric/modifier.cpp',
 	'metric/static.cpp',
 	'match/matcher.cpp',
-	'match/instantiate.cpp',
 	'query.cpp',
 	'embedding/static.cpp',
 	'module.cpp',

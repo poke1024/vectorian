@@ -99,13 +99,17 @@ PYBIND11_MODULE(core, m) {
 	frequencies.def_property_readonly("df_tensor", &Frequencies::df_tensor);
 	frequencies.def_property_readonly("tf_idf_tensor", &Frequencies::tf_idf_tensor);
 
+	py::class_<SliceStrategy, SliceStrategyRef> slice_strategy(m, "SliceStrategy");
+	slice_strategy.def(py::init<const py::dict&>());
+
 	py::class_<Query, QueryRef> query(m, "Query");
 	query.def(py::init<const py::object&, VocabularyRef, const py::dict&>());
 	query.def("initialize", &Query::initialize);
 	query.def_property_readonly("n_tokens", &Query::n_tokens);
-
 	query.def_property_readonly("tokens", &Query::py_tokens);
 	query.def("abort", &Query::abort);
+
+	py::class_<TokenContainer, TokenContainerRef> token_container(m, "TokenContainer");
 
 	py::class_<Document, DocumentRef> document(m, "Document");
 	document.def(py::init<

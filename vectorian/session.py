@@ -102,8 +102,9 @@ class Partition:
 	@cached_property
 	def freq(self):
 		freq = core.Frequencies(self._session.vocab)
+		strategy = core.SliceStrategy(self.to_args())
 		for doc in self._session.documents:
-			freq.add(doc.compiled, self.to_args())
+			freq.add(doc.compiled, strategy)
 		return freq
 
 	def max_len(self):

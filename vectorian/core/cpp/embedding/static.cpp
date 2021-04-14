@@ -5,7 +5,7 @@
 Needle::Needle(
 	const QueryRef &p_query) :
 
-	m_needle(p_query->tokens()) {
+	m_needle(p_query->tokens_vector()) {
 
 	const auto &needle = *m_needle;
 

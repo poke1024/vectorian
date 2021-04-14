@@ -18,7 +18,7 @@ std::vector<float> parse_tag_weights(
 
 	const auto mapped_pos_weights =
 		p_query->vocabulary()->mapped_pos_weights(pos_weights);
-	const auto t_tokens = p_query->tokens();
+	const auto t_tokens = p_query->tokens_vector();
 
 	std::vector<float> t_tokens_pos_weights;
 	t_tokens_pos_weights.reserve(t_tokens->size());

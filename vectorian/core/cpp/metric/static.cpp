@@ -162,7 +162,7 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::create(
 			auto &contextual_sim = matrix->m_similarity;
 
 			const size_t n_tokens = p_document->n_tokens();
-			const auto &tokens = *p_document->tokens();
+			const auto &tokens = *p_document->tokens_vector();
 
 			contextual_sim.resize({
 				ssize_t(n_tokens), ssize_t(needle.size())});
@@ -210,7 +210,7 @@ void StaticSimilarityMatrix::call_hook(
 		const auto &vocab = p_query->vocabulary();
 
 		py::list col_tokens;
-		for (const auto &t : *p_query->tokens()) {
+		for (const auto &t : *p_query->tokens_vector()) {
 			col_tokens.append(vocab->id_to_token(t.id));
 		}
 		return col_tokens;

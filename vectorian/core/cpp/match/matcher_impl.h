@@ -70,46 +70,33 @@ class MatcherImpl : public MatcherBase<Aligner> {
 
 		const auto &slice_strategy = this->m_query->slice_strategy();
 
-		const auto spans = this->m_document->spans(slice_strategy.level);
-		const size_t n_slices = spans->size();
-		//const size_t max_len_s = m_document->max_len_s();
-
-		size_t token_at = 0;
-
-		const Token *s_tokens = this->m_document->tokens()->data();
-		const Token *t_tokens = this->m_query->tokens()->data();
-		const auto len_t = this->m_query->tokens()->size();
+		const Token *s_tokens = this->m_document->tokens_vector()->data();
+		const Token *t_tokens = this->m_query->tokens_vector()->data();
+		const auto len_t = this->m_query->n_tokens();
 		if (len_t < 1) {
 			return; // no matches
 		}
 
 		const MatcherRef matcher = this->shared_from_this();
+		const auto spans = this->m_document->spans(slice_strategy.level);
 
-		for (size_t slice_id = 0;
-			slice_id < n_slices && !this->m_query->aborted();
-			slice_id += slice_strategy.window_step) {
+		const auto match_span = [&, s_tokens, t_tokens, len_t] (
+			const size_t slice_id, const size_t token_at, const size_t len_s) {
 
-			const auto len_s = spans->bounded_len(
-				slice_id, slice_strategy.window_size);
-
-			if (len_s < 1) {
-				continue;
-			}
-
-			const MatchRef m = p_run_match([&] () -> MatchRef {
+			p_run_match([&, s_tokens, t_tokens, slice_id, token_at, len_s, len_t] () {
 
 				const auto slice = m_slice_factory.create_slice(
 					slice_id,
 				    TokenSpan{s_tokens, static_cast<int32_t>(token_at), static_cast<int32_t>(len_s)},
 				    TokenSpan{t_tokens, 0, static_cast<int32_t>(len_t)});
 
-				return this->m_aligner.template make_match<Hook>(
-					matcher, slice, p_matches);
+				return this->m_aligner.template make_match<Hook>(matcher, slice, p_matches);
 			});
 
-			token_at += spans->bounded_len(
-				slice_id, slice_strategy.window_step);
-		}
+			return !this->m_query->aborted();
+		};
+
+		spans->iterate(slice_strategy, match_span);
 	}
 
 public:

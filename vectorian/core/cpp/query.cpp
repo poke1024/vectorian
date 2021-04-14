@@ -254,3 +254,10 @@ TokenFilterRef Query::make_token_filter(const py::kwargs &p_kwargs) const {
 		return tf;
 	}
 }
+
+
+SliceStrategy::SliceStrategy(const py::dict &p_slice_strategy) {
+	level = p_slice_strategy["level"].cast<py::str>();
+	window_size = p_slice_strategy["window_size"].cast<py::int_>();
+	window_step = p_slice_strategy["window_step"].cast<py::int_>();
+}

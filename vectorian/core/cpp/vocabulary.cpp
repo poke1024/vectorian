@@ -68,48 +68,72 @@ std::vector<StaticEmbeddingRef> QueryVocabulary::get_compiled_embeddings(const s
 	return static_embeddings;
 }
 
+
+void Frequencies::compute_tf_idf() {
+	if (m_tf_idf_valid) {
+		return;
+	}
+	xt::pytensor<float, 1> idf;
+	idf.resize({static_cast<ssize_t>(m_tf.shape(0))});
+	idf = xt::log(m_n_docs / xt::cast<float>(1 + m_df));
+	m_tf_idf = m_tf * idf;
+	m_tf_idf_valid = true;
+}
+
+Frequencies::Frequencies(const VocabularyRef &p_vocab) :
+	m_vocab(p_vocab), m_n_docs(0) {
+
+	const ssize_t size = static_cast<ssize_t>(p_vocab->size());
+
+	m_tf.resize({size});
+	m_tf.fill(0);
+
+	m_df.resize({size});
+	m_df.fill(0);
+
+	m_tf_idf_valid = false;
+}
+
 void Frequencies::add(
 	const DocumentRef &p_doc,
-	const py::dict &p_slice_strategy) {
+	const SliceStrategyRef &p_slice_strategy) {
 
-	SliceStrategy slice_strategy;
-	slice_strategy.level = p_slice_strategy["level"].cast<py::str>();
-	slice_strategy.window_size = p_slice_strategy["window_size"].cast<py::int_>();
-	slice_strategy.window_step = p_slice_strategy["window_step"].cast<py::int_>();
+	const SliceStrategy &slice_strategy = *p_slice_strategy;
 
-	const auto spans = p_doc->spans(slice_strategy.level);
-
-	const size_t n_slices = spans->size();
-	size_t token_at = 0;
-
-	const Token *tokens = p_doc->tokens()->data();
+	const Token *tokens = p_doc->tokens_vector()->data();
 	std::unordered_set<token_t> seen;
 	seen.reserve(slice_strategy.window_size);
 
-	for (size_t slice_id = 0;
-		slice_id < n_slices;
-		slice_id += slice_strategy.window_step) {
+	const auto spans = p_doc->spans(slice_strategy.level);
 
-		const auto len_s = spans->bounded_len(
-			slice_id, slice_strategy.window_size);
+	spans->iterate(slice_strategy,
+		[this, tokens, &seen] (const size_t slice_id, const size_t offset, const size_t len_s) {
 
-		if (len_s < 1) {
-			continue;
-		}
-
-		seen.clear();
-		for (ssize_t i = 0; i < len_s; i++) {
-			const auto id = tokens[token_at + i].id;
-			m_tf(id) += 1;
-			if (seen.find(id) == seen.end()) {
-				seen.insert(id);
-				m_df(id) += 1;
+			seen.clear();
+			for (size_t i = 0; i < len_s; i++) {
+				const auto id = tokens[offset + i].id;
+				m_tf(id) += 1;
+				if (seen.find(id) == seen.end()) {
+					seen.insert(id);
+					m_df(id) += 1;
+				}
 			}
-		}
 
-		token_at += spans->bounded_len(
-			slice_id, slice_strategy.window_step);
+			m_n_docs += 1;
+			return true;
 
-		m_n_docs += 1;
-	}
+		});
 }
+
+/*xt::pytensor<float, 2> Frequencies::bow(
+	const TokenContainerRef &p_container,
+	const SliceStrategyRef &p_slice_strategy) {
+
+	const SliceStrategy &slice_strategy = *p_slice_strategy;
+	const auto spans = p_container->spans(slice_strategy.level);
+
+	const size_t n_slices = spans->size();
+	xt::pytensor<float, 2> data({n_slices, m_tf.shape(0)}, 0.0f);
+
+	return data;
+}*/

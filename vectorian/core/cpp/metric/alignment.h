@@ -6,18 +6,79 @@
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 
-class VSM {
+/*class CosineVSM {
+	const QueryRef m_query;
+
+	std::unordered_map<token_t, int32_t> m_t_token_map;
+	std::vector<int32_t> m_t_token_count;
+	std::vector<int32_t> m_s_token_count;
+
 public:
-	/*
+	VSM(const QueryRef &p_query) : m_query(p_query) {
 
-	idea:
-	build a fast (perfect?) hashmap for query (token id -> query token index)
-	scan over target s and check if token exists in query using hashmap
-	accumulate shared token ids via query token index
-	compute shared nbows
+		const size_t n = m_query->n_tokens();
+		const auto &tokens = *m_query->tokens_vector();
 
-	*/
-};
+		for (size_t i = 0; i < n; i++) {
+			const auto id = tokens[i].id;
+			const auto it = m_t_token_map.find(id);
+			if (it != m_t_token_map.end()) {
+				m_t_token_count[it->second] += 1;
+			} else {
+				const auto k = m_t_token_count.size();
+				m_t_token_map[id] = k;
+				m_t_token_count.push_back(1);
+			}
+		}
+
+		m_s_token_count.reserve(m_t_token_count.size());
+	}
+
+	template<bool Hook, typename Slice>
+	inline MatchRef make_match(
+		const MatcherRef &p_matcher,
+		const Slice &p_slice,
+		const ResultSetRef &p_result_set) const {
+
+		const auto shared_vocab_size = m_t_token_count.size();
+
+		m_s_token_count.clear();
+		m_s_token_count.resize(shared_vocab_size, 0);
+
+		const size_t len_s = p_slice.len_s();
+
+		for (size_t i = 0; i < len_s; i++) {
+			const auto it = m_t_token_map.find(p_slice.s(i).id);
+			if (it != m_t_token_map.end()) {
+				m_s_token_count[it->second] += 1;
+			}
+		}
+
+		const float score = 0.0f;
+
+		if (Hook) {
+			py::gil_scoped_acquire acquire;
+			const auto callback = *p_matcher->query()->debug_hook();
+			py::dict data;
+			data["score"] = score;
+			data["worst_score"] = p_result_set->worst_score();
+			callback("alignment/vsm/make", data);
+		}
+
+		if (score > p_result_set->worst_score()) {
+			auto flow = p_result_set->flow_factory()->create_sparse();
+			flow->initialize(shared_vocab_size);
+
+			return p_result_set->add_match(
+				p_matcher,
+				p_slice.id(),
+				flow,
+				score);
+		} else {
+			return MatchRef();
+		}
+	}
+};*/
 
 template<typename Slice>
 inline float reference_score(
@@ -153,8 +214,8 @@ public:
 	            end = std::max(end, m.target);
 	        }
 
-			const Token *s_tokens = p_match->document()->tokens()->data();
-			const auto &t_tokens = p_match->query()->tokens();
+			const Token *s_tokens = p_match->document()->tokens_vector()->data();
+			const auto &t_tokens = p_match->query()->tokens_vector();
 
 	        const auto slice = m_factory.create_slice(
 	            0,
@@ -523,6 +584,15 @@ MatcherRef create_alignment_matcher(
 
 	const py::dict &alignment_def = p_matcher_options.alignment_def;
 	const std::string algorithm = get_alignment_algorithm(alignment_def);
+
+	/*if (algorithm == "cosine-vector-space-model") {
+
+		return make_matcher(
+			p_query, p_document, p_metric, p_factory,
+			std::move(CosineVSM<Index>(p_query)),
+			CosineVSM<Index>::create_score_computer(p_factory));
+
+	} else*/
 
 	if (algorithm == "waterman-smith-beyer") {
 		float zero = 0.5;
