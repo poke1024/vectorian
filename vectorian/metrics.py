@@ -161,6 +161,17 @@ class MetricModifier(VectorSpaceMetric):
 		return self._kernel.name(self._source.name)
 
 
+class RadialBasis(UnaryOperator):
+	def __init__(self, gamma):
+		self._gamma = gamma
+
+	def kernel(self, data):
+		data[:, :] = np.exp(-self._gamma * np.power(data, 2))
+
+	def name(self, operand):
+		return f'radialbasis({operand}, {self._gamma})'
+
+
 class DistanceToSimilarity(UnaryOperator):
 	def kernel(self, data):
 		data[:, :] = np.maximum(0, 1 - data)

@@ -101,8 +101,8 @@ class PNormWidget:
 			value=1,
 			min=1e-4,
 			max=1000,
-			step=0.25,
-			description='Scale:',
+			step=0.01,
+			description='gamma:',
 			disabled=False,
 			layout={'width': '10em'})
 
@@ -116,8 +116,7 @@ class PNormWidget:
 		return vectorian.metrics.MetricModifier(
 			vectorian.metrics.PNormDistance(p=self._p.value),
 			[
-				vectorian.metrics.Scale(self._scale.value),
-				vectorian.metrics.DistanceToSimilarity()
+				vectorian.metrics.RadialBasis(self._scale.value)
 			]
 		)
 
