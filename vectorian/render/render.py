@@ -104,14 +104,22 @@ class Renderer:
 						text(r_location['speaker'])
 
 				with tag('div', klass='is-pulled-right'):
-					if speaker:
+					appended = False
+					if r_location['author']:
 						with tag('small'):
-							text(r_location['author'] + ', ')
+							text(r_location['author'])
+							appended = True
 					if title:
 						with tag('small', klass='is-italic'):
-							text(title + ', ')
-					with tag('small'):
-						text(r_location['location'])
+							if appended:
+								text(', ')
+							text(title)
+							appended = True
+					if r_location['location']:
+						with tag('small'):
+							if appended:
+								text(', ')
+							text(r_location['location'])
 
 				with tag('div'):
 					doc.stag('br')
