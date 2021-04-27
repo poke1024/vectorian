@@ -578,8 +578,12 @@ class PretrainedGloVe(CachedWordEmbedding):
 		txt_data_path = download_path / f"glove-{self._glove_name}"
 
 		if not txt_data_path.exists():
-			url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
-			download.download(url, txt_data_path, kind="zip", progressbar=True)
+			try:
+				url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
+				download.download(url, txt_data_path, kind="zip", progressbar=True)
+			except:
+				txt_data_path.unlink(missing_ok=True)
+				raise
 
 		return _load_glove_txt(
 			txt_data_path / f"glove.{self._glove_name}.{self._ndims}d.txt")
