@@ -13,6 +13,9 @@ import compress_fasttext
 import h5py
 import sklearn
 import time
+import contextlib
+import io
+import re
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -502,6 +505,24 @@ class CompressedFastTextVectors(StaticEmbedding):
 		return self._name
 
 
+class ProgressParser(io.StringIO):
+	def __init__(self, pbar):
+		super().__init__()
+		self._pbar = pbar
+		self._pattern = re.compile(r"\((\d+\.\d+)%\)")
+
+	def flush(self):
+		s = self.getvalue()
+		self.truncate(0)
+		self.seek(0)
+
+		m = self._pattern.search(s)
+		if m:
+			ratio = json.loads(m.group(1)) / 100
+			self._pbar.n = int(self._pbar.total * ratio)
+			self._pbar.refresh()
+
+
 class PretrainedFastText(StaticEmbedding):
 	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, ft):
@@ -546,10 +567,14 @@ class PretrainedFastText(StaticEmbedding):
 		filename = "cc.%s.300.bin" % self._lang
 		if not (download_path / filename).exists():
 			os.chdir(download_path)
-			with tqdm(desc="Downloading " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
-				filename = fasttext.util.download_model(
-					self._lang, if_exists='ignore')
-				pbar.update(1)
+
+			with tqdm(
+					desc="Downloading " + self.name,
+					total=10000,
+					bar_format='{desc:<30}{percentage:3.2f}%|{bar:40}') as pbar:
+				with contextlib.redirect_stdout(ProgressParser(pbar)):
+					filename = fasttext.util.download_model(
+						self._lang, if_exists='ignore')
 
 		with tqdm(desc="Opening " + self.name, total=1, bar_format='{l_bar}{bar}') as pbar:
 			ft = fasttext.load_model(str(download_path / filename))
