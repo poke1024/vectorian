@@ -134,7 +134,7 @@ class Importer:
 				text = Importer._t[x](text)
 		return text
 
-	def _make_doc(self, md, partitions, loc_ax, locations):
+	def _make_doc(self, md, partitions, loc_ax, locations, show_progress=True):
 		pipe = self._nlp.pipe(
 			partitions,
 			batch_size=self._batch_size,
@@ -152,7 +152,12 @@ class Importer:
 
 		text_len = 0
 
-		for location, doc in tqdm(zip(locations, pipe), total=len(locations), desc=f'Importing {md.origin}'):
+		for location, doc in tqdm(
+				zip(locations, pipe),
+				total=len(locations),
+				desc=f'Importing {md.origin}',
+				disable=not show_progress):
+
 			doc_json = doc.to_json()
 
 			partition_tokens = doc_json['tokens']
@@ -401,7 +406,7 @@ class PlayShakespeareImporter(Importer):
 class StringImporter(Importer):
 	# a generic importer for short text strings for ad-hoc experiments.
 
-	def __call__(self, s, unique_id=None, author="", title=""):
+	def __call__(self, s, unique_id=None, author="", title="", show_progress=False):
 		if unique_id is None:
 			unique_id = str(datetime.datetime.now())
 
@@ -417,4 +422,5 @@ class StringImporter(Importer):
 			title=title,
 			speakers={})
 
-		return self._make_doc(md, [self._preprocess_text(s)], [], locations)
+		return self._make_doc(
+			md, [self._preprocess_text(s)], [], locations, show_progress=show_progress)
