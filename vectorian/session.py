@@ -2,6 +2,7 @@ import vectorian.core as core
 import vectorian.normalize as normalize
 import logging
 import collections
+import time
 
 from cached_property import cached_property
 from functools import lru_cache
@@ -291,6 +292,8 @@ class LabSession(Session):
 	def __init__(self, *args, location_formatter=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._location_formatter = location_formatter or LocationFormatter()
+		self._progress = None
+		self._last_progress_update = None
 
 	def interact(self, nlp):
 		from vectorian.interact import InteractiveQuery
@@ -307,22 +310,40 @@ class LabSession(Session):
 			renderers=[ExcerptRenderer()],
 			location_formatter=self._location_formatter)
 
-	def on_progress(self, task):
+	def _create_progress(self):
 		import ipywidgets as widgets
 		from IPython.display import display
 
-		progress = widgets.FloatProgress(
+		if self._progress is not None:
+			return
+
+		self._progress = widgets.FloatProgress(
 			value=0, min=0, max=1, description="",
 			layout=widgets.Layout(width="100%"))
 
-		display(progress)
+		display(self._progress)
 
-		def update_progress(t):
-			progress.value = progress.max * t
+	def _update_progress(self, t):
+		update_delay = 0.5
+
+		now = time.time()
+		if now - self._last_progress_update < update_delay:
+			return
+
+		self._create_progress()
+
+		new_value = self._progress.max * t
+		self._progress.value = new_value
+		self._last_progress_update = now
+
+	def on_progress(self, task):
+		self._last_progress_update = time.time()
 
 		try:
-			result = task(update_progress)
+			result = task(self._update_progress)
 		finally:
-			progress.close()
+			if self._progress:
+				self._progress.close()
+				self._progress = None
 
 		return result
