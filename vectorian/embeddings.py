@@ -3,14 +3,12 @@ import vectorian.core as core
 from tqdm import tqdm
 from pathlib import Path
 from cached_property import cached_property
-from urllib.parse import urlparse
 
 import collections
 import numpy as np
 import json
 import os
 import sys
-import download
 import compress_fasttext
 import h5py
 import sklearn
@@ -20,6 +18,9 @@ import io
 import re
 import gensim
 import gensim.models
+import requests
+import zipfile
+import urllib.parse
 
 
 _gensim_version = int(gensim.__version__.split(".")[0])
@@ -42,6 +43,42 @@ def _make_cache_path():
 		cache_path = _custom_cache_path / "embeddings"
 	cache_path.mkdir(exist_ok=True, parents=True)
 	return cache_path
+
+
+def _download(url, path, force_download=False):
+	path = Path(path)
+	download_path = path / urllib.parse.urlparse(url).path.split("/")[-1]
+	is_zip = download_path.suffix == ".zip"
+
+	if is_zip:
+		result_path = path / download_path.stem
+	else:
+		result_path = download_path
+
+	if result_path.exists() and not force_download:
+		return result_path
+
+	with tqdm(desc="Downloading " + url, unit='iB', unit_scale=True) as pbar:
+		response = requests.get(url, stream=True)
+
+		total_length = int(response.headers.get('content-length', 0))
+		pbar.reset(total=total_length)
+
+		try:
+			with open(download_path, "wb") as f:
+				for data in response.iter_content(chunk_size=4096):
+					pbar.update(len(data))
+					f.write(data)
+		except:
+			download_path.unlink(missing_ok=True)
+			raise
+
+	if download_path != result_path:
+		with zipfile.ZipFile(download_path, 'r') as zf:
+			zf.extractall(result_path.parent)
+		download_path.unlink()
+
+	return result_path if result_path.exists() else None
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -531,25 +568,9 @@ class CompressedFastTextVectors(StaticEmbedding):
 
 
 class Zoo:
+	_initialized = False
+
 	_embeddings = {
-		'glove-6B-50': {
-			'constructor': 'PretrainedGloVe',
-			'name': '6B',
-			'ndims': 50
-		},
-		'glove-6B-300': {
-			'constructor': 'PretrainedGloVe',
-			'name': '6B',
-			'ndims': 300
-		},
-		'fasttext-en': {
-			'constructor': 'PretrainedFastText',
-			'lang': 'en'
-		},
-		'fasttext-de': {
-			'constructor': 'PretrainedFastText',
-			'lang': 'de'
-		},
 		'fasttext-en-mini': {
 			'constructor': CompressedFastTextVectors,
 			'url': 'https://www.dropbox.com/s/zj34mh3zp0pv1db/fasttext-en-mini.kv?dl=1'
@@ -571,44 +592,55 @@ class Zoo:
 	}
 
 	@staticmethod
-	def _download(url):
+	def _init():
+		if Zoo._initialized:
+			return
+
+		from fasttext.util.util import valid_lang_ids as ft_valid_lang_ids
+		for lang in ft_valid_lang_ids:
+			Zoo._embeddings[f'fasttext-{lang}'] = {
+				'constructor': PretrainedFastText,
+				'lang': lang
+			}
+
+		for name, sizes in {
+			'6B': [50, 100, 200, 300],
+			'42B': [300],
+			'840B': [300],
+			'twitter.27B': [25, 50, 100, 200]}.items():
+
+			for size in sizes:
+				Zoo._embeddings[f'glove-{name}-{size}'] = {
+					'constructor': PretrainedGloVe,
+					'name': name,
+					'ndims': size
+				}
+
+		Zoo._initialized = True
+
+	@staticmethod
+	def _download(url, force_download=False):
 		cache_path = _make_cache_path()
 
 		download_path = cache_path / "models"
 		download_path.mkdir(exist_ok=True, parents=True)
 
-		model_path = download_path / url.split("/")[-1].split("?")[0]
-		if not model_path.exists():
-			kwargs = {}
-			if model_path.suffix == ".zip":
-				kwargs["kind"] = "zip"
-			try:
-				download.download(url, model_path, progressbar=True, **kwargs)
-			except:
-				if model_path.exists() and model_path.is_dir():
-					(model_path / model_path.stem).unlink(missing_ok=True)
-					model_path.rmdir()
-				else:
-					model_path.unlink(missing_ok=True)
-				raise
-
-		if model_path.suffix == ".zip":
-			return model_path / model_path.stem
-		else:
-			return model_path
+		return _download(url, download_path, force_download=force_download)
 
 	@staticmethod
 	def list():
-		return tuple(Zoo._embeddings.keys())
+		Zoo._init()
+		return tuple(sorted(Zoo._embeddings.keys()))
 
 	@staticmethod
-	def load(name):
+	def load(name, force_download=False):
+		Zoo._init()
 		spec = Zoo._embeddings.get(name)
 		if spec is None:
 			raise ValueError(f"unknown embedding name {name}")
 		kwargs = dict((k, v) for k, v in spec.items() if k not in ("constructor", "url"))
 		if "url" in spec:
-			kwargs["path"] = Zoo._download(spec["url"])
+			kwargs["path"] = Zoo._download(spec["url"], force_download)
 		return spec["constructor"](**kwargs)
 
 
@@ -703,22 +735,16 @@ class PretrainedGloVe(CachedWordEmbedding):
 		self._glove_name = name
 		self._ndims = ndims
 
-	def _load(self):
+	def _load(self, force_download=False):
 		download_path = self._cache_path / "models"
 		download_path.mkdir(exist_ok=True, parents=True)
+		txt_path = download_path / f"glove.{self._glove_name}.{self._ndims}d.txt"
 
-		txt_data_path = download_path / f"glove-{self._glove_name}"
+		if force_download or not txt_path.exists():
+			url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
+			_download(url, download_path, force_download=force_download)
 
-		if not txt_data_path.exists():
-			try:
-				url = f"http://downloads.cs.stanford.edu/nlp/data/glove.{self._glove_name}.zip"
-				download.download(url, txt_data_path, kind="zip", progressbar=True)
-			except:
-				txt_data_path.unlink(missing_ok=True)
-				raise
-
-		return _load_glove_txt(
-			txt_data_path / f"glove.{self._glove_name}.{self._ndims}d.txt")
+		return _load_glove_txt(txt_path)
 
 	@property
 	def unique_name(self):
