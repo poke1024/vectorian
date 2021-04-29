@@ -868,6 +868,11 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		# https://github.com/explosion/spaCy/issues/7032
 		# https://github.com/explosion/spaCy/discussions/6511
 
+		if not hasattr(doc._, 'trf_data'):
+			raise RuntimeError(
+				"Could not access spaCy Transformer data for document. "
+				f"Are you sure {self._nlp.meta['name']} is a Transformer model?")
+
 		token_emb, sent_emb = doc._.trf_data.tensors
 		token_emb = token_emb.reshape(-1, token_emb.shape[-1])
 		n_dims = token_emb.shape[-1]
