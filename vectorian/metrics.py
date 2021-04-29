@@ -147,8 +147,8 @@ class Kernel:
 		return name
 
 
-class MetricModifier(VectorSpaceMetric):
-	def __init__(self, source, operators):
+class ModifiedMetric(VectorSpaceMetric):
+	def __init__(self, source, *operators):
 		self._source = source
 		self._kernel = Kernel(operators)
 
@@ -278,6 +278,14 @@ class TokenSimilarity(AbstractTokenSimilarity):
 	@property
 	def name(self):
 		return f'{self._metric.name}[{self._embedding.name}]'
+
+	@property
+	def embedding(self):
+		return self._embedding
+
+	@property
+	def metric(self):
+		return self._metric
 
 	def to_args(self, index):
 		return {
