@@ -3,7 +3,9 @@ import vectorian.core as core
 from tqdm import tqdm
 from pathlib import Path
 from cached_property import cached_property
+from urllib.parse import urlparse
 
+import collections
 import numpy as np
 import json
 import os
@@ -16,6 +18,30 @@ import time
 import contextlib
 import io
 import re
+import gensim
+import gensim.models
+
+
+_gensim_version = int(gensim.__version__.split(".")[0])
+if _gensim_version >= 4:
+	raise RuntimeError("Vectorian needs gensim < 4.0.0")
+
+
+_custom_cache_path = None
+
+
+def set_cache_path(path):
+	global _custom_cache_path
+	_custom_cache_path = Path(path)
+
+
+def _make_cache_path():
+	if _custom_cache_path is None:
+		cache_path = Path.home() / ".vectorian" / "embeddings"
+	else:
+		cache_path = _custom_cache_path / "embeddings"
+	cache_path.mkdir(exist_ok=True, parents=True)
+	return cache_path
 
 
 def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
@@ -79,12 +105,6 @@ def _load_glove_txt(csv_path):
 	embeddings = embeddings[:len(tokens), :]
 
 	return tokens, embeddings
-
-
-def _make_cache_path():
-	cache_path = Path.home() / ".vectorian" / "embeddings"
-	cache_path.mkdir(exist_ok=True, parents=True)
-	return cache_path
 
 
 class Embedding:
@@ -424,7 +444,37 @@ class CachedWordEmbedding(StaticEmbedding):
 		return loaded
 
 
-class GensimKeyedVectors(StaticEmbedding):
+class Word2VecVectors(CachedWordEmbedding):
+	def __init__(self, name, path, binary=False, embedding_sampling="nearest"):
+		super().__init__(embedding_sampling)
+		self._name = name
+		self._path = path
+		self._binary = binary
+
+	def _load(self):
+		wv = gensim.models.KeyedVectors.load_word2vec_format(
+			self._path, binary=self._binary)
+		if _gensim_version < 4:
+			emb_keys = wv.vocab
+			emb_vectors = wv.vectors
+		else:
+			emb_keys = []
+			emb_vectors = []
+			vectors = wv.vectors
+			for k, i in wv.key_to_index.items():
+				emb_keys.append(k)
+				emb_vectors.append(vectors[i])
+		return emb_keys, emb_vectors
+
+	@property
+	def unique_name(self):
+		return self._name
+
+
+class KeyedVectors(StaticEmbedding):
+	# using this class directly circumvents Vectorian's token
+	# normalization. use with care.
+
 	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, wv):
 			self._name = name
@@ -455,7 +505,7 @@ class GensimKeyedVectors(StaticEmbedding):
 		self._wv = wv
 
 	def create_instance(self, session):
-		return GensimKeyedVectors.Instance(self._name, self._wv)
+		return KeyedVectors.Instance(self._name, self._wv)
 
 	@property
 	def name(self):
@@ -463,15 +513,61 @@ class GensimKeyedVectors(StaticEmbedding):
 
 	@staticmethod
 	def load(path):
-		from gensim.models import KeyedVectors
-		wv = KeyedVectors.load(path)
-		return GensimKeyedVectors(Path(path).stem, wv)
+		wv = gensim.models.KeyedVectors.load(path)
+		return KeyedVectors(Path(path).stem, wv)
 
 
 class CompressedFastTextVectors(StaticEmbedding):
-	_model_urls = {
-		'fasttext-en-mini': 'https://www.dropbox.com/s/zj34mh3zp0pv1db/fasttext-en-mini.kv?dl=1',
-		'fasttext-de-mini': 'https://www.dropbox.com/s/5u1742sqdww93ww/fasttext-de-mini.kv?dl=1'
+	def __init__(self, path):
+		self._name = Path(path).stem
+		self._wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(str(path))
+
+	def create_instance(self, session):
+		return KeyedVectors.Instance(self._name, self._wv)
+
+	@property
+	def name(self):
+		return self._name
+
+
+class Zoo:
+	_embeddings = {
+		'glove-6B-50': {
+			'constructor': 'PretrainedGloVe',
+			'name': '6B',
+			'ndims': 50
+		},
+		'glove-6B-300': {
+			'constructor': 'PretrainedGloVe',
+			'name': '6B',
+			'ndims': 300
+		},
+		'fasttext-en': {
+			'constructor': 'PretrainedFastText',
+			'lang': 'en'
+		},
+		'fasttext-de': {
+			'constructor': 'PretrainedFastText',
+			'lang': 'de'
+		},
+		'fasttext-en-mini': {
+			'constructor': CompressedFastTextVectors,
+			'url': 'https://www.dropbox.com/s/zj34mh3zp0pv1db/fasttext-en-mini.kv?dl=1'
+		},
+		'fasttext-de-mini': {
+			'constructor': CompressedFastTextVectors,
+			'url': 'https://www.dropbox.com/s/5u1742sqdww93ww/fasttext-de-mini.kv?dl=1'
+		},
+		'numberbatch-19.08-en-50': {
+			'constructor': Word2VecVectors,
+			'url': 'https://www.dropbox.com/s/9u29dsk1e0by9no/numberbatch-19.08-en-50.txt.zip?dl=1',
+			'name': 'numberbatch-19.08-en-50'
+		},
+		'numberbatch-19.08-de-50': {
+			'constructor': Word2VecVectors,
+			'url': 'https://www.dropbox.com/s/yyha7lw72r11z3f/numberbatch-19.08-de-50.txt.zip?dl=1',
+			'name': 'numberbatch-19.08-de-50'
+		}
 	}
 
 	@staticmethod
@@ -483,26 +579,37 @@ class CompressedFastTextVectors(StaticEmbedding):
 
 		model_path = download_path / url.split("/")[-1].split("?")[0]
 		if not model_path.exists():
-			download.download(url, model_path, progressbar=True)
-		return model_path
+			kwargs = {}
+			if model_path.suffix == ".zip":
+				kwargs["kind"] = "zip"
+			try:
+				download.download(url, model_path, progressbar=True, **kwargs)
+			except:
+				if model_path.exists() and model_path.is_dir():
+					(model_path / model_path.stem).unlink(missing_ok=True)
+					model_path.rmdir()
+				else:
+					model_path.unlink(missing_ok=True)
+				raise
+
+		if model_path.suffix == ".zip":
+			return model_path / model_path.stem
+		else:
+			return model_path
 
 	@staticmethod
-	def _from_zoo(name):
-		url = CompressedFastTextVectors._model_urls.get(name)
-		return CompressedFastTextVectors._download(url)
+	def list():
+		return tuple(Zoo._embeddings.keys())
 
-	def __init__(self, path):
-		if path.startswith("zoo:"):
-			path = self._from_zoo(path[4:].strip())
-		self._name = Path(path).stem
-		self._wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(str(path))
-
-	def create_instance(self, session):
-		return GensimKeyedVectors.Instance(self._name, self._wv)
-
-	@property
-	def name(self):
-		return self._name
+	@staticmethod
+	def load(name):
+		spec = Zoo._embeddings.get(name)
+		if spec is None:
+			raise ValueError(f"unknown embedding name {name}")
+		kwargs = dict((k, v) for k, v in spec.items() if k not in ("constructor", "url"))
+		if "url" in spec:
+			kwargs["path"] = Zoo._download(spec["url"])
+		return spec["constructor"](**kwargs)
 
 
 class ProgressParser(io.StringIO):
@@ -865,3 +972,56 @@ class MaskedVectorsRef(VectorsRef):
 	def open(self):
 		return MaskedVectors(
 			self._vectors.open(), self._mask)
+
+
+# utilities.
+
+def extract_numberbatch(path, languages):
+	# e.g. extract_numberbatch("/path/to/numberbatch-19.08.txt", ["en", "de"])
+	# then use KeyedVectors.load()
+
+	path = Path(path)
+	languages = set(languages)
+
+	pattern = re.compile(r"^/c/([a-z]+)/")
+
+	with open(path, "r") as f:
+		num_lines, num_dimensions = [int(x) for x in f.readline().split()]
+		vectors = collections.defaultdict(lambda: {
+			"keys": [],
+			"vectors": []
+		})
+
+		for _ in tqdm(range(num_lines)):
+			line = f.readline()
+			m = pattern.match(line)
+			if m:
+				lang = m.group(1)
+				if lang in languages:
+					line = line[len(m.group(0)):]
+					cols = line.split()
+					key = cols[0]
+					if key.isalpha():
+						record = vectors[lang]
+						record["keys"].append(key)
+						record["vectors"].append(
+							np.array([float(x) for x in cols[1:]]))
+
+	for lang, record in vectors.items():
+		wv = gensim.models.KeyedVectors(num_dimensions)
+		wv.add_vectors(record["keys"], record["vectors"])
+		wv.save(str(path.parent / f"{path.stem}-{lang}.kv"))
+
+
+def compress_keyed_vectors(model, n_dims):
+	pca = sklearn.decomposition.PCA(n_components=n_dims)
+	vectors = pca.fit_transform(model.vectors)
+	wv = gensim.models.KeyedVectors(
+		vector_size=n_dims, count=vectors.shape[0])
+	if _gensim_version < 4:
+		for i, k in enumerate(model.vocab):
+			wv.add_vector(k, vectors[i])
+	else:
+		for k, i in model.key_to_index.items():
+			wv.add_vector(k, vectors[i])
+	return wv
