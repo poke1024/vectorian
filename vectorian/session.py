@@ -366,4 +366,4 @@ class LabSession(Session):
 			va = Vectors([ei.word_vec(a)])
 			vb = Vectors([ei.word_vec(b)])
 			token_sim.metric(va, vb, out)
-		return out[0]
+		return out[0, 0]
