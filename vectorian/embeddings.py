@@ -522,7 +522,7 @@ class KeyedVectors(StaticEmbedding):
 			return self._name
 
 		def word_vec(self, t):
-			return self._wv.word_vec(t)
+			return self._wv.word_vec(t).astype(np.float32)
 
 		@property
 		def dimension(self):
