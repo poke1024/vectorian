@@ -3,6 +3,7 @@ import vectorian.normalize as normalize
 import logging
 import collections
 import time
+import numpy as np
 
 from cached_property import cached_property
 from functools import lru_cache
@@ -10,7 +11,7 @@ from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSentenceSimilarity, SentenceSimilarity
-from vectorian.embeddings import VectorsCache
+from vectorian.embeddings import VectorsCache, Vectors
 
 
 class Result:
@@ -347,3 +348,22 @@ class LabSession(Session):
 				self._progress = None
 
 		return result
+
+	def word_vec(self, embedding, word):
+		ei = self.get_embedding_instance(embedding)
+		return ei.word_vec(word)
+
+	def similarity(self, token_sim, a, b):
+		out = np.zeros((1, 1), dtype=np.float32)
+		if token_sim.is_modifier:
+			x = np.zeros((len(token_sim.operands), 1), dtype=np.float32)
+			for i, op in enumerate(token_sim.operands):
+				x[i] = self.similarity(op, a, b)
+			token_sim(x, out)
+		else:
+			ei = self.get_embedding_instance(
+				token_sim.embedding)
+			va = Vectors([ei.word_vec(a)])
+			vb = Vectors([ei.word_vec(b)])
+			token_sim.metric(va, vb, out)
+		return out[0]
