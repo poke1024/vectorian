@@ -358,9 +358,9 @@ class SentenceSimilarity:
 
 
 class AlignmentSentenceSimilarity(SentenceSimilarity):
-	def __init__(self, token_metric: AbstractTokenSimilarity, alignment=None):
-		if not isinstance(token_metric, AbstractTokenSimilarity):
-			raise TypeError(token_metric)
+	def __init__(self, token_sim: AbstractTokenSimilarity, alignment=None):
+		if not isinstance(token_sim, AbstractTokenSimilarity):
+			raise TypeError(token_sim)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
@@ -368,12 +368,12 @@ class AlignmentSentenceSimilarity(SentenceSimilarity):
 		if not isinstance(alignment, AlignmentAlgorithm):
 			raise TypeError(alignment)
 
-		self._token_metric = token_metric
+		self._token_sim = token_sim
 		self._alignment = alignment
 
 	@property
-	def token_similarity_metric(self):
-		return self._token_metric
+	def token_similarity(self):
+		return self._token_sim
 
 	@property
 	def alignment(self):
@@ -385,26 +385,26 @@ class AlignmentSentenceSimilarity(SentenceSimilarity):
 	def to_args(self, index):
 		return {
 			'metric': 'alignment-isolated',
-			'token_metric': self._token_metric,
+			'token_metric': self._token_sim,
 			'alignment': self._alignment.to_args(index.partition)
 		}
 
 
 class TagWeightedSentenceSimilarity(SentenceSimilarity):
-	def __init__(self, token_metric: AbstractTokenSimilarity, alignment, **kwargs):
-		assert isinstance(token_metric, AbstractTokenSimilarity)
+	def __init__(self, token_sim: AbstractTokenSimilarity, alignment, **kwargs):
+		assert isinstance(token_sim, AbstractTokenSimilarity)
 
 		if alignment is None:
 			alignment = WatermanSmithBeyer()
 
-		self._token_metric = token_metric
+		self._token_sim = token_sim
 		self._alignment = alignment
 
 		self._options = kwargs
 
 	@property
-	def token_similarity_metric(self):
-		return self._token_metric
+	def token_similarity(self):
+		return self._token_sim
 
 	@property
 	def alignment(self):
@@ -416,7 +416,7 @@ class TagWeightedSentenceSimilarity(SentenceSimilarity):
 	def to_args(self, index):
 		return {
 			'metric': 'alignment-tag-weighted',
-			'token_metric': self._token_metric,
+			'token_metric': self._token_sim,
 			'alignment': self._alignment.to_args(index.partition),
 			'pos_mismatch_penalty': self._options.get('pos_mismatch_penalty', 0),
 			'similarity_threshold': self._options.get('similarity_threshold', 0),
