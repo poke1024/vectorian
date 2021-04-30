@@ -18,6 +18,7 @@ import io
 import re
 import gensim
 import gensim.models
+import gensim.downloader
 import requests
 import zipfile
 import urllib.parse
