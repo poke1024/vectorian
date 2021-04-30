@@ -466,6 +466,9 @@ class Span:
 		col_tok_idx = self._table["idx"]
 		col_tok_len = self._table["len"]
 
+		if len(col_tok_idx) == 0:
+			return ""
+
 		i0, i1 = xspan(
 			col_tok_idx, col_tok_len, self._start,
 			self._end - self._start, 1)
