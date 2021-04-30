@@ -635,10 +635,12 @@ class PartitionEmbeddingIndex(Index):
 				"query produced more than one embedding")
 
 		if self._ip_to_l2:
-			query_vec = augment_xq(query_vec)
+			faiss_query_vec = augment_xq(query_vec)
+		else:
+			faiss_query_vec = query_vec
 
 		distance, index = self._index.search(
-			query_vec, query.options["max_matches"])
+			faiss_query_vec, query.options["max_matches"])
 
 		matches = []
 		for d, i in zip(distance[0], index[0]):
@@ -653,7 +655,7 @@ class PartitionEmbeddingIndex(Index):
 			#print(i, doc_index, sent_index, self._doc_starts)
 
 			doc = self.session.documents[doc_index]
-			score = (d + 1) * 0.5
+			score = d
 
 			#print(c_doc, sentence_id)
 			#print(c_doc.sentence(sentence_id))
