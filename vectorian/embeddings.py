@@ -21,6 +21,7 @@ import gensim.models
 import requests
 import zipfile
 import urllib.parse
+import cachetools
 
 
 _gensim_version = int(gensim.__version__.split(".")[0])
@@ -1004,8 +1005,117 @@ class MaskedVectorsRef(VectorsRef):
 		return MaskedVectors(
 			self._vectors.open(), self._mask)
 
+# === sentence/partition encoders.
 
-# utilities.
+
+def chunks(x, n):
+	for i in range(0, len(x), n):
+		yield x[i:i + n]
+
+
+class PartitionEncoder:
+	def __init__(self, partition, vector_size, cache_size=150, normalize=True):
+		self._partition = partition
+		self._cache = cachetools.LRUCache(cache_size)
+		self._vector_size = vector_size
+
+	@property
+	def partition(self):
+		return self._partition
+
+	def prepare(self, docs, pbar=True):
+		if len(docs) > self._cache.maxsize:
+			raise RuntimeError("cache too small")
+		self.encode(docs, pbar, update_cache=True)
+
+	def _encode(self, docs, pbar):
+		raise NotImplementedError()
+
+	def encode(self, docs, pbar=False, update_cache=True):
+		out = np.empty((len(docs), self._vector_size))
+
+		new = []
+		index = []
+
+		for i, doc in enumerate(docs):
+			cached = self._cache.get(doc.unique_id)
+			if cached is not None:
+				out[i, :] = cached
+			else:
+				new.append(doc)
+				index.append(i)
+
+		if new:
+			for i, v in zip(index, self._encode(new, pbar)):
+				out[i, :] = v
+				if update_cache:
+					uid = docs[i].unique_id
+					if uid is not None:
+						self._cache[uid] = v
+
+		return Vectors(out)
+
+
+class TokenAveragingEncoder(PartitionEncoder):
+	# simple unweighted token averaging as described by Mikolov et al.
+	# in "Distributed representations of words and phrases and their
+	# compositionality.", 2013.
+
+	def __init__(self, partition, embedding, cache_size=150):
+		super().__init__(partition, embedding.dimension, cache_size)
+		self._partition = partition
+		self._embedding = embedding
+
+	def _encode(self, docs, pbar):
+		embeddings = []
+		for doc in tqdm(docs, desc="Encoding", disable=not pbar):
+			v = []
+			for span in doc.spans(self._partition):
+				for k, token in enumerate(span):
+					v.append(self._embedding.word_vec(token.text))
+			embeddings.append(np.mean(v, axis=0))
+		return embeddings
+
+
+class PartitionTextEncoder(PartitionEncoder):
+	def __init__(self, partition, vector_size, chunk_size=50, cache_size=150):
+		super().__init__(partition, vector_size, cache_size)
+		self._chunk_size = chunk_size
+
+	def _encode_text(self, text):
+		raise NotImplementedError()
+
+	def _encode(self, docs, pbar):
+		n_spans = sum(doc.n_spans(self._partition) for doc in docs)
+
+		embeddings = []
+		with tqdm(desc="Encoding", total=n_spans, disable=not pbar) as pbar:
+			for i, doc in enumerate(docs):
+				spans = list(doc.spans(self._partition))
+				for chunk in chunks(spans, self._chunk_size):
+					doc_vec = self._encode_text([span.text for span in chunk])
+					embeddings.append(doc_vec)
+					pbar.update(len(chunk))
+
+		return np.vstack(embeddings) if embeddings else []
+
+
+class SentenceBERTEncoder(PartitionTextEncoder):
+	# see https://github.com/UKPLab/sentence-transformers and
+	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
+	# a good default is paraphrase-distilroberta-base-v1
+
+	def __init__(self, partition, name, vector_size=768, **kwargs):
+		super().__init__(partition, vector_size, **kwargs)
+
+		from sentence_transformers import SentenceTransformer
+		self._model = SentenceTransformer(name)
+
+	def _encode_text(self, texts):
+		return self._model.encode(texts)
+
+
+# === utilities.
 
 def extract_numberbatch(path, languages):
 	# e.g. extract_numberbatch("/path/to/numberbatch-19.08.txt", ["en", "de"])

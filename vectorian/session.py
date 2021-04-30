@@ -126,6 +126,10 @@ class Partition:
 		return Slice(self._level, self._window_step * slice_id, self._window_size)
 
 
+SessionEmbedding = collections.namedtuple(
+	"SessionEmbedding", ["factory", "instance"])
+
+
 class Session:
 	def __init__(self, docs, embeddings=None, normalizers=None):
 		if embeddings is None:
@@ -154,7 +158,9 @@ class Session:
 		self._embedding_instances = {}
 		for embedding in self._embeddings:
 			instance = embedding.create_instance(self)
-			self._embedding_instances[instance.name] = instance
+			self._embedding_instances[instance.name] = SessionEmbedding(
+				factory=embedding,
+				instance=instance)
 			self._embedding_manager.add_embedding(instance)
 
 		self._vocab = core.Vocabulary(self._embedding_manager)
@@ -187,10 +193,10 @@ class Session:
 
 	@property
 	def embeddings(self):
-		return self._embeddings
+		return self._embedding_instances
 
-	def get_embedding_instance(self, embedding):
-		return self._embedding_instances[embedding.name]
+	def to_embedding_instance(self, embedding):
+		return self._embedding_instances[embedding.name].instance
 
 	@property
 	def vectors_cache(self):
@@ -217,6 +223,24 @@ class Session:
 
 	def normalizer(self, stage):
 		return self._normalizers[stage]
+
+	def word_vec(self, embedding, word):
+		return self.to_embedding_instance(embedding).word_vec(word)
+
+	def similarity(self, token_sim, a, b):
+		out = np.zeros((1, 1), dtype=np.float32)
+		if token_sim.is_modifier:
+			x = np.zeros((len(token_sim.operands), 1), dtype=np.float32)
+			for i, op in enumerate(token_sim.operands):
+				x[i] = self.similarity(op, a, b)
+			token_sim(x, out)
+		else:
+			ei = self.to_embedding_instance(
+				token_sim.embedding)
+			va = Vectors([ei.word_vec(a)])
+			vb = Vectors([ei.word_vec(b)])
+			token_sim.metric(va, vb, out)
+		return out[0, 0]
 
 
 class LabResult(Result):
@@ -349,21 +373,3 @@ class LabSession(Session):
 
 		return result
 
-	def word_vec(self, embedding, word):
-		ei = self.get_embedding_instance(embedding)
-		return ei.word_vec(word)
-
-	def similarity(self, token_sim, a, b):
-		out = np.zeros((1, 1), dtype=np.float32)
-		if token_sim.is_modifier:
-			x = np.zeros((len(token_sim.operands), 1), dtype=np.float32)
-			for i, op in enumerate(token_sim.operands):
-				x[i] = self.similarity(op, a, b)
-			token_sim(x, out)
-		else:
-			ei = self.get_embedding_instance(
-				token_sim.embedding)
-			va = Vectors([ei.word_vec(a)])
-			vb = Vectors([ei.word_vec(b)])
-			token_sim.metric(va, vb, out)
-		return out[0, 0]

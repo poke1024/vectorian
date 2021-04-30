@@ -192,9 +192,7 @@ class EmbeddingWidget:
 		return self._vbox
 
 	def make(self):
-		for x in self._iquery.session.embeddings:
-			if x.name == self._embedding.value:
-				return x
+		return self._iquery.session.embeddings[self._embedding.value].factory
 
 
 class TokenSimilarityAtomWidget:

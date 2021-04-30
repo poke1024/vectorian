@@ -52,7 +52,8 @@ class PreparedQuery:
 		# by analyzing query
 
 		contextual_embeddings = collections.defaultdict(list)
-		for e in self._query.index.session.embeddings:
+		for v in self._query.index.session.embeddings.values():
+			e = v.factory
 			if e.is_contextual:
 				contextual_embeddings[e.name].append(e.encode(doc))
 
@@ -92,6 +93,10 @@ class PreparedQuery:
 		self._tokens = self._compiled.tokens
 
 	@property
+	def unique_id(self):
+		return None
+
+	@property
 	def index(self):
 		return self._query.index
 
@@ -110,6 +115,11 @@ class PreparedQuery:
 	@property
 	def n_tokens(self):
 		return self._compiled.n_tokens
+
+	def spans(self, partition):
+		# queries always have one full span, by definition
+		# we do not subdivide them further.
+		return [self.span]
 
 	@cached_property
 	def span(self):
@@ -478,14 +488,10 @@ class BruteForceIndex(Index):
 		return [CoreMatch(self, p_query, m) for m in results.best_n(-1)]
 
 
-def chunks(x, n):
-	for i in range(0, len(x), n):
-		yield x[i:i + n]
-
-
 # the next three functions are taken from:
 # https://gist.github.com/mdouze/e4bdb404dbd976c83fe447e529e5c9dc
 # see http://ulrichpaquet.com/Papers/SpeedUp.pdf theorem 5
+
 
 def get_phi(xb):
 	return (xb ** 2).sum(1).max()
@@ -505,12 +511,12 @@ def augment_xq(xq):
 
 
 class SentenceEmbeddingIndex(Index):
-	def __init__(self, partition, metric, encoder, vectors=None, faiss_description='Flat'):
-		super().__init__(partition, metric)
+	def __init__(self, metric, encoder, vectors=None, faiss_description='Flat'):
+		super().__init__(encoder.partition, metric)
 
 		import faiss
 
-		self._partition = partition
+		self._partition = encoder.partition
 		self._metric = metric
 		self._encoder = encoder
 
@@ -524,21 +530,9 @@ class SentenceEmbeddingIndex(Index):
 		if vectors is not None:
 			corpus_vec = vectors
 		else:
-			corpus_vec = []
-
-			chunk_size = 50
-			n_spans = self._doc_starts[-1]
-
-			with tqdm(desc="Encoding", total=n_spans) as pbar:
-				for i, doc in enumerate(session.documents):
-					spans = list(doc.spans(self._partition))
-					for chunk in chunks(spans, chunk_size):
-						doc_vec = encoder(chunk)
-						corpus_vec.append(doc_vec)
-						pbar.update(len(chunk))
-
-			corpus_vec = np.vstack(corpus_vec)
-			corpus_vec /= np.linalg.norm(corpus_vec, axis=1, keepdims=True)
+			corpus_vec = encoder.encode(session.documents, pbar=True, update_cache=False)
+			# FIXME normalization should only apply to cosine metrics
+			corpus_vec = corpus_vec.normalized
 
 		# https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
 		# https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
@@ -547,6 +541,7 @@ class SentenceEmbeddingIndex(Index):
 
 		self._ip_to_l2 = faiss_description.split(",")[-1] != "Flat"
 
+		# FIXME the following should only apply to cosine metrics
 		if self._ip_to_l2:
 			corpus_vec = augment_xb(corpus_vec)
 			metric = faiss.METRIC_L2
@@ -605,8 +600,11 @@ class SentenceEmbeddingIndex(Index):
 			}))
 
 	def _find(self, query, progress=None):
-		query_vec = self._encoder([query.text])
-		query_vec /= np.linalg.norm(query_vec)
+		query_vec = self._encoder.encode([query])
+		if query_vec.shape[0] != 1:
+			raise RuntimeError(
+				"query produced more than one embedding")
+		query_vec = query_vec[0]
 
 		if self._ip_to_l2:
 			query_vec = augment_xq(query_vec)

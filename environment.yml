@@ -29,5 +29,6 @@ dependencies:
       - skl2onnx>=1.8.0
       - onnxruntime>=1.7.0
       - matplotlib>=3.4.1
+      - cachetools>=4.2.2
 variables:
   VECTORIAN_BLAS: 1

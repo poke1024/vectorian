@@ -411,7 +411,7 @@ class Document:
 		return self.metadata['title']
 
 	def prepare(self, session, doc_index):
-		names = [e.name for e in session.embeddings if e.is_contextual]
+		names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
 		contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 		return PreparedDocument(
