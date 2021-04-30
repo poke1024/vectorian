@@ -482,16 +482,16 @@ class CachedWordEmbedding(StaticEmbedding):
 		return loaded
 
 
-class Word2VecVectors(CachedWordEmbedding):
-	def __init__(self, name, path, binary=False, embedding_sampling="nearest"):
+class GensimVectors(CachedWordEmbedding):
+	def __init__(self, name, embedding_sampling="nearest"):
 		super().__init__(embedding_sampling)
 		self._name = name
-		self._path = path
-		self._binary = binary
+
+	def _load_wv(self):
+		raise NotImplementedError()
 
 	def _load(self):
-		wv = gensim.models.KeyedVectors.load_word2vec_format(
-			self._path, binary=self._binary)
+		wv = self._load_wv()
 		if _gensim_version < 4:
 			emb_keys = wv.vocab
 			emb_vectors = wv.vectors
@@ -507,6 +507,26 @@ class Word2VecVectors(CachedWordEmbedding):
 	@property
 	def unique_name(self):
 		return self._name
+
+
+class PretrainedGensimVectors(GensimVectors):
+	def __init__(self, name, gensim_name, embedding_sampling="nearest"):
+		super().__init__(name, embedding_sampling)
+		self._gensim_name = gensim_name
+
+	def _load_wv(self):
+		return gensim.downloader.load(self._gensim_name)
+
+
+class Word2VecVectors(GensimVectors):
+	def __init__(self, name, path, binary=False, embedding_sampling="nearest"):
+		super().__init__(name, embedding_sampling)
+		self._path = path
+		self._binary = binary
+
+	def _load_wv(self):
+		return gensim.models.KeyedVectors.load_word2vec_format(
+			self._path, binary=self._binary)
 
 
 class KeyedVectors(StaticEmbedding):
@@ -616,6 +636,14 @@ class Zoo:
 					'name': name,
 					'ndims': size
 				}
+
+		# add special glove source for faster downloads.
+
+		Zoo._embeddings['glove-6B-50'] = {
+			'constructor': PretrainedGensimVectors,
+			'name': 'glove-6B-50',
+			'gensim_name': 'glove-wiki-gigaword-50'
+		}
 
 		Zoo._initialized = True
 
