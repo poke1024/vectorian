@@ -9,6 +9,7 @@ import yaml
 import collections
 import contextlib
 import logging
+import faiss
 
 from cached_property import cached_property
 from collections import namedtuple
@@ -529,8 +530,6 @@ def augment_xq(xq):
 class SentenceEmbeddingIndex(Index):
 	def __init__(self, metric, encoder, vectors=None, faiss_description='Flat'):
 		super().__init__(encoder.partition, metric)
-
-		import faiss
 
 		self._partition = encoder.partition
 		self._metric = metric
