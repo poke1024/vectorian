@@ -27,6 +27,10 @@ class Query:
 		self._options = options
 
 	@property
+	def unique_id(self):
+		return None
+
+	@property
 	def index(self):
 		return self._index
 
@@ -343,7 +347,7 @@ class CoreMatch(Match):
 		return self._c_match.flow
 
 
-class PyMatch:
+class PyMatch(Match):
 	def __init__(self, index, query, document, slice_id, score, metric=None, omitted=None, regions=None, level="word"):
 		self._index = index
 		self._query = query
@@ -383,8 +387,7 @@ class PyMatch:
 	def omitted(self):
 		return self._omitted
 
-	@property
-	def regions(self):
+	def regions(self, context_size=None):
 		return self._regions
 
 	@property
@@ -527,11 +530,11 @@ def augment_xq(xq):
 	return np.hstack((xq, extracol.reshape(-1, 1)))
 
 
-class SentenceEmbeddingIndex(Index):
-	def __init__(self, metric, encoder, vectors=None, faiss_description='Flat'):
-		super().__init__(encoder.partition, metric)
+class PartitionEmbeddingIndex(Index):
+	def __init__(self, partition, metric, encoder, vectors=None, faiss_description='Flat'):
+		super().__init__(partition, metric)
 
-		self._partition = encoder.partition
+		self._partition = partition
 		self._metric = metric
 		self._encoder = encoder
 
@@ -545,7 +548,8 @@ class SentenceEmbeddingIndex(Index):
 		if vectors is not None:
 			corpus_vec = vectors
 		else:
-			corpus_vec = encoder.encode(session.documents, pbar=True, update_cache=False)
+			corpus_vec = encoder.encode(
+				partition, session.documents, pbar=True, update_cache=False)
 			# FIXME normalization should only apply to cosine metrics
 			corpus_vec = corpus_vec.normalized
 
@@ -592,7 +596,7 @@ class SentenceEmbeddingIndex(Index):
 				raise FileNotFoundError(p)
 			corpus_vec.append(np.load(p))
 		corpus_vec = np.vstack(corpus_vec)
-		return SentenceEmbeddingIndex(
+		return PartitionEmbeddingIndex(
 			session.partition(**data["partition"]),
 			metric, encoder, corpus_vec)
 
@@ -618,11 +622,17 @@ class SentenceEmbeddingIndex(Index):
 			}))
 
 	def _find(self, query, progress=None):
-		query_vec = self._encoder.encode([query])
+		query_vec = self._encoder.encode(
+			self._partition, [query])
+
+		# FIXME normalization should only apply to cosine metrics
+		query_vec = query_vec.normalized
+
+		query_vec = query_vec.astype(np.float32)
+
 		if query_vec.shape[0] != 1:
 			raise RuntimeError(
 				"query produced more than one embedding")
-		query_vec = query_vec[0]
 
 		if self._ip_to_l2:
 			query_vec = augment_xq(query_vec)
@@ -649,11 +659,11 @@ class SentenceEmbeddingIndex(Index):
 			#print(c_doc.sentence(sentence_id))
 			#print(score, d)
 
-			span_text = doc.span(self._partition, sent_index)
+			span = doc.span(self._partition, sent_index)
 			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
 
 			regions = [Region(
-				s=span_text.strip(),
+				s=span.text.strip(),
 				match=None, gap_penalty=0)]
 
 			matches.append(PyMatch(

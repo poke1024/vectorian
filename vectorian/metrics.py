@@ -1,7 +1,7 @@
 import numpy as np
 
 from vectorian.alignment import AlignmentAlgorithm, WatermanSmithBeyer
-from vectorian.index import BruteForceIndex, SentenceEmbeddingIndex
+from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
 
 
 # inspired by https://github.com/explosion/thinc/blob/master/thinc/types.py
@@ -357,7 +357,7 @@ class MinimumTokenSimilarity(ExtremumTokenSimilarity):
 	_name = 'minimum'
 
 
-class SentenceSimilarity:
+class PartitionSimilarity:
 	def create_index(self, partition):
 		raise NotImplementedError()
 
@@ -365,7 +365,7 @@ class SentenceSimilarity:
 		raise NotImplementedError()
 
 
-class AlignmentSentenceSimilarity(SentenceSimilarity):
+class AlignmentSimilarity(PartitionSimilarity):
 	def __init__(self, token_sim: AbstractTokenSimilarity, alignment=None):
 		if not isinstance(token_sim, AbstractTokenSimilarity):
 			raise TypeError(token_sim)
@@ -398,7 +398,7 @@ class AlignmentSentenceSimilarity(SentenceSimilarity):
 		}
 
 
-class TagWeightedSentenceSimilarity(SentenceSimilarity):
+class TagWeightedSimilarity(PartitionSimilarity):
 	def __init__(self, token_sim: AbstractTokenSimilarity, alignment, **kwargs):
 		assert isinstance(token_sim, AbstractTokenSimilarity)
 
@@ -432,7 +432,7 @@ class TagWeightedSentenceSimilarity(SentenceSimilarity):
 		}
 
 
-class SentenceEmbeddingSimilarity(SentenceSimilarity):
+class PartitionEmbeddingSimilarity(PartitionSimilarity):
 	"""
 	example usage:
 	from sentence_transformers import SentenceTransformer
@@ -450,11 +450,11 @@ class SentenceEmbeddingSimilarity(SentenceSimilarity):
 		self._metric = metric
 
 	def create_index(self, partition, **kwargs):
-		return SentenceEmbeddingIndex(
+		return PartitionEmbeddingIndex(
 			partition, self, self._encoder, **kwargs)
 
 	def load_index(self, session, path, **kwargs):
-		return SentenceEmbeddingIndex.load(
+		return PartitionEmbeddingIndex.load(
 			session, self, self._encoder, path, **kwargs)
 
 	def to_args(self, index):
@@ -462,4 +462,4 @@ class SentenceEmbeddingSimilarity(SentenceSimilarity):
 
 	@property
 	def name(self):
-		return "SentenceEmbeddingMetric"
+		return "PartitionEmbeddingMetric"

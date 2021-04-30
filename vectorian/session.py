@@ -10,7 +10,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSentenceSimilarity, SentenceSimilarity
+from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSimilarity, PartitionSimilarity
 from vectorian.embeddings import VectorsCache, Vectors
 
 
@@ -113,7 +113,7 @@ class Partition:
 		return self._session.max_len(self._level, self._window_size)
 
 	def index(self, metric, nlp=None, **kwargs):
-		if not isinstance(metric, SentenceSimilarity):
+		if not isinstance(metric, PartitionSimilarity):
 			raise TypeError(metric)
 
 		if nlp:
@@ -179,7 +179,7 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._embeddings[0]
-		return AlignmentSentenceSimilarity(
+		return AlignmentSimilarity(
 			TokenSimilarity(
 				embedding, CosineSimilarity()))
 

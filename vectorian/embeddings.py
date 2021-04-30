@@ -1014,25 +1014,26 @@ def chunks(x, n):
 
 
 class PartitionEncoder:
-	def __init__(self, partition, vector_size, cache_size=150, normalize=True):
-		self._partition = partition
+	def __init__(self, cache_size=150):
 		self._cache = cachetools.LRUCache(cache_size)
-		self._vector_size = vector_size
 
-	@property
-	def partition(self):
-		return self._partition
-
-	def prepare(self, docs, pbar=True):
-		if len(docs) > self._cache.maxsize:
-			raise RuntimeError("cache too small")
-		self.encode(docs, pbar, update_cache=True)
-
-	def _encode(self, docs, pbar):
+	def vector_size(self, session):
 		raise NotImplementedError()
 
-	def encode(self, docs, pbar=False, update_cache=True):
-		out = np.empty((len(docs), self._vector_size))
+	def prepare(self, partition, docs, pbar=True):
+		if len(docs) > self._cache.maxsize:
+			raise RuntimeError("cache too small")
+		self.encode(partition, docs, pbar, update_cache=True)
+
+	def _encode(self, partition, docs, pbar):
+		raise NotImplementedError()
+
+	def encode(self, partition, docs, pbar=False, update_cache=True):
+		out = np.empty((len(docs), self.vector_size(partition.session)))
+
+		if partition.level != "document":
+			# would need better cache keys than unique_id for this.
+			update_cache = False
 
 		new = []
 		index = []
@@ -1046,7 +1047,7 @@ class PartitionEncoder:
 				index.append(i)
 
 		if new:
-			for i, v in zip(index, self._encode(new, pbar)):
+			for i, v in zip(index, self._encode(partition, new, pbar)):
 				out[i, :] = v
 				if update_cache:
 					uid = docs[i].unique_id
@@ -1061,37 +1062,61 @@ class TokenAveragingEncoder(PartitionEncoder):
 	# in "Distributed representations of words and phrases and their
 	# compositionality.", 2013.
 
-	def __init__(self, partition, embedding, cache_size=150):
-		super().__init__(partition, embedding.dimension, cache_size)
-		self._partition = partition
+	def __init__(self, nlp, embedding, cache_size=150):
+		super().__init__(cache_size=cache_size)
 		self._embedding = embedding
+		self._nlp = nlp
 
-	def _encode(self, docs, pbar):
+	def _prepare(self, doc):
+		if hasattr(doc, 'prepare'):
+			return doc.prepare(self._nlp)
+		else:
+			return doc
+
+	def vector_size(self, session):
+		return session.to_embedding_instance(self._embedding).dimension
+
+	def _encode(self, partition, docs, pbar):
+		docs = [self._prepare(doc) for doc in docs]
+
+		emb_inst = partition.session.to_embedding_instance(self._embedding)
 		embeddings = []
 		for doc in tqdm(docs, desc="Encoding", disable=not pbar):
 			v = []
-			for span in doc.spans(self._partition):
+			for span in doc.spans(partition):
 				for k, token in enumerate(span):
-					v.append(self._embedding.word_vec(token.text))
+					v.append(emb_inst.word_vec(token.text))
 			embeddings.append(np.mean(v, axis=0))
 		return embeddings
 
 
 class PartitionTextEncoder(PartitionEncoder):
-	def __init__(self, partition, vector_size, chunk_size=50, cache_size=150):
-		super().__init__(partition, vector_size, cache_size)
+	def __init__(self, nlp, chunk_size=50, cache_size=150):
+		super().__init__(cache_size=cache_size)
+		self._nlp = nlp
 		self._chunk_size = chunk_size
+
+	def _prepare(self, doc):
+		if hasattr(doc, 'prepare'):
+			return doc.prepare(self._nlp)
+		else:
+			return doc
 
 	def _encode_text(self, text):
 		raise NotImplementedError()
 
-	def _encode(self, docs, pbar):
-		n_spans = sum(doc.n_spans(self._partition) for doc in docs)
+	def vector_size(self, session):
+		raise NotImplementedError()
+
+	def _encode(self, partition, docs, pbar):
+		docs = [self._prepare(doc) for doc in docs]
+
+		n_spans = sum(doc.n_spans(partition) for doc in docs)
 
 		embeddings = []
 		with tqdm(desc="Encoding", total=n_spans, disable=not pbar) as pbar:
 			for i, doc in enumerate(docs):
-				spans = list(doc.spans(self._partition))
+				spans = list(doc.spans(partition))
 				for chunk in chunks(spans, self._chunk_size):
 					doc_vec = self._encode_text([span.text for span in chunk])
 					embeddings.append(doc_vec)
@@ -1105,11 +1130,15 @@ class SentenceBERTEncoder(PartitionTextEncoder):
 	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
 	# a good default is paraphrase-distilroberta-base-v1
 
-	def __init__(self, partition, name, vector_size=768, **kwargs):
-		super().__init__(partition, vector_size, **kwargs)
+	def __init__(self, nlp, name, vector_size=768, **kwargs):
+		super().__init__(nlp, **kwargs)
 
 		from sentence_transformers import SentenceTransformer
 		self._model = SentenceTransformer(name)
+		self._vector_size = vector_size
+
+	def vector_size(self, session):
+		return self._vector_size
 
 	def _encode_text(self, texts):
 		return self._model.encode(texts)
