@@ -121,6 +121,9 @@ class PreparedQuery:
 		# we do not subdivide them further.
 		return [self.span]
 
+	def n_spans(self, partition):
+		return 1
+
 	@cached_property
 	def span(self):
 		from vectorian.corpus.document import Span
@@ -415,11 +418,8 @@ class Index:
 		}
 		print(yaml.dump(data))
 
-	def find(
-		self, text,
-		n=10, min_score=0.0, debug=None,
-		run_task=None, make_result=None,
-		options: dict = dict()):
+	def make_query(self, text, n=10, min_score=0.0, debug=None, options: dict = dict()):
+		from vectorian.index import Query
 
 		options = options.copy()
 
@@ -429,11 +429,23 @@ class Index:
 			options["debug"] = debug
 		options["partition"] = self._partition.to_args()
 
-		metric_args = self._metric.to_args(self)
-		if metric_args:
-			options["metric"] = metric_args
+		if self._metric is not None:
+			metric_args = self._metric.to_args(self)
+			if metric_args:
+				options["metric"] = metric_args
+
+		return Query(self, self._partition.session.vocab, text, options)
+
+	def find(
+		self, text,
+		n=10, min_score=0.0, debug=None,
+		run_task=None, make_result=None,
+		options: dict = dict()):
 
 		start_time = time.time()
+
+		query = self.make_query(
+			text, n=n, min_score=min_score, debug=debug, options=options)
 
 		session = self._partition.session
 		if make_result is None:
@@ -441,13 +453,17 @@ class Index:
 		if run_task is None:
 			run_task = session.on_progress
 
-		query = Query(self, session.vocab, text, options)
 		matches = run_task(lambda progress: self._find(query, progress=progress))
 
 		return make_result(
 			self,
 			matches,
 			duration=time.time() - start_time)
+
+
+class DummyIndex(Index):
+	def __init__(self, partition):
+		super().__init__(partition, None)
 
 
 class BruteForceIndex(Index):
