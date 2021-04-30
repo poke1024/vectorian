@@ -549,6 +549,8 @@ class SentenceEmbeddingIndex(Index):
 			# FIXME normalization should only apply to cosine metrics
 			corpus_vec = corpus_vec.normalized
 
+		corpus_vec = corpus_vec.astype(np.float32)
+
 		# https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
 		# https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
 		# https://github.com/facebookresearch/faiss/wiki/The-index-factory
@@ -564,6 +566,7 @@ class SentenceEmbeddingIndex(Index):
 			metric = faiss.METRIC_INNER_PRODUCT
 
 		n_dims = corpus_vec.shape[-1]
+
 		index = faiss.index_factory(n_dims, faiss_description, metric)
 		index.train(corpus_vec)
 		index.add(corpus_vec)
