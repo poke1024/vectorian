@@ -149,6 +149,10 @@ class PreparedQuery:
 			return None
 
 	@property
+	def contextual_embeddings(self):
+		return self._contextual_embeddings
+
+	@property
 	def compiled(self):
 		return self._compiled
 

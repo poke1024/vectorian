@@ -448,6 +448,14 @@ class Span:
 		self._start = start
 		self._end = end
 
+	@property
+	def start(self):
+		return self._start
+
+	@property
+	def end(self):
+		return self._end
+
 	def __iter__(self):
 		for i in range(self._end - self._start):
 			yield self[i]
@@ -539,6 +547,10 @@ class PreparedDocument:
 	@property
 	def storage(self):
 		return self._doc.storage
+
+	@property
+	def contextual_embeddings(self):
+		return self._doc.contextual_embeddings
 
 	def _save_tokens(self, path):
 		with open(path, "w") as f:

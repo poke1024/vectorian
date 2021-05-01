@@ -206,6 +206,13 @@ class Vectors(AbstractVectors):
 	def __init__(self, unmodified):
 		self._unmodified = unmodified
 
+	def __enter__(self):
+		return self
+
+	def __exit__(self, exc_type, exc_value, exc_traceback):
+		self.close()
+		return False
+
 	def close(self):
 		pass  # a no op
 
@@ -839,6 +846,10 @@ class PCACompression(Transform):
 	def __init__(self, n_dims):
 		self._n_dims = n_dims
 
+	@property
+	def dimension(self):
+		return self._n_dims
+
 	def apply(self, vectors):
 		pca = sklearn.decomposition.PCA(n_components=self._n_dims)
 		pca.fit(vectors.unmodified)
@@ -890,6 +901,16 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 	def __init__(self, nlp, transform=None):
 		super().__init__(transform)
 		self._nlp = nlp
+
+	@property
+	def dimension(self):
+		if self._transform is not None:
+			return self._transform.dimension
+		else:
+			# https://spacy.io/usage/processing-pipelines
+			# https://thinc.ai/docs/api-model
+			tfm = self._nlp.pipeline[self._nlp.pipe_names.index("transformer")][1]
+			return tfm.model.get_dim("nO")
 
 	def compressed(self, n_dims):
 		return SpacyTransformerEmbedding(self._nlp, PCACompression(n_dims))
@@ -947,6 +968,13 @@ class ExternalMemoryVectors:
 
 	def __init__(self, hf):
 		self._hf = hf
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, exc_type, exc_value, exc_traceback):
+		self.close()
+		return False
 
 	def close(self):
 		self._hf.close()
@@ -1106,21 +1134,40 @@ class TokenAveragingEncoder(PartitionEncoder):
 		super().__init__(cache_size=cache_size)
 		self._embedding = embedding
 
+		if embedding.is_contextual and embedding.transform is not None:
+			raise RuntimeError("cannot use transformed contextual embedding with TokenAveragingEncoder")
+
 	def vector_size(self, session):
 		return session.to_embedding_instance(self._embedding).dimension
 
 	def _encode(self, partition, docs, nlp, pbar):
 		docs = [self._prepare_doc(doc, nlp) for doc in docs]
 
-		emb_inst = partition.session.to_embedding_instance(self._embedding)
-		embeddings = []
+		embedding = partition.session.to_embedding_instance(self._embedding)
+		out = []
+
+		if embedding.is_static:
+			def process_doc(doc):
+				for span in doc.spans(partition):
+					text = [token.text for token in span]
+					emb_vec = embedding.get_embeddings(text)
+					out.append(np.mean(emb_vec.unmodified, axis=0))
+
+		elif embedding.is_contextual:
+			def process_doc(doc):
+				vec_ref = doc.contextual_embeddings[self._embedding.name]
+				with vec_ref.open() as emb_vec:
+					emb_vec_data = emb_vec.unmodified
+					for span in doc.spans(partition):
+						out.append(np.mean(emb_vec_data[span.start:span.end, :], axis=0))
+
+		else:
+			assert False
+
 		for doc in tqdm(docs, desc="Encoding", disable=not pbar):
-			v = []
-			for span in doc.spans(partition):
-				for k, token in enumerate(span):
-					v.append(emb_inst.word_vec(token.text))
-			embeddings.append(np.mean(v, axis=0))
-		return embeddings
+			process_doc(doc)
+
+		return out
 
 
 class PartitionTextEncoder(PartitionEncoder):
