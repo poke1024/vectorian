@@ -46,7 +46,7 @@ class FineTuneableWidget:
 		self._fine_tune = self._types[i][1](self._iquery)
 
 	def on_changed(self, change):
-		self._iquery.clear_output()
+		self._iquery.on_changed()
 		self._instantiate_fine_tune(change.new)
 		self._box.children = [self._type, self._fine_tune.widget]
 
@@ -143,8 +143,8 @@ class EmbeddingMixerWidget:
 		self._iquery = iquery
 
 		names = []
-		for x in iquery.session.embeddings:
-			names.append(x.name)
+		for x in sorted(iquery.session.embeddings.keys()):
+			names.append(x)
 
 		items = []
 		for name in names:
@@ -171,8 +171,8 @@ class EmbeddingWidget:
 		self._iquery = iquery
 
 		options = []
-		for x in iquery.session.embeddings:
-			options.append(x.name)
+		for x in sorted(iquery.session.embeddings.keys()):
+			options.append(x)
 
 		self._embedding = widgets.Dropdown(
 			options=options,
@@ -372,6 +372,7 @@ class TokenSimilarityMetricWidget:
 class SlidingGapCostWidget:
 	def __init__(self, iquery, description, construct, max=1.0):
 		self._construct = construct
+		self._iquery = iquery
 
 		self._cost = widgets.FloatSlider(
 			value=0,
@@ -417,7 +418,7 @@ class SlidingGapCostWidget:
 	def on_changed(self, change):
 		# cost = change.new
 		self.update_plot()
-		self._iquery.clear_output()
+		self._iquery.on_changed()
 
 	@property
 	def widget(self):
@@ -457,15 +458,15 @@ class GapCostWidget(FineTuneableWidget):
 
 class AlignmentAlgorithmWidget:
 	def __init__(self, iquery, parameters, indent='5em'):
-		self._token_metric = TokenSimilarityMetricWidget(iquery)
+		self._token_sim = TokenSimilarityMetricWidget(iquery)
 
 		if parameters is None:
 			self._vbox = widgets.VBox([
-				self._token_metric.widget])
+				self._token_sim.widget])
 		else:
 			parameters.layout = widgets.Layout(margin=f'0 0 0 {indent}')
 			self._vbox = widgets.VBox([
-				self._token_metric.widget,
+				self._token_sim.widget,
 				make_root_label('Alignment Args:'),
 				parameters])
 
@@ -473,8 +474,8 @@ class AlignmentAlgorithmWidget:
 	def widget(self):
 		return self._vbox
 
-	def make_token_metric(self):
-		return self._token_metric.make()
+	def make_token_sim(self):
+		return self._token_sim.make()
 
 
 class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
@@ -606,12 +607,12 @@ class AlignmentWidget(FineTuneableWidget):
 	def make_alignment(self):
 		return self._fine_tune.make()
 
-	def make_token_metric(self):
-		return self._fine_tune.make_token_metric()
+	def make_token_sim(self):
+		return self._fine_tune.make_token_sim()
 
 	def make(self):
-		return vectorian.metrics.AlignmentSentenceSimilarity(
-			token_metric=self.make_token_metric(),
+		return vectorian.metrics.AlignmentSimilarity(
+			token_sim=self.make_token_sim(),
 			alignment=self.make_alignment())
 
 
@@ -649,8 +650,8 @@ class TagWeightedAlignmentWidget():
 		])
 
 	def make(self):
-		return vectorian.metrics.TagWeightedSentenceSimilarity(
-			token_metric=self._alignment.make_token_metric(),
+		return vectorian.metrics.TagWeightedSimilarity(
+			token_sim=self._alignment.make_token_sim(),
 			alignment=self._alignment.make_alignment())
 
 	@property
@@ -675,20 +676,20 @@ class SentenceEmbeddingWidget:
 			disabled=False)
 
 	def make(self):
-		return vectorian.metrics.SentenceEmbeddingSimilarity()
+		return vectorian.metrics.PartitionEmbeddingSimilarity()
 
 	@property
 	def widget(self):
 		return self._widget
 
 
-class SentenceMetricWidget(FineTuneableWidget):
-	_description = 'Sentence Metric:'
+class PartitionMetricWidget(FineTuneableWidget):
+	_description = 'Partition Metric:'
 
 	_types = [
 		('Alignment', AlignmentWidget),
 		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
-		('Sentence Embedding', SentenceEmbeddingWidget)
+		('Partition Embedding', SentenceEmbeddingWidget)
 	]
 
 	_default = 'Alignment'
@@ -795,8 +796,9 @@ class QueryWidget:
 			description='Query:',
 			disabled=False,
 			layout={'width': '40em'},
-			style=ROOT_LEVEL_STYLE)
-		self._query.on_submit(self.on_search)
+			style=ROOT_LEVEL_STYLE,
+			continuous_update=False)
+		self._query.observe(self.on_search, 'value')
 
 		self._submit_query = widgets.Button(
 			description='Search',
@@ -805,7 +807,7 @@ class QueryWidget:
 		self._submit_query.on_click(self.on_search)
 
 		self._partition = PartitionWidget(iquery)
-		self._sentence = SentenceMetricWidget(iquery)
+		self._sentence = PartitionMetricWidget(iquery)
 
 		self._progress = widgets.FloatProgress(
 			value=0, min=0, max=1, description='',
@@ -863,14 +865,14 @@ class QueryWidget:
 			renderers=[vectorian.render.excerpt.ExcerptRenderer()],
 			location_formatter=self._location_formatter)
 
-	def clear_output(self):
+	def on_changed(self):
 		self._results.value = ''
 
 	def on_search(self, change):
 		self.search()
 
 	def search(self):
-		self.clear_output()
+		self.on_changed()
 
 		debug = None
 
@@ -923,8 +925,8 @@ class InteractiveQuery:
 	def set_index(self, index):
 		pass
 
-	def clear_output(self):
-		self._widget.clear_output()
+	def on_changed(self):
+		self._widget.on_changed()
 
 	def set_format(self, fmt):
 		self._widget.set_format(fmt)
