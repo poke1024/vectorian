@@ -531,12 +531,13 @@ def augment_xq(xq):
 
 
 class PartitionEmbeddingIndex(Index):
-	def __init__(self, partition, metric, encoder, vectors=None, faiss_description='Flat'):
+	def __init__(self, partition, metric, encoder, nlp, vectors=None, faiss_description='Flat'):
 		super().__init__(partition, metric)
 
 		self._partition = partition
 		self._metric = metric
 		self._encoder = encoder
+		self._nlp = nlp
 
 		session = self._partition.session
 
@@ -549,7 +550,7 @@ class PartitionEmbeddingIndex(Index):
 			corpus_vec = vectors
 		else:
 			corpus_vec = encoder.encode(
-				partition, session.documents, pbar=True, update_cache=False)
+				partition, session.documents, nlp=nlp, pbar=True, update_cache=False)
 			# FIXME normalization should only apply to cosine metrics
 			corpus_vec = corpus_vec.normalized
 
@@ -623,7 +624,7 @@ class PartitionEmbeddingIndex(Index):
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder.encode(
-			self._partition, [query])
+			self._partition, [query], nlp=self._nlp)
 
 		# FIXME normalization should only apply to cosine metrics
 		query_vec = query_vec.normalized

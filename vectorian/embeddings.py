@@ -1046,18 +1046,26 @@ class PartitionEncoder:
 	def __init__(self, cache_size=150):
 		self._cache = cachetools.LRUCache(cache_size)
 
+	def _prepare_doc(self, doc, nlp):
+		if hasattr(doc, 'prepare'):
+			if nlp is None:
+				raise RuntimeError(f"need nlp to prepare {doc}")
+			return doc.prepare(nlp)
+		else:
+			return doc
+
 	def vector_size(self, session):
 		raise NotImplementedError()
 
-	def prepare(self, partition, docs, pbar=True):
+	def prepare(self, partition, docs, nlp=None, pbar=True):
 		if len(docs) > self._cache.maxsize:
 			raise RuntimeError("cache too small")
-		self.encode(partition, docs, pbar, update_cache=True)
+		self.encode(partition, docs, nlp=nlp, pbar=pbar, update_cache=True)
 
 	def _encode(self, partition, docs, pbar):
 		raise NotImplementedError()
 
-	def encode(self, partition, docs, pbar=False, update_cache=True):
+	def encode(self, partition, docs, nlp=None, pbar=False, update_cache=True):
 		out = np.empty((len(docs), self.vector_size(partition.session)))
 
 		if partition.level != "document":
@@ -1076,7 +1084,7 @@ class PartitionEncoder:
 				index.append(i)
 
 		if new:
-			for i, v in zip(index, self._encode(partition, new, pbar)):
+			for i, v in zip(index, self._encode(partition, new, nlp=nlp, pbar=pbar)):
 				out[i, :] = v
 				if update_cache:
 					uid = docs[i].unique_id
@@ -1091,22 +1099,15 @@ class TokenAveragingEncoder(PartitionEncoder):
 	# in "Distributed representations of words and phrases and their
 	# compositionality.", 2013.
 
-	def __init__(self, nlp, embedding, cache_size=150):
+	def __init__(self, embedding, cache_size=150):
 		super().__init__(cache_size=cache_size)
 		self._embedding = embedding
-		self._nlp = nlp
-
-	def _prepare(self, doc):
-		if hasattr(doc, 'prepare'):
-			return doc.prepare(self._nlp)
-		else:
-			return doc
 
 	def vector_size(self, session):
 		return session.to_embedding_instance(self._embedding).dimension
 
-	def _encode(self, partition, docs, pbar):
-		docs = [self._prepare(doc) for doc in docs]
+	def _encode(self, partition, docs, nlp, pbar):
+		docs = [self._prepare_doc(doc, nlp) for doc in docs]
 
 		emb_inst = partition.session.to_embedding_instance(self._embedding)
 		embeddings = []
@@ -1120,16 +1121,9 @@ class TokenAveragingEncoder(PartitionEncoder):
 
 
 class PartitionTextEncoder(PartitionEncoder):
-	def __init__(self, nlp, chunk_size=50, cache_size=150):
+	def __init__(self, chunk_size=50, cache_size=150):
 		super().__init__(cache_size=cache_size)
-		self._nlp = nlp
 		self._chunk_size = chunk_size
-
-	def _prepare(self, doc):
-		if hasattr(doc, 'prepare'):
-			return doc.prepare(self._nlp)
-		else:
-			return doc
 
 	def _encode_text(self, text):
 		raise NotImplementedError()
@@ -1137,8 +1131,8 @@ class PartitionTextEncoder(PartitionEncoder):
 	def vector_size(self, session):
 		raise NotImplementedError()
 
-	def _encode(self, partition, docs, pbar):
-		docs = [self._prepare(doc) for doc in docs]
+	def _encode(self, partition, docs, nlp, pbar):
+		docs = [self._prepare_doc(doc, nlp) for doc in docs]
 
 		n_spans = sum(doc.n_spans(partition) for doc in docs)
 
@@ -1159,8 +1153,8 @@ class SentenceBERTEncoder(PartitionTextEncoder):
 	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
 	# a good default is paraphrase-distilroberta-base-v1
 
-	def __init__(self, nlp, name, vector_size=768, **kwargs):
-		super().__init__(nlp, **kwargs)
+	def __init__(self, name, vector_size=768, **kwargs):
+		super().__init__(**kwargs)
 
 		from sentence_transformers import SentenceTransformer
 		self._model = SentenceTransformer(name)
