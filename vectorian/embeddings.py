@@ -781,7 +781,7 @@ class PretrainedGloVe(CachedWordEmbedding):
 		return f"glove-{self._glove_name}-{self._ndims}"
 
 
-class StackedEmbedding:
+class StackedEmbedding(StaticEmbedding):
 	class Instance(StaticEmbeddingInstance):
 		def __init__(self, name, embeddings):
 			self._name = name
@@ -792,7 +792,7 @@ class StackedEmbedding:
 			return self._name
 
 		def word_vec(self, t):
-			return np.hstack([e.word_vec(t) for e in self.embeddings])
+			return np.hstack([e.word_vec(t) for e in self._embeddings])
 
 		@property
 		def dimension(self):
@@ -809,7 +809,10 @@ class StackedEmbedding:
 
 	def __init__(self, embeddings, name=None):
 		if name is None:
-			name = '[' + ', '.join([e.name for e in embeddings]) + ']'
+			name = ' + '.join([e.name for e in embeddings])
+
+		if not all(e.is_static for e in embeddings):
+			raise RuntimeError("currently StackedEmbedding only supports static embeddings")
 
 		self._embeddings = embeddings
 		self._name = name
