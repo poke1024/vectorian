@@ -659,7 +659,7 @@ class TagWeightedAlignmentWidget():
 		return self._vbox
 
 
-class SentenceEmbeddingWidget:
+class PartitionEmbeddingWidget:
 	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
 	_variants = [
 		'stsb-roberta-large',
@@ -689,7 +689,7 @@ class PartitionMetricWidget(FineTuneableWidget):
 	_types = [
 		('Alignment', AlignmentWidget),
 		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
-		('Partition Embedding', SentenceEmbeddingWidget)
+		#('Partition Embedding', PartitionEmbeddingWidget)
 	]
 
 	_default = 'Alignment'
