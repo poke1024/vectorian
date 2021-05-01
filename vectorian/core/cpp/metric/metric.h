@@ -25,6 +25,10 @@ public:
 	virtual ~SimilarityMatrix() {
 	}
 
+	inline void clip() {
+		m_similarity = xt::clip(m_similarity, 0.0f, 1.0f);
+	}
+
 	inline const xt::pytensor<float, 2> &sim() const {
 		return m_similarity;
 	}

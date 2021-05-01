@@ -53,6 +53,8 @@ SimilarityMatrixRef ContextualEmbeddingSimilarityMatrixFactory::create_with_py_c
 			tfm_vectors_t.attr(PY_MAGNITUDES).cast<py::array_t<float>>());
 	}
 
+	sim_matrix->clip();
+
 	if (m_query->debug_hook().has_value()) {
 		sim_matrix->call_hook(m_query);
 	}

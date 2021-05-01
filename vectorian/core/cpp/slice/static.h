@@ -205,6 +205,8 @@ public:
 
 		m_delegate(p_delegate),
 		m_modifiers(p_modifiers) {
+
+		PPK_ASSERT(m_modifiers.similarity_threshold >= 0.0f);
 	}
 
 	size_t id() const {

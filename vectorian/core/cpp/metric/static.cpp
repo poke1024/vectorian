@@ -72,6 +72,8 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 			matrix);
 	}
 
+	matrix->clip();
+
 	return matrix;
 }
 
