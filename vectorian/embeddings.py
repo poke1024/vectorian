@@ -948,8 +948,9 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 
 	@cached_property
 	def name(self):
+		meta = self._nlp.meta
 		return '/'.join([
-			'spacy', self._nlp.meta['name'], self._nlp.meta['version']
+			'spacy', meta['lang'], meta['name'], meta['version']
 		] + ([] if self._transform is None else [self._transform.name]))
 
 
