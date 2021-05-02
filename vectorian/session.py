@@ -101,6 +101,10 @@ class Partition:
 			'window_step': self._window_step
 		}
 
+	@property
+	def cache_key(self):
+		return self._level, self._window_size, self._window_step
+
 	@cached_property
 	def freq(self):
 		freq = core.Frequencies(self._session.vocab)
@@ -209,7 +213,7 @@ class Session:
 	def make_result(self, *args, **kwargs):
 		return Result(*args, **kwargs)
 
-	def on_progress(self, task):
+	def on_progress(self, task, disable_progress=False):
 		return task(None)
 
 	def partition(self, level, window_size=1, window_step=None):
@@ -361,11 +365,14 @@ class LabSession(Session):
 		self._progress.value = new_value
 		self._last_progress_update = now
 
-	def on_progress(self, task):
+	def on_progress(self, task, disable_progress=False):
 		self._last_progress_update = time.time()
 
 		try:
-			result = task(self._update_progress)
+			if disable_progress:
+				result = task(None)
+			else:
+				result = task(self._update_progress)
 		finally:
 			if self._progress:
 				self._progress.close()

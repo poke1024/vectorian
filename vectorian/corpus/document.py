@@ -70,8 +70,8 @@ class TokenTable:
 			self._token_idx.append(token["start"])
 			self._token_len.append(token["end"] - token["start"])
 
-			self._token_pos.append(token["pos"])
-			self._token_tag.append(token["tag"])
+			self._token_pos.append(token.get("pos", "") or "")
+			self._token_tag.append(token.get("tag", "") or "")
 
 			self._token_str.append(norm_text)
 			return True
@@ -135,9 +135,12 @@ class InternalMemoryTokens(Tokens):
 			i = self._index
 			return dict((k, v[i]) for k, v in self._data.items())
 
-		def __getitem__(self, key):
+		def get(self, key, default=None):
 			array = self._data.get(key)
-			return None if array is None else array[self._index]
+			return default if array is None else array[self._index]
+
+		def __getitem__(self, key):
+			return self.get(key)
 
 	def __init__(self, tokens):
 		self._tokens = tokens
@@ -182,9 +185,12 @@ class ExternalMemoryTokens(Tokens):
 		def items(self):
 			return self.copy().items()
 
-		def __getitem__(self, key):
+		def get(self, key, default=None):
 			array = self._get(key)
-			return None if array is None else array[self._index]
+			return default if array is None else array[self._index]
+
+		def __getitem__(self, key):
+			return self.get(key)
 
 	def __init__(self, path):
 		self._hf = h5py.File(path, 'r')

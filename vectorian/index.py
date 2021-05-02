@@ -10,13 +10,14 @@ import collections
 import contextlib
 import logging
 import faiss
+import functools
 
 from cached_property import cached_property
 from collections import namedtuple
 from tqdm import tqdm
 from pathlib import Path
 from vectorian.corpus.document import TokenTable, InternalMemoryText
-from vectorian.embeddings import Vectors, ProxyVectorsRef
+from vectorian.embeddings import Vectors, ProxyVectorsRef, prepare_docs
 
 
 class Query:
@@ -446,7 +447,7 @@ class Index:
 
 	def find(
 		self, text,
-		n=10, min_score=0.0, debug=None,
+		n=10, min_score=0.0, debug=None, disable_progress=False,
 		run_task=None, make_result=None,
 		options: dict = dict()):
 
@@ -459,7 +460,7 @@ class Index:
 		if make_result is None:
 			make_result = session.make_result
 		if run_task is None:
-			run_task = session.on_progress
+			run_task = functools.partial(session.on_progress, disable_progress=disable_progress)
 
 		matches = run_task(lambda progress: self._find(query, progress=progress))
 
@@ -554,7 +555,7 @@ class PartitionEmbeddingIndex(Index):
 			corpus_vec = vectors
 		else:
 			corpus_vec = encoder.encode(
-				partition, session.documents, nlp=nlp, pbar=True, update_cache=False)
+				session.documents, partition, pbar=True)
 			# FIXME normalization should only apply to cosine metrics
 			corpus_vec = corpus_vec.normalized
 
@@ -628,7 +629,7 @@ class PartitionEmbeddingIndex(Index):
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder.encode(
-			self._partition, [query], nlp=self._nlp)
+			prepare_docs([query], nlp=self._nlp), self._partition)
 
 		# FIXME normalization should only apply to cosine metrics
 		query_vec = query_vec.normalized

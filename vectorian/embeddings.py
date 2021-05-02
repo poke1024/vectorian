@@ -897,11 +897,34 @@ class ContextualEmbedding(Embedding):
 		raise NotImplementedError()
 
 
-class SpacyTransformerEmbedding(ContextualEmbedding):
+class SpacyEmbedding(ContextualEmbedding):
 	def __init__(self, nlp, transform=None):
 		super().__init__(transform)
 		self._nlp = nlp
 
+	@cached_property
+	def name(self):
+		meta = self._nlp.meta
+		return '/'.join([
+			'spacy', meta['lang'], meta['name'], meta['version']
+		] + ([] if self._transform is None else [self._transform.name]))
+
+
+class SentenceBertEmbedding(SpacyEmbedding):
+	# a shim to spacy-sentence-bert
+
+	@property
+	def dimension(self):
+		return self._nlp.meta["vectors"]["width"]
+
+	def compressed(self, n_dims):
+		return SentenceBertEmbedding(self._nlp, PCACompression(n_dims))
+
+	def encode(self, doc):
+		return np.array([token.vector for token in doc])
+
+
+class SpacyTransformerEmbedding(SpacyEmbedding):
 	@property
 	def dimension(self):
 		if self._transform is not None:
@@ -945,13 +968,6 @@ class SpacyTransformerEmbedding(ContextualEmbedding):
 		assert len(doc) == trf_vectors.shape[0]
 
 		return trf_vectors
-
-	@cached_property
-	def name(self):
-		meta = self._nlp.meta
-		return '/'.join([
-			'spacy', meta['lang'], meta['name'], meta['version']
-		] + ([] if self._transform is None else [self._transform.name]))
 
 
 class ExternalMemoryVectors:
@@ -1001,7 +1017,7 @@ class ExternalMemoryVectors:
 		return np.array(self._hf["magnitudes"])
 
 	def transform(self, vectors):
-		raise vectors
+		return vectors
 
 
 class VectorsCache:
@@ -1074,65 +1090,129 @@ def chunks(x, n):
 		yield x[i:i + n]
 
 
-class PartitionEncoder:
-	def __init__(self, cache_size=150):
-		self._cache = cachetools.LRUCache(cache_size)
+def _prepare_doc(doc, nlp):
+	if hasattr(doc, 'prepare'):
+		if nlp is None:
+			raise RuntimeError(f"need nlp to prepare {doc}")
+		return doc.prepare(nlp)
+	else:
+		return doc
 
-	def _prepare_doc(self, doc, nlp):
-		if hasattr(doc, 'prepare'):
-			if nlp is None:
-				raise RuntimeError(f"need nlp to prepare {doc}")
-			return doc.prepare(nlp)
-		else:
-			return doc
 
+def prepare_docs(docs, nlp):
+	return [_prepare_doc(doc, nlp) for doc in docs]
+
+
+class AbstractPartitionEncoder:
 	def vector_size(self, session):
 		raise NotImplementedError()
 
-	def prepare(self, partition, docs, nlp=None, pbar=True):
-		if len(docs) > self._cache.maxsize:
-			raise RuntimeError("cache too small")
-		self.encode(partition, docs, nlp=nlp, pbar=pbar, update_cache=True)
-
-	def _encode(self, partition, docs, pbar):
+	def encode(self, docs, partition, pbar=False):
 		raise NotImplementedError()
 
-	def encode(self, partition, docs, nlp=None, pbar=False, update_cache=True):
-		out = np.empty((len(docs), self.vector_size(partition.session)))
 
-		if partition.level != "document":
-			# would need better cache keys than unique_id for this.
-			update_cache = False
+class PartitionEncoder(AbstractPartitionEncoder):
+	def __init__(self, span_encoder):
+		self._span_encoder = span_encoder
+
+	def vector_size(self, session):
+		return self._span_encoder.vector_size(session)
+
+	def encode(self, docs, partition, pbar=False):
+		n_spans = [doc.n_spans(partition) for doc in docs]
+		i_spans = np.cumsum([0] + n_spans)
+
+		out = np.empty((i_spans[-1], self.vector_size(partition.session)))
+
+		def gen_spans():
+			with tqdm(
+				desc="Encoding",
+				total=i_spans[-1],
+				disable=not pbar) as pbar_instance:
+
+				for doc in docs:
+					spans = list(doc.spans(partition))
+					yield doc, spans
+					pbar_instance.update(len(spans))
+
+		for i, v in enumerate(self._span_encoder.encode(partition.session, gen_spans())):
+			out[i_spans[i]:i_spans[i + 1], :] = v
+
+		return Vectors(out)
+
+
+class CachedPartitionEncoder(AbstractPartitionEncoder):
+	def __init__(self, span_encoder, cache_size=150):
+		self._encoder = PartitionEncoder(span_encoder)
+		self._cache = cachetools.LRUCache(cache_size)
+
+	def cache(self, docs, partition, pbar=True):
+		if len(docs) > self._cache.maxsize:
+			raise RuntimeError("cache too small")
+		self.encode(docs, partition, pbar=pbar)
+
+	def vector_size(self, session):
+		return self._encoder.vector_size(session)
+
+	def encode(self, docs, partition, pbar=False):
+		n_spans = [doc.n_spans(partition) for doc in docs]
+		i_spans = np.cumsum([0] + n_spans)
+
+		out = np.empty((sum(n_spans), self.vector_size(partition.session)))
 
 		new = []
 		index = []
 
+		def mk_cache_key(doc):
+			uid = doc.unique_id
+			if uid is not None:
+				return (uid,) + partition.cache_key
+			else:
+				return None
+
 		for i, doc in enumerate(docs):
-			cached = self._cache.get(doc.unique_id)
+			cached = self._cache.get(mk_cache_key(doc))
 			if cached is not None:
-				out[i, :] = cached
+				out[i_spans[i]:i_spans[i + 1], :] = cached
 			else:
 				new.append(doc)
 				index.append(i)
 
 		if new:
-			for i, v in zip(index, self._encode(partition, new, nlp=nlp, pbar=pbar)):
-				out[i, :] = v
-				if update_cache:
-					uid = docs[i].unique_id
-					if uid is not None:
-						self._cache[uid] = v
+			v = self._encoder.encode(new, partition, pbar).unmodified
+
+			n_spans_new = [n_spans[i] for i in index]
+			i_spans_new = np.cumsum([0] + n_spans_new)
+
+			for j, i in enumerate(index):
+				v_doc = v[i_spans_new[j]:i_spans_new[j + 1], :]
+				out[i_spans[i]:i_spans[i + 1], :] = v_doc
+
+				cache_key = mk_cache_key(new[i])
+				if cache_key is not None:
+					self._cache[cache_key] = v_doc
 
 		return Vectors(out)
 
 
-class TokenAveragingEncoder(PartitionEncoder):
+class AbstractSpanEncoder:
+	def __init__(self):
+		pass
+
+	def vector_size(self, session):
+		raise NotImplementedError()
+
+	def encode(self, session, doc_spans):
+		raise NotImplementedError()
+
+
+class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 	# simple unweighted token averaging as described by Mikolov et al.
 	# in "Distributed representations of words and phrases and their
 	# compositionality.", 2013.
 
-	def __init__(self, embedding, cache_size=150):
-		super().__init__(cache_size=cache_size)
+	def __init__(self, embedding):
+		super().__init__()
 		self._embedding = embedding
 
 		if embedding.is_contextual and embedding.transform is not None:
@@ -1141,39 +1221,34 @@ class TokenAveragingEncoder(PartitionEncoder):
 	def vector_size(self, session):
 		return session.to_embedding_instance(self._embedding).dimension
 
-	def _encode(self, partition, docs, nlp, pbar):
-		docs = [self._prepare_doc(doc, nlp) for doc in docs]
+	def encode(self, session, doc_spans):
+		embedding = session.to_embedding_instance(self._embedding)
 
-		embedding = partition.session.to_embedding_instance(self._embedding)
-		out = []
+		for doc, spans in doc_spans:
+			out = np.zeros((len(spans), self.vector_size(session)), dtype=np.float32)
 
-		if embedding.is_static:
-			def process_doc(doc):
-				for span in doc.spans(partition):
+			if embedding.is_static:
+				for i, span in enumerate(spans):
 					text = [token.text for token in span]
 					emb_vec = embedding.get_embeddings(text)
-					out.append(np.mean(emb_vec.unmodified, axis=0))
+					out[i, :] = np.mean(emb_vec.unmodified, axis=0)
 
-		elif embedding.is_contextual:
-			def process_doc(doc):
+			elif embedding.is_contextual:
 				vec_ref = doc.contextual_embeddings[self._embedding.name]
 				with vec_ref.open() as emb_vec:
 					emb_vec_data = emb_vec.unmodified
-					for span in doc.spans(partition):
-						out.append(np.mean(emb_vec_data[span.start:span.end, :], axis=0))
+					for i, span in enumerate(spans):
+						out[i] = np.mean(emb_vec_data[span.start:span.end, :], axis=0)
 
-		else:
-			assert False
+			else:
+				assert False
 
-		for doc in tqdm(docs, desc="Encoding", disable=not pbar):
-			process_doc(doc)
-
-		return out
+			yield out
 
 
-class PartitionTextEncoder(PartitionEncoder):
-	def __init__(self, chunk_size=50, cache_size=150):
-		super().__init__(cache_size=cache_size)
+class SpanTextEncoder(AbstractSpanEncoder):
+	def __init__(self, chunk_size=50):
+		super().__init__()
 		self._chunk_size = chunk_size
 
 	def _encode_text(self, text):
@@ -1182,40 +1257,23 @@ class PartitionTextEncoder(PartitionEncoder):
 	def vector_size(self, session):
 		raise NotImplementedError()
 
-	def _encode(self, partition, docs, nlp, pbar):
-		docs = [self._prepare_doc(doc, nlp) for doc in docs]
-
-		n_spans = sum(doc.n_spans(partition) for doc in docs)
-
-		embeddings = []
-		with tqdm(desc="Encoding", total=n_spans, disable=not pbar) as pbar:
-			for i, doc in enumerate(docs):
-				spans = list(doc.spans(partition))
-				for chunk in chunks(spans, self._chunk_size):
-					doc_vec = self._encode_text([span.text for span in chunk])
-					embeddings.append(doc_vec)
-					pbar.update(len(chunk))
-
-		return np.vstack(embeddings) if embeddings else []
+	def encode(self, session, doc_spans):
+		for doc, spans in doc_spans:
+			#for chunk in chunks(spans, self._chunk_size):
+			yield self._encode_text([span.text for span in spans])
 
 
-class SentenceBERTEncoder(PartitionTextEncoder):
-	# see https://github.com/UKPLab/sentence-transformers and
-	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
-	# a good default is paraphrase-distilroberta-base-v1
-
-	def __init__(self, name, vector_size=768, **kwargs):
+class SpanEncoder(SpanTextEncoder):
+	def __init__(self, encode, vector_size=768, **kwargs):
 		super().__init__(**kwargs)
-
-		from sentence_transformers import SentenceTransformer
-		self._model = SentenceTransformer(name)
+		self._encode = encode
 		self._vector_size = vector_size
 
 	def vector_size(self, session):
 		return self._vector_size
 
 	def _encode_text(self, texts):
-		return self._model.encode(texts)
+		return self._encode(texts)
 
 
 # === utilities.
