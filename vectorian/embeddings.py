@@ -906,7 +906,7 @@ class SpacyEmbedding(ContextualEmbedding):
 	def name(self):
 		meta = self._nlp.meta
 		return '/'.join([
-			'spacy', meta['lang'], meta['name'], meta['version']
+			meta['url'], meta['lang'], meta['name'], meta['version']
 		] + ([] if self._transform is None else [self._transform.name]))
 
 
