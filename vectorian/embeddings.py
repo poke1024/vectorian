@@ -1149,6 +1149,34 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 		self._encoder = PartitionEncoder(span_encoder)
 		self._cache = cachetools.LRUCache(cache_size)
 
+	def save(self, path):
+		path = Path(path)
+		index = []
+		with h5py.File(path.parent / (path.name + ".h5"), 'w') as f:
+			for k, v in self._cache.items():
+				f.create_dataset(str(len(index)), data=v)
+				index.append(k)
+		with open(path.parent / (path.name + ".json"), "w") as f:
+			f.write(json.dumps(index))
+
+	def try_load(self, path):
+		path = Path(path)
+		if not (path.parent / (path.name + ".json")).exists():
+			return False
+		with open(path.parent / (path.name + ".json"), "r") as f:
+			index = json.loads(f.read())
+		if len(index) > self._cache.maxsize:
+			raise RuntimeError("cache is too small")
+		with h5py.File(path.parent / (path.name + ".h5"), 'r') as f:
+			for i, key in enumerate(index):
+				self._cache[tuple(key)] = np.array(f[str(i)])
+
+		return True
+
+	def load(self, path):
+		if not self.try_load(path):
+			raise FileNotFoundError(path)
+
 	def cache(self, docs, partition, pbar=True):
 		if len(docs) > self._cache.maxsize:
 			raise RuntimeError("cache too small")
