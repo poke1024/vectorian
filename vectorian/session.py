@@ -232,18 +232,43 @@ class Session:
 		return self.to_embedding_instance(embedding).word_vec(word)
 
 	def similarity(self, token_sim, a, b):
+		from vectorian.corpus.document import Token
+
 		out = np.zeros((1, 1), dtype=np.float32)
 		if token_sim.is_modifier:
 			x = np.zeros((len(token_sim.operands), 1), dtype=np.float32)
 			for i, op in enumerate(token_sim.operands):
 				x[i] = self.similarity(op, a, b)
 			token_sim(x, out)
+
 		else:
-			ei = self.to_embedding_instance(
+			embedding = self.to_embedding_instance(
 				token_sim.embedding)
-			va = Vectors([ei.word_vec(a)])
-			vb = Vectors([ei.word_vec(b)])
+			if embedding.is_static:
+				if isinstance(a, Token):
+					a = a.text
+				if isinstance(b, Token):
+					b = b.text
+
+				va = Vectors([embedding.word_vec(a)])
+				vb = Vectors([embedding.word_vec(b)])
+
+			elif embedding.is_contextual:
+				if not isinstance(a, Token):
+					raise ValueError(f"expected a Token, got {a}")
+				if not isinstance(b, Token):
+					raise ValueError(f"expected a Token, got {b}")
+
+				with a.doc.contextual_embeddings[embedding.name].open() as vec:
+					va = Vectors([vec.unmodified[a.index]])
+
+				with b.doc.contextual_embeddings[embedding.name].open() as vec:
+					vb = Vectors([vec.unmodified[b.index]])
+			else:
+				raise ValueError()
+
 			token_sim.metric(va, vb, out)
+
 		return out[0, 0]
 
 

@@ -435,6 +435,14 @@ class Token:
 		self._table = table
 		self._index = index
 
+	@property
+	def doc(self):
+		return self._doc
+
+	@property
+	def index(self):
+		return self._index
+
 	def to_slice(self):
 		offset = self._table["idx"][self._index]
 		return slice(offset, offset + self._table["len"][self._index])
