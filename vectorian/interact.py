@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import time
 
 import vectorian.alignment
+import vectorian.embeddings
 import vectorian.metrics
 import vectorian.session
 
@@ -660,23 +661,20 @@ class TagWeightedAlignmentWidget():
 
 
 class PartitionEmbeddingWidget:
-	# https://docs.google.com/spreadsheets/d/14QplCdTCDwEmTqrn1LH4yrbKvdogK4oQvYO1K1aPR5M/edit#gid=0
-	_variants = [
-		'stsb-roberta-large',
-		'stsb-roberta-base',
-		'stsb-bert-large',
-		'stsb-distilbert-base'
-	]
-
 	def __init__(self, iquery):
+		self._iquery = iquery
+		self._encoders = self._iquery.partition_encoders
+		keys = sorted(self._encoders.keys())
 		self._widget = widgets.Dropdown(
-			options=self._variants,
-			value='stsb-distilbert-base',
+			options=keys,
+			value=keys[0],
 			description='Model:',
-			disabled=False)
+			disabled=False,
+			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.PartitionEmbeddingSimilarity()
+		return vectorian.metrics.PartitionEmbeddingSimilarity(
+			self._encoders[self._widget.value].to_cached())
 
 	@property
 	def widget(self):
@@ -684,12 +682,12 @@ class PartitionEmbeddingWidget:
 
 
 class PartitionMetricWidget(FineTuneableWidget):
-	_description = 'Partition Metric:'
+	_description = 'Strategy:'
 
 	_types = [
 		('Alignment', AlignmentWidget),
-		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
-		#('Partition Embedding', PartitionEmbeddingWidget)
+		# ('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
+		('Partition Embedding', PartitionEmbeddingWidget)
 	]
 
 	_default = 'Alignment'
@@ -874,19 +872,22 @@ class QueryWidget:
 	def search(self):
 		self.on_changed()
 
-		debug = None
+		debug_path = None
 
-		def debug(hook, data):
-			if hook == 'alignment/word-rotators-distance/solver':
-				import numpy as np
-				with open("/Users/arbeit/Desktop/debug.txt", "a") as f:
-					for k, v in data.items():
-						if isinstance(v, np.ndarray):
-							f.write(f"{k}: {v}\n")
-						else:
-							f.write(f"{k}: {v}\n")
-					f.write("-" * 80)
-					f.write("\n")
+		if debug_path:
+			def debug(hook, data):
+				if hook == 'alignment/word-rotators-distance/solver':
+					import numpy as np
+					with open(debug_path, "a") as f:
+						for k, v in data.items():
+							if isinstance(v, np.ndarray):
+								f.write(f"{k}: {v}\n")
+							else:
+								f.write(f"{k}: {v}\n")
+						f.write("-" * 80)
+						f.write("\n")
+		else:
+			debug = None
 
 		r = self.index.find(
 			self._query.value, n=1,
@@ -921,6 +922,10 @@ class InteractiveQuery:
 	@property
 	def nlp(self):
 		return self._nlp
+
+	@property
+	def partition_encoders(self):
+		return {}
 
 	def set_index(self, index):
 		pass

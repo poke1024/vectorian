@@ -433,13 +433,6 @@ class TagWeightedSimilarity(PartitionSimilarity):
 
 
 class PartitionEmbeddingSimilarity(PartitionSimilarity):
-	"""
-	example usage:
-	from sentence_transformers import SentenceTransformer
-	model = SentenceTransformer('paraphrase-distilroberta-base-v1')
-	metric = SentenceEmbeddingMetric(model.encode)
-	"""
-
 	def __init__(self, encoder, metric=None):
 		if metric is None:
 			metric = CosineSimilarity()

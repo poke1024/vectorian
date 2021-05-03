@@ -1140,6 +1140,9 @@ class PartitionEncoder(AbstractPartitionEncoder):
 
 		return Vectors(out)
 
+	def to_cached(self, cache_size=150):
+		return CachedPartitionEncoder(self._encoder, cache_size)
+
 
 class CachedPartitionEncoder(AbstractPartitionEncoder):
 	def __init__(self, span_encoder, cache_size=150):
@@ -1193,6 +1196,9 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 					self._cache[cache_key] = v_doc
 
 		return Vectors(out)
+
+	def to_cached(self, cache_size=None):
+		return self
 
 
 class AbstractSpanEncoder:
