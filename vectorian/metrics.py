@@ -235,6 +235,10 @@ class AbstractTokenSimilarity:
 	def name(self):
 		raise NotImplementedError()
 
+	@property
+	def embeddings(self):
+		raise NotImplementedError()
+
 
 class TokenSimilarityModifier(AbstractTokenSimilarity):
 	@property
@@ -243,6 +247,10 @@ class TokenSimilarityModifier(AbstractTokenSimilarity):
 
 	@property
 	def name(self):
+		raise NotImplementedError()
+
+	@property
+	def embeddings(self):
 		raise NotImplementedError()
 
 
@@ -269,6 +277,10 @@ class UnaryTokenSimilarityModifier(TokenSimilarityModifier):
 	def name(self):
 		return self._kernel.name(self._operand.name)
 
+	@property
+	def embeddings(self):
+		return [x.embedding for x in self._operand]
+
 
 class TokenSimilarity(AbstractTokenSimilarity):
 	def __init__(self, embedding, metric: VectorSpaceMetric):
@@ -278,6 +290,10 @@ class TokenSimilarity(AbstractTokenSimilarity):
 	@property
 	def name(self):
 		return f'{self._metric.name}[{self._embedding.name}]'
+
+	@property
+	def embeddings(self):
+		return [self._embedding]
 
 	@property
 	def embedding(self):
@@ -319,6 +335,10 @@ class MixedTokenSimilarity(TokenSimilarityModifier):
 			terms.append(f'{w / total} * {m.name}')
 		return f'({" + ".join(terms)})'
 
+	@property
+	def embeddings(self):
+		return [x.embedding for x in self._metrics]
+
 
 class ExtremumTokenSimilarity(TokenSimilarityModifier):
 	def __init__(self, metrics):
@@ -345,6 +365,10 @@ class ExtremumTokenSimilarity(TokenSimilarityModifier):
 	@property
 	def name(self):
 		return f'{self._name}({", ".join([x.name for x in self._metrics])})'
+
+	@property
+	def embeddings(self):
+		return [x.embedding for x in self._metrics]
 
 
 class MaximumTokenSimilarity(ExtremumTokenSimilarity):
