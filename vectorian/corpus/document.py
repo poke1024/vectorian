@@ -5,6 +5,7 @@ import numpy as np
 import contextlib
 import zipfile
 import h5py
+import uuid
 
 from functools import lru_cache
 from slugify import slugify
@@ -264,7 +265,8 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 		self._metadata = None
 
 	def _load_metadata(self, zf):
-		self._metadata = json.loads(zf.read('metadata.json'))
+		data = json.loads(zf.read('data.json'))
+		self._metadata = data['metadata']
 		self._metadata['origin'] = str(self._path)
 
 	@property
@@ -347,7 +349,6 @@ class Document:
 
 		with self._storage.json() as data:
 			with zipfile.ZipFile(path.with_suffix(".zip"), "w") as zf:
-				zf.writestr("metadata.json", json.dumps(self.metadata))
 				zf.writestr("data.json", json.dumps(data))
 
 		with self._storage.tokens() as tokens:
@@ -372,9 +373,10 @@ class Document:
 			emb_path.mkdir(exist_ok=True)
 
 			for k, vectors in self._contextual_embeddings.items():
-				slug_name = slugify(k)
-				emb_data[k] = slug_name
-				vectors.save(emb_path / slug_name)
+				unique_name = uuid.uuid1().hex
+				assert not (emb_path / unique_name).exists()
+				emb_data[k] = unique_name
+				vectors.save(emb_path / unique_name)
 
 			with open(emb_path / "info.json", "w") as f:
 				f.write(json.dumps(emb_data))
