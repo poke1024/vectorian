@@ -128,6 +128,14 @@ class Renderer:
 					for renderer in self._renderers:
 						renderer.write_match(doc, match, self._next_unique_id)
 
+	def to_bare_bones_html(self, matches):
+		doc, tag, text = Doc().tagtext()
+
+		for match_obj in matches:
+			self.add_match(doc, match_obj)
+
+		return doc.getvalue()
+
 	def to_html(self, matches):
 		doc, tag, text = Doc().tagtext()
 		iframe_id = self._next_unique_id()

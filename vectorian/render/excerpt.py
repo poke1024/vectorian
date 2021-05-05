@@ -49,10 +49,10 @@ class ExcerptRenderer:
 				with tag('span', style='display:table-row;'):
 					with tag('span', style='display:table-cell;'):
 						self.add_bold_text(doc, region['s'])
-					text(" ")
+						text(" ")
 					with tag('span', style='display:table-cell;'):
 						self.add_light_tag(doc, edge['t'])
-					text(" ")
+						text(" ")
 					opacity = 0.5 + 0.5 * edge["flow"]
 					with tag('span', style=f'display:table-cell; opacity:{opacity};'):
 						similarity = 1 - edge["distance"]

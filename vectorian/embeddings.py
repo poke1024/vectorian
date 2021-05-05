@@ -1259,13 +1259,16 @@ class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 		embedding = session.to_embedding_instance(self._embedding)
 
 		for doc, spans in doc_spans:
-			out = np.zeros((len(spans), self.vector_size(session)), dtype=np.float32)
+			out = np.empty((len(spans), self.vector_size(session)), dtype=np.float32)
+			out.fill(np.nan)
 
 			if embedding.is_static:
 				for i, span in enumerate(spans):
 					text = [token.text for token in span]
 					emb_vec = embedding.get_embeddings(text)
-					out[i, :] = np.mean(emb_vec.unmodified, axis=0)
+					v = emb_vec.unmodified
+					if v.shape[0] > 0:
+						out[i, :] = np.mean(v, axis=0)
 
 			elif embedding.is_contextual:
 				vec_ref = doc.contextual_embeddings[self._embedding.name]
