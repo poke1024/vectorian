@@ -1256,17 +1256,19 @@ class AbstractSpanEncoder:
 		raise NotImplementedError()
 
 
-class TokenAveragingSpanEncoder(AbstractSpanEncoder):
-	# simple unweighted token averaging as described by Mikolov et al.
+class TokenEmbeddingAggregator(AbstractSpanEncoder):
+	# simple aggregated token embeddings, e.g. unweighted token
+	# averaging as described by Mikolov et al.
 	# in "Distributed representations of words and phrases and their
 	# compositionality.", 2013.
 
-	def __init__(self, embedding):
+	def __init__(self, embedding, agg=np.mean):
 		super().__init__()
 		self._embedding = embedding
+		self._agg = agg
 
 		if embedding.is_contextual and embedding.transform is not None:
-			raise RuntimeError("cannot use transformed contextual embedding with TokenAveragingEncoder")
+			raise RuntimeError("cannot use transformed contextual embedding with TokenAggregator")
 
 	@property
 	def embedding(self):
@@ -1288,7 +1290,7 @@ class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 					emb_vec = embedding.get_embeddings(text)
 					v = emb_vec.unmodified
 					if v.shape[0] > 0:
-						out[i, :] = np.mean(v, axis=0)
+						out[i, :] = self._agg(v, axis=0)
 
 			elif embedding.is_contextual:
 				vec_ref = doc.contextual_embeddings[self._embedding.name]
@@ -1297,7 +1299,7 @@ class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 					for i, span in enumerate(spans):
 						v = emb_vec_data[span.start:span.end, :]
 						if v.shape[0] > 0:
-							out[i, :] = np.mean(v, axis=0)
+							out[i, :] = self._agg(v, axis=0)
 
 			else:
 				assert False
