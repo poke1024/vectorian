@@ -228,8 +228,29 @@ class Session:
 	def normalizer(self, stage):
 		return self._normalizers[stage]
 
-	def word_vec(self, embedding, word):
-		return self.to_embedding_instance(embedding).word_vec(word)
+	def word_vec(self, embedding, token_or_tokens):
+		from vectorian.corpus.document import Token
+
+		embedding_instance = self.to_embedding_instance(embedding)
+		if embedding_instance.is_static:
+			def get(token):
+				if isinstance(token, Token):
+					token = token.text
+				return embedding_instance.word_vec(token)
+		elif embedding.is_contextual:
+			def get(token):
+				if not isinstance(token, Token):
+					raise ValueError(f"expected a Token, got {token}")
+
+				with token.doc.contextual_embeddings[embedding.name].open() as vec:
+					return vec.unmodified[token.index]
+		else:
+			raise ValueError()
+
+		if isinstance(token_or_tokens, (list, tuple)):
+			return [get(x) for x in token_or_tokens]
+		else:
+			return get(token_or_tokens)
 
 	def similarity(self, token_sim, a, b):
 		from vectorian.corpus.document import Token

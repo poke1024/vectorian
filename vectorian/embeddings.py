@@ -1107,6 +1107,10 @@ class AbstractPartitionEncoder:
 	def vector_size(self, session):
 		raise NotImplementedError()
 
+	@property
+	def embedding(self):
+		raise NotImplementedError()
+
 	def encode(self, docs, partition, pbar=False):
 		raise NotImplementedError()
 
@@ -1117,6 +1121,10 @@ class PartitionEncoder(AbstractPartitionEncoder):
 
 	def vector_size(self, session):
 		return self._span_encoder.vector_size(session)
+
+	@property
+	def embedding(self):  # i.e. token embedding
+		return self._span_encoder.embedding
 
 	def encode(self, docs, partition, pbar=False):
 		n_spans = [doc.n_spans(partition) for doc in docs]
@@ -1185,6 +1193,10 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 	def vector_size(self, session):
 		return self._encoder.vector_size(session)
 
+	@property
+	def embedding(self):
+		return self._encoder.embedding
+
 	def encode(self, docs, partition, pbar=False):
 		n_spans = [doc.n_spans(partition) for doc in docs]
 		i_spans = np.cumsum([0] + n_spans)
@@ -1236,6 +1248,10 @@ class AbstractSpanEncoder:
 	def vector_size(self, session):
 		raise NotImplementedError()
 
+	@property
+	def embedding(self):  # i.e. token embedding
+		raise NotImplementedError()
+
 	def encode(self, session, doc_spans):
 		raise NotImplementedError()
 
@@ -1251,6 +1267,10 @@ class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 
 		if embedding.is_contextual and embedding.transform is not None:
 			raise RuntimeError("cannot use transformed contextual embedding with TokenAveragingEncoder")
+
+	@property
+	def embedding(self):
+		return self._embedding
 
 	def vector_size(self, session):
 		return session.to_embedding_instance(self._embedding).dimension
@@ -1275,7 +1295,9 @@ class TokenAveragingSpanEncoder(AbstractSpanEncoder):
 				with vec_ref.open() as emb_vec:
 					emb_vec_data = emb_vec.unmodified
 					for i, span in enumerate(spans):
-						out[i] = np.mean(emb_vec_data[span.start:span.end, :], axis=0)
+						v = emb_vec_data[span.start:span.end, :]
+						if v.shape[0] > 0:
+							out[i, :] = np.mean(v, axis=0)
 
 			else:
 				assert False
@@ -1308,6 +1330,10 @@ class SpanEncoder(SpanTextEncoder):
 
 	def vector_size(self, session):
 		return self._vector_size
+
+	@property
+	def embedding(self):  # i.e. token embedding
+		return None
 
 	def _encode_text(self, texts):
 		return self._encode(texts)
