@@ -18,10 +18,12 @@ def make_root_label(s):
 class FineTuneableWidget:
 	_level = 0
 
-	def __init__(self, iquery, fix_to=None):
+	def __init__(self, iquery, fix_to=None, default=None):
+		if default is None:
+			default = self._default
 		kwargs = dict(
 			options=[x[0] for x in self._types],
-			value=self._default if fix_to is None else fix_to,
+			value=default if fix_to is None else fix_to,
 			description=self._description,
 			disabled=fix_to is not None,
 			layout={'width': '25em'},
@@ -47,12 +49,16 @@ class FineTuneableWidget:
 		self._fine_tune = self._types[i][1](self._iquery)
 
 	def on_changed(self, change):
-		self._iquery.on_changed()
 		self._instantiate_fine_tune(change.new)
 		self._box.children = [self._type, self._fine_tune.widget]
+		self._iquery.on_changed()
 
 	def make(self):
 		return self._fine_tune.make()
+
+	@property
+	def value(self):
+		return self._type.value
 
 	@property
 	def widget(self):
@@ -134,6 +140,9 @@ class VectorMetricWidget(FineTuneableWidget):
 	def make(self):
 		return self._fine_tune.make()
 
+	def describe(self):
+		return f"**{self.value.lower()}**"
+
 	@property
 	def layout(self):
 		return {'width': '15em'}
@@ -182,11 +191,14 @@ class EmbeddingWidget:
 			disabled=False,
 			layout={'width': '15em'})
 
-		# self._mixer = EmbeddingMixerWidget(iquery)
+		self._embedding.observe(self.on_changed, names='value')
 
 		self._vbox = widgets.VBox([
 			self._embedding
 		])
+
+	def on_changed(self, changed):
+		self._iquery.on_changed()
 
 	@property
 	def widget(self):
@@ -194,6 +206,9 @@ class EmbeddingWidget:
 
 	def make(self):
 		return self._iquery.session.embeddings[self._embedding.value].factory
+
+	def describe(self):
+		return f"**{self._embedding.value}**"
 
 
 class TokenSimilarityAtomWidget:
@@ -229,6 +244,9 @@ class TokenSimilarityAtomWidget:
 		return vectorian.metrics.TokenSimilarity(
 			self._embedding.make(),
 			self._metric.make())
+
+	def describe(self):
+		return f"{self._metric.describe()} over {self._embedding.describe()}"
 
 	@property
 	def weight(self):
@@ -315,6 +333,8 @@ class TokenSimilarityMetricWidget:
 
 		self._update_operand_widgets()
 
+		self._iquery.on_changed()
+
 	def _update_operand_widgets(self):
 		option = self._option_info(self._operator.value)
 		max_i = len(self._iquery.session.embeddings) - 1
@@ -336,8 +356,7 @@ class TokenSimilarityMetricWidget:
 		else:
 			extra = []
 
-		self._operands_vbox.children = [
-										   x.widget for x in self._operands] + extra
+		self._operands_vbox.children = [x.widget for x in self._operands] + extra
 
 	def on_add_operand(self, changed):
 		self._num_operands += 1
@@ -356,6 +375,18 @@ class TokenSimilarityMetricWidget:
 				sim, [vectorian.metrics.Power(self._falloff.value)])
 		return sim
 
+	def describe(self):
+		text = [self._operator.value.lower(), ", by employing "]
+		for i, x in enumerate(self._operands):
+			text.append(x.describe())
+			if i > 0:
+				text.append(" and ")
+		if self._falloff.value != 1:
+			text.append(". A **falloff** of **%.2f** is applied." % self._falloff)
+		else:
+			text.append(".")
+		return "".join(text)
+
 	def _make_one(self, operands):
 		return operands[0]
 
@@ -371,15 +402,15 @@ class TokenSimilarityMetricWidget:
 
 
 class SlidingGapCostWidget:
-	def __init__(self, iquery, description, construct, max=1.0):
+	def __init__(self, iquery, description, construct, default=0, max=1.0, step=0.01):
 		self._construct = construct
 		self._iquery = iquery
 
 		self._cost = widgets.FloatSlider(
-			value=0,
+			value=default,
 			min=0,
 			max=max,
-			step=0.01,
+			step=step,
 			description=description,
 			disabled=False)
 
@@ -430,15 +461,24 @@ class ConstantGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
 		super().__init__(iquery, 'Cost:', vectorian.alignment.ConstantGapCost)
 
+	def describe(self):
+		return "**constant gap cost** of **%.2f**" % self._cost.value
+
 
 class LinearGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
 		super().__init__(iquery, 'Cost:', vectorian.alignment.LinearGapCost)
 
+	def describe(self):
+		return "**linear gap cost** of **%.2f**" % self._cost.value
+
 
 class ExponentialGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
-		super().__init__(iquery, 'Cutoff:', vectorian.alignment.ExponentialGapCost, max=20)
+		super().__init__(iquery, 'Cutoff:', vectorian.alignment.ExponentialGapCost, default=3, max=20, step=1)
+
+	def describe(self):
+		return "**exponential gap cost** with a cutoff at **%.2f**" % self._cost.value
 
 
 class GapCostWidget(FineTuneableWidget):
@@ -455,6 +495,9 @@ class GapCostWidget(FineTuneableWidget):
 	_default = 'Linear'
 
 	_box = widgets.HBox
+
+	def describe(self):
+		return self._fine_tune.describe()
 
 
 class AlignmentAlgorithmWidget:
@@ -478,6 +521,12 @@ class AlignmentAlgorithmWidget:
 	def make_token_sim(self):
 		return self._token_sim.make()
 
+	def describe_token_sim(self):
+		return self._token_sim.describe()
+
+	def describe_alignment(self):
+		raise NotImplementedError()
+
 
 class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
@@ -487,6 +536,9 @@ class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
 	def make(self):
 		return vectorian.alignment.NeedlemanWunsch(
 			gap=self._gap_cost.make().to_scalar())
+
+	def describe_alignment(self):
+		return "with " + self._gap_cost.describe()
 
 
 class SmithWatermanWidget(AlignmentAlgorithmWidget):
@@ -507,10 +559,13 @@ class SmithWatermanWidget(AlignmentAlgorithmWidget):
 		return vectorian.alignment.SmithWaterman(
 			gap=self._gap_cost.make().to_scalar(), zero=self._zero.value)
 
+	def describe_alignment(self):
+		return "with " + self._gap_cost.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
+
 
 class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
-		self._gap_cost = GapCostWidget(iquery)
+		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._zero = widgets.BoundedFloatText(
 			value=0.25,
 			min=0,
@@ -526,6 +581,9 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 	def make(self):
 		return vectorian.alignment.WatermanSmithBeyer(
 			gap=self._gap_cost.make(), zero=self._zero.value)
+
+	def describe_alignment(self):
+		return "with " + self._gap_cost.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
 
 
 class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
@@ -566,6 +624,9 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		else:
 			raise ValueError(self._variant.value)
 
+	def describe_alignment(self):
+		return self._variant.value
+
 
 class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
@@ -591,6 +652,12 @@ class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
 			normalize_magnitudes=self._normalize_magnitudes.value,
 			extra_mass_penalty=self._extra_mass_penalty.value)
 
+	def describe_alignment(self):
+		if self._normalize_magnitudes.value:
+			return "with normalized magnitudes"
+		else:
+			return "without normalized magnitudes"
+
 
 class AlignmentWidget(FineTuneableWidget):
 	_description = 'Alignment:'
@@ -599,8 +666,8 @@ class AlignmentWidget(FineTuneableWidget):
 		('Needleman-Wunsch', NeedlemanWunschWidget),
 		('Smith-Waterman', SmithWatermanWidget),
 		('Waterman-Smith-Beyer', WatermanSmithBeyerWidget),
-		('Word Movers Distance', WordMoversDistanceWidget),
-		('Word Rotators Distance', WordRotatorsDistanceWidget)
+		('Word Movers Distance (WMD)', WordMoversDistanceWidget),
+		('Word Rotators Distance (WRD)', WordRotatorsDistanceWidget)
 	]
 
 	_default = 'Waterman-Smith-Beyer'
@@ -615,6 +682,12 @@ class AlignmentWidget(FineTuneableWidget):
 		return vectorian.metrics.AlignmentSimilarity(
 			token_sim=self.make_token_sim(),
 			alignment=self.make_alignment())
+
+	def describe(self):
+		return ''.join([
+			f"alignment using **{self.value}** over token similarities. ",
+			f"{self.value} is employed {self._fine_tune.describe_alignment()}. ",
+			"Token similarity is computed through ", self._fine_tune.describe_token_sim()])
 
 
 class TagWeightedAlignmentWidget():
@@ -676,6 +749,9 @@ class PartitionEmbeddingWidget:
 		return vectorian.metrics.PartitionEmbeddingSimilarity(
 			self._encoders[self._widget.value].to_cached())
 
+	def describe(self):
+		return f"partition embeddings using {self._widget.value}."
+
 	@property
 	def widget(self):
 		return self._widget
@@ -691,6 +767,9 @@ class PartitionMetricWidget(FineTuneableWidget):
 	]
 
 	_default = 'Alignment'
+
+	def describe(self):
+		return "Partition similarity is computed via " + self._fine_tune.describe()
 
 
 class PartitionWidget:
