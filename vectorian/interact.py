@@ -890,6 +890,10 @@ class QueryWidget:
 			value=0, min=0, max=1, description='',
 			layout=widgets.Layout(width='100%', visibility='hidden'))
 
+		self._num_results_slider = widgets.IntSlider(
+			description='Results:', value=1, min=1, max=100, step=1,
+			layout={'width': '40em'}, style=ROOT_LEVEL_STYLE)
+
 		self._location_formatter = vectorian.render.location.LocationFormatter()
 
 		self._render = MatchRenderWidget(iquery)
@@ -902,6 +906,7 @@ class QueryWidget:
 
 		self._vbox = widgets.VBox([
 			widgets.HBox([self._query, self._submit_query]),
+			self._num_results_slider,
 			self._partition.widget,
 			self._sentence.widget,
 			self._render.widget,
@@ -969,7 +974,7 @@ class QueryWidget:
 			debug = None
 
 		r = self.index.find(
-			self._query.value, n=1,
+			self._query.value, n=self._num_results_slider.value,
 			run_task=self._run_task,
 			make_result=self._make_result,
 			debug=None)
