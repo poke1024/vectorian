@@ -18,7 +18,7 @@ def make_root_label(s):
 class FineTuneableWidget:
 	_level = 0
 
-	def __init__(self, iquery, fix_to=None, default=None):
+	def __init__(self, iquery, fix_to=None, default=None, default_options=None):
 		if default is None:
 			default = self._default
 		kwargs = dict(
@@ -37,16 +37,18 @@ class FineTuneableWidget:
 
 		self._iquery = iquery
 
-		self._instantiate_fine_tune(self._type.value)
+		self._instantiate_fine_tune(self._type.value, default_options)
 
 		self._type.observe(self.on_changed, names='value')
 
 		box_type = getattr(self, '_box', widgets.VBox)
 		self._box = box_type([self._type, self._fine_tune.widget])
 
-	def _instantiate_fine_tune(self, name):
+	def _instantiate_fine_tune(self, name, options=None):
+		if options is None:
+			options = {}
 		i = [x[0] for x in self._types].index(name)
-		self._fine_tune = self._types[i][1](self._iquery)
+		self._fine_tune = self._types[i][1](self._iquery, **options)
 
 	def on_changed(self, change):
 		self._instantiate_fine_tune(change.new)
@@ -478,7 +480,7 @@ class ExponentialGapCostWidget(SlidingGapCostWidget):
 		super().__init__(iquery, 'Cutoff:', vectorian.alignment.ExponentialGapCost, default=3, max=20, step=1)
 
 	def describe(self):
-		return "**exponential gap cost** with a cutoff at **%.2f**" % self._cost.value
+		return "**exponential gap cost** with a 50%% cutoff at **%.2f**" % self._cost.value
 
 
 class GapCostWidget(FineTuneableWidget):
@@ -685,7 +687,7 @@ class AlignmentWidget(FineTuneableWidget):
 
 	def describe(self):
 		return ''.join([
-			f"alignment using **{self.value}** over token similarities. ",
+			f"**alignment** using **{self.value}** over token similarities. ",
 			f"{self.value} is employed {self._fine_tune.describe_alignment()}. ",
 			"Token similarity is computed through ", self._fine_tune.describe_token_sim()])
 
@@ -698,13 +700,26 @@ class TagWeightedAlignmentWidget():
 			max=1,
 			step=0.1,
 			description='POS Mismatch Penalty:',
-			disabled=False)
+			disabled=False,
+			style=ROOT_LEVEL_STYLE)
 
+		# weights from Batanovic et al.
+		self._tag_weights = dict((k, float(v)) for k, v in [
+			('CC', '0.7'), ('CD', '0.8'), ('DT', '0.7'), ('EX', '0.7'), ('FW', '0.7'), ('IN', '0.7'), ('JJ', '0.7'),
+			('JJR', '0.7'), ('JJS', '0.8'), ('LS', '0.7'), ('MD', '1.2'), ('NN', '0.8'), ('NNS', '1.0'), ('NNP', '0.8'),
+			('NNPS', '0.8'), ('PDT', '0.7'), ('POS', '0.7'), ('PRP', '0.7'), ('PRP$', '0.7'), ('RB', '1.3'), ('RBR', '1.2'),
+			('RBS', '1.0'), ('RP', '1.2'), ('SYM', '0.7'), ('TO', '0.8'), ('UH', '0.7'), ('VB', '1.2'), ('VBD', '1.2'),
+			('VBG', '1.1'), ('VBN', '0.8'), ('VBP', '1.2'), ('VBZ', '1.2'), ('WDT', '0.7'), ('WP', '0.7'), ('WP$', '0.7'),
+			('WRB', '1.3')])
+
+		'''
 		self._tag_weights = widgets.Dropdown(
 			options=['Off', 'POST STSS'],
 			value='POST STSS',
 			description='Tag Weights:',
-			disabled=False)
+			disabled=False,
+			style=ROOT_LEVEL_STYLE)
+			'''
 
 		self._similarity_threshold = widgets.FloatSlider(
 			value=0.2,
@@ -712,13 +727,14 @@ class TagWeightedAlignmentWidget():
 			max=1,
 			step=0.1,
 			description='Similarity Threshold:',
-			disabled=False)
+			disabled=False,
+			style=ROOT_LEVEL_STYLE)
 
 		self._alignment = AlignmentWidget(iquery)
 
 		self._vbox = widgets.VBox([
 			self._pos_mismatch_penalty,
-			self._tag_weights,
+			#self._tag_weights,
 			self._similarity_threshold,
 			self._alignment.widget
 		])
@@ -726,11 +742,15 @@ class TagWeightedAlignmentWidget():
 	def make(self):
 		return vectorian.metrics.TagWeightedSimilarity(
 			token_sim=self._alignment.make_token_sim(),
-			alignment=self._alignment.make_alignment())
+			alignment=self._alignment.make_alignment(),
+			tag_weights=self._tag_weights)
 
 	@property
 	def widget(self):
 		return self._vbox
+
+	def describe(self):
+		return "**tag-weighted** " + self._alignment.describe()
 
 
 class PartitionEmbeddingWidget:
@@ -762,7 +782,7 @@ class PartitionMetricWidget(FineTuneableWidget):
 
 	_types = [
 		('Alignment', AlignmentWidget),
-		# ('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
+		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
 		('Partition Embedding', PartitionEmbeddingWidget)
 	]
 

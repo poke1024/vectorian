@@ -573,18 +573,12 @@ public:
 	}
 
 	POSWMap mapped_pos_weights(
-		const std::map<std::string, float> &p_pos_weights) const {
+		const std::map<std::string, float> &p_pos_weights) {
 
 		POSWMap pos_weights;
 		for (auto const &x : p_pos_weights) {
-			const int i = m_tag->to_id(x.first);
-			if (i >= 0) {
-				pos_weights[i] = x.second;
-			} else {
-				std::ostringstream err;
-				err << "unknown Penn Treebank tag " << x.first;
-				throw std::runtime_error(err.str());
-			}
+			const int i = m_tag->add(x.first);
+			pos_weights[i] = x.second;
 		}
 		return pos_weights;
 	}
