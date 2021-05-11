@@ -39,6 +39,13 @@ class RewrittenDict:
 		self._base = base
 		self._chg = chg
 
+	def get(self, k, default=None):
+		v = self._chg.get(k)
+		if v is not None:
+			return v
+		else:
+			return self._base.get(k, default)
+
 	def __getitem__(self, k):
 		v = self._chg.get(k)
 		if v is not None:
