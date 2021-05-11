@@ -166,8 +166,9 @@ class InternalMemoryTokens(Tokens):
 				dt = h5py.enum_dtype(mapping, basetype=np.uint8)
 				hf.create_dataset(k, dtype=dt, data=[mapping[x] for x in data])
 			elif dtype == 'str':
-				dt = h5py.string_dtype(encoding='utf-8')
-				hf.create_dataset(k, dtype=dt, data=['' if x is None else x for x in data], compression='lzf')
+				dt = h5py.string_dtype(encoding='utf8')
+				strs = ['' if x is None else str(x) for x in data]
+				hf.create_dataset(k, dtype=dt, data=[s.encode("utf8") for s in strs], compression='lzf')
 			else:
 				raise ValueError(dtype)
 
