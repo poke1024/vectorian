@@ -113,12 +113,13 @@ py::list Flow<Index>::py_regions(
 				Slice{idx0, s.idx - idx0}, p));
 		}
 
-		std::vector<MatchedRegion::HalfEdge> region_edges;
+		std::vector<MatchedRegion::HalfEdgeRef> region_edges;
 
 		do {
 			const auto source = edges[edge_index].source;
 			const auto &t = t_tokens.at(source);
-			region_edges.emplace_back(MatchedRegion::HalfEdge(
+			region_edges.push_back(std::make_shared<MatchedRegion::HalfEdge>(
+				p_match->query()->vocabulary(),
 				edges[edge_index].weight,
 				Slice{t.idx, t.len},
 				TokenRef{t_tokens_ref, source},

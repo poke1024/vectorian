@@ -48,54 +48,88 @@ struct TokenRef {
 
 class MatchedRegion : public Region {
 public:
-	struct HalfEdge {
+	class QueryToken {
+		const QueryVocabularyRef m_vocab;
+		const TokenRef m_token;
+		const Slice m_slice;
+
+	public:
+		QueryToken(
+			const QueryVocabularyRef &p_vocab,
+			const TokenRef &p_token,
+			const Slice &p_slice) :
+			m_vocab(p_vocab), m_token(p_token), m_slice(p_slice) {
+		}
+
+		const size_t index() const {
+			return m_token.index;
+		}
+
+		py::tuple slice() const {
+			return m_slice.to_py();
+		}
+
+		const std::string_view &pos() const {
+			return m_vocab->pos_str(m_token->pos);
+		}
+	};
+
+	typedef std::shared_ptr<QueryToken> QueryTokenRef;
+
+
+	class HalfEdge {
+		const QueryVocabularyRef m_vocab;
 		const Weight m_weight;
 		const Slice m_slice;
 		const TokenRef m_token;
 		const std::string m_metric;
 
 	public:
-		inline HalfEdge(
+		HalfEdge(
+			const QueryVocabularyRef &p_vocab,
 			const Weight &p_weight,
 			const Slice &p_slice,
 			const TokenRef &p_token,
 			const std::string &p_metric) :
 
+			m_vocab(p_vocab),
 			m_weight(p_weight),
 			m_slice(p_slice),
 			m_token(p_token),
-			m_metric(p_metric)
-		{
+			m_metric(p_metric) {
 		}
 
-		inline const Weight &weight() const {
-			return m_weight;
+		float flow() const {
+			return m_weight.flow;
 		}
 
-		inline const Slice &slice() const {
-			return m_slice;
+		float distance() const {
+			return m_weight.distance;
 		}
 
-		inline const TokenRef &token() const {
-			return m_token;
+		QueryTokenRef token() const {
+			return std::make_shared<QueryToken>(
+				m_vocab, m_token, m_slice);
 		}
 
-		inline const std::string &metric() const {
+		const std::string &metric() const {
 			return m_metric;
 		}
 	};
 
+	typedef std::shared_ptr<HalfEdge> HalfEdgeRef;
+
 private:
 	const QueryVocabularyRef m_vocab;
 	const TokenRef m_s_token;
-	std::vector<HalfEdge> m_edges;
+	std::vector<HalfEdgeRef> m_edges;
 
 public:
 	MatchedRegion(
 		const QueryVocabularyRef &p_vocab,
 		const Slice &p_s,
 		const TokenRef &p_s_token,
-		std::vector<HalfEdge> &&p_edges) :
+		std::vector<HalfEdgeRef> &&p_edges) :
 
 		Region(p_s),
 		m_vocab(p_vocab),
@@ -111,28 +145,12 @@ public:
 		return m_edges.size();
 	}
 
-	float flow(const size_t p_index) const {
-		return m_edges.at(p_index).weight().flow;
-	}
-
-	float distance(const size_t p_index) const {
-		return m_edges.at(p_index).weight().distance;
-	}
-
-	py::tuple t(const size_t p_index) const {
-		return m_edges.at(p_index).slice().to_py();
+	HalfEdgeRef edge(const size_t p_index) const {
+		return m_edges.at(p_index);
 	}
 
 	const std::string_view &pos_s() const {
 		return m_vocab->pos_str(m_s_token->pos);
-	}
-
-	const std::string_view &pos_t(const size_t p_index) const {
-		return m_vocab->pos_str(m_edges.at(p_index).token()->pos);
-	}
-
-	const std::string &metric(const size_t p_index) const {
-		return m_edges.at(p_index).metric();
 	}
 };
 

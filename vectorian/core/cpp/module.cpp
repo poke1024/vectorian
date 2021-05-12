@@ -36,14 +36,21 @@ PYBIND11_MODULE(core, m) {
 	region.def_property_readonly("mismatch_penalty", &Region::mismatch_penalty);
 	region.def_property_readonly("matched", &Region::is_matched);
 
+	py::class_<MatchedRegion::QueryToken, MatchedRegion::QueryTokenRef> query_token(m, "QueryToken");
+	query_token.def_property_readonly("index", &MatchedRegion::QueryToken::index);
+	query_token.def_property_readonly("slice", &MatchedRegion::QueryToken::slice);
+	query_token.def_property_readonly("pos", &MatchedRegion::QueryToken::pos);
+
+	py::class_<MatchedRegion::HalfEdge, MatchedRegion::HalfEdgeRef> half_edge(m, "HalfEdge");
+	half_edge.def_property_readonly("flow", &MatchedRegion::HalfEdge::flow);
+	half_edge.def_property_readonly("distance", &MatchedRegion::HalfEdge::distance);
+	half_edge.def_property_readonly("token", &MatchedRegion::HalfEdge::token);
+	half_edge.def_property_readonly("metric", &MatchedRegion::HalfEdge::metric);
+
 	py::class_<MatchedRegion, Region, MatchedRegionRef> matched_region(m, "MatchedRegion");
 	matched_region.def_property_readonly("num_edges", &MatchedRegion::num_edges);
-	matched_region.def("flow", &MatchedRegion::flow);
-	matched_region.def("distance", &MatchedRegion::distance);
-	matched_region.def("t", &MatchedRegion::t);
+	matched_region.def("edge", &MatchedRegion::edge);
 	matched_region.def_property_readonly("pos_s", &MatchedRegion::pos_s);
-	matched_region.def("pos_t", &MatchedRegion::pos_t);
-	matched_region.def("metric", &MatchedRegion::metric);
 
 	py::class_<ExternalMatcher, ExternalMatcherRef> matcher(m, "ExternalMatcher");
 	matcher.def(py::init<const QueryRef&,

@@ -51,7 +51,7 @@ class ExcerptRenderer:
 						self.add_bold_text(doc, region['s'])
 						text(" ")
 					with tag('span', style='display:table-cell;'):
-						self.add_light_tag(doc, edge['t'])
+						self.add_light_tag(doc, edge['t']['text'])
 						text(" ")
 					opacity = 0.5 + 0.5 * edge["flow"]
 					with tag('span', style=f'display:table-cell; opacity:{opacity};'):
@@ -63,7 +63,7 @@ class ExcerptRenderer:
 					cell_style = 'display:table-cell; padding-left: 0.2em; padding-right: 0.2em;'
 
 					with tag('span', style='display:table-row;'):
-						if region['pos_s'] == edge['pos_t']:
+						if region['pos_s'] == edge['t']['pos']:
 							text_class = 'has-text-black'
 						else:
 							text_class = 'has-text-danger'
@@ -74,7 +74,7 @@ class ExcerptRenderer:
 									text(region['pos_s'])
 							with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered'):
 								if self._annotate.get('tags'):
-									text(edge['pos_t'])
+									text(edge['t']['pos'])
 						if self._annotate.get('metric'):
 							with tag('span', style=cell_style, klass=f'is-size-7 has-text-centered has-text-grey-light'):
 								if self._annotate.get('metric'):

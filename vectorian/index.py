@@ -167,7 +167,11 @@ TokenMatch = namedtuple('TokenMatch', [
 
 
 TokenMatchEdge = namedtuple('TokenMatchEdge', [
-	't', 'pos_t', 'flow', 'distance', 'metric'])
+	't', 'flow', 'distance', 'metric'])
+
+
+TokenMatchT = namedtuple('TokenMatchT', [
+	'text', 'index', 'pos'])
 
 
 PartitionData = namedtuple('PartitionData', [
@@ -246,8 +250,11 @@ class Match:
 				edges = []
 				for e in region.match.edges:
 					edges.append({
-						't': e.t,
-						'pos_t': e.pos_t,
+						't': {
+							'text': e.t.text,
+							'index': e.t.index,
+							'pos': e.t.pos
+						},
 						'flow': e.flow,
 						'distance': e.distance,
 						'metric': e.metric
@@ -322,12 +329,17 @@ class CoreMatch(Match):
 				if r.matched:
 					edges = []
 					for i in range(r.num_edges):
+						edge = r.edge(i)
+						t = edge.token
 						edges.append(TokenMatchEdge(
-							t=t_text[slice(*r.t(i))],
-							pos_t=r.pos_t(i),
-							flow=r.flow(i),
-							distance=r.distance(i),
-							metric=r.metric(i)))
+							t=TokenMatchT(
+								text=t_text[slice(*t.slice)],
+								index=t.index,
+								pos=t.pos
+							),
+							flow=edge.flow,
+							distance=edge.distance,
+							metric=edge.metric))
 
 					regions.append(Region(
 						s=s_text[slice(*r.s)],
