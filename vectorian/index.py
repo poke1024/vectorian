@@ -307,7 +307,11 @@ class CoreMatch(Match):
 
 	@property
 	def score(self):
-		return self._c_match.score
+		return self._c_match.score_nrm
+
+	@property
+	def score_max(self):
+		return self._c_match.score_max
 
 	@property
 	def metric(self):
@@ -395,6 +399,10 @@ class PyMatch(Match):
 	@property
 	def score(self):
 		return self._score
+
+	@property
+	def score_max(self):
+		return 1
 
 	@property
 	def metric(self):

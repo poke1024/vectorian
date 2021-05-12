@@ -18,7 +18,7 @@ class ResultSet {
 public:
 	ResultSet(
 		const size_t p_max_matches,
-		const float p_min_score) :
+		const Score &p_min_score) :
 
 		m_flow_factory(std::make_shared<FlowFactory<int16_t>>()),
 		m_max_matches(p_max_matches),
@@ -29,7 +29,7 @@ public:
 		m_matches.reserve(p_max_matches);
 	}
 
-	inline float worst_score() const {
+	inline const Score &worst_score() const {
 		if (m_matches.size() < m_max_matches) {
 			return m_min_score;
 		} else {
@@ -115,7 +115,7 @@ public:
 		const MatcherRef &p_matcher,
 		const int32_t p_slice_id,
 		const FlowRef<int16_t> &p_flow,
-		const float p_score) {
+		const Score &p_score) {
 
 		const MatchRef m = std::make_shared<Match>(
 			p_matcher,
@@ -149,7 +149,7 @@ private:
 	std::vector<MatchRef> m_matches;
 
 	const size_t m_max_matches;
-	const float m_min_score;
+	const Score m_min_score;
 };
 
 #endif // __VECTORIAN_RESULT_SET_H__

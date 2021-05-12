@@ -58,15 +58,16 @@ PYBIND11_MODULE(core, m) {
 		const MetricRef&>());
 
 	py::class_<Match, MatchRef> match(m, "Match");
-	match.def(py::init<const MatcherRef&,
+	/*match.def(py::init<const MatcherRef&,
 		const DocumentRef&,
 		const int32_t,
 		const FlowRef<int16_t>&,
-		const float>());
+		const float>());*/
 	match.def_property_readonly("query", &Match::query);
 	match.def_property_readonly("document", &Match::document);
 	match.def_property_readonly("flow", &Match::flow_to_py);
-	match.def_property_readonly("score", &Match::score);
+	match.def_property_readonly("score_nrm", &Match::score_nrm);
+	match.def_property_readonly("score_max", &Match::score_max);
 	match.def_property_readonly("metric", &Match::metric_name);
 	match.def_property_readonly("slice_id", &Match::slice_id);
 	match.def("regions", &Match::regions);

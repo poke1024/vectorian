@@ -173,8 +173,9 @@ public:
 
 		m_kernel(*m_aligner.get(), p_matcher->query(), p_slice, *m_cached_flow.get());
 
-		const float score = m_aligner->score() / reference_score(
+		const float score_max = reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
+		const auto score = Score(m_aligner->score(), score_max);
 
 		if (Hook) {
 			call_debug_hook(p_matcher->query(), p_slice, m_cached_flow, m_aligner->score());
@@ -443,8 +444,9 @@ class WordMoversDistance {
 			return MatchRef();
 		}
 
-		const float score = r.score / reference_score(
+		const float score_max = reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
+		const auto score = Score(r.score, score_max);
 
 		if (Hook) {
 			py::gil_scoped_acquire acquire;
@@ -542,8 +544,9 @@ public:
 		const auto r = m_wrd.compute(
 			p_matcher->query(), p_slice, flow_factory, m_options);
 
-		const float score = r.score / reference_score(
+		const float score_max = reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
+		const auto score = Score(r.score, score_max);
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(

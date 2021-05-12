@@ -11,7 +11,7 @@ ResultSetRef Query::match(
 	const DocumentRef &p_document) {
 
 	ResultSetRef matches = std::make_shared<ResultSet>(
-		max_matches(), min_score());
+		max_matches(), Score(min_score(), 1));
 
 	for (const auto &metric : m_metrics) {
 		const auto matcher = metric->matcher_factory()->create_matcher(

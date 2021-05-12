@@ -33,7 +33,7 @@ struct MatchDigest::compare {
 Match::Match(
 	const MatcherRef &p_matcher,
 	MatchDigest &&p_digest,
-	const float p_score) :
+	const Score &p_score) :
 
 	m_matcher(p_matcher),
 	m_digest(p_digest),
@@ -45,7 +45,7 @@ Match::Match(
 	const DocumentRef &p_document,
 	const int32_t p_slice_id,
 	const FlowRef<int16_t> &p_flow,
-	const float p_score) :
+	const Score &p_score) :
 
 	m_matcher(p_matcher),
 	m_digest(MatchDigest(p_document, p_slice_id, p_flow)),

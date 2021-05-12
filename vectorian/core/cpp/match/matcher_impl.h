@@ -38,7 +38,7 @@ public:
 		m_no_match = std::make_shared<Match>(
 			this->shared_from_this(),
 			MatchDigest(m_document, -1, FlowRef<int16_t>()),
-			m_query->min_score()
+			Score(m_query->min_score(), 1)
 		);
 	}
 

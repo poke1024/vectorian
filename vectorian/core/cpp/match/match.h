@@ -288,24 +288,59 @@ public:
 	}
 };
 
+class Score {
+	const float m_normalized; // overall score in [0, 1]
+	const float m_max; // max of unnormalized
+
+public:
+	inline Score(const float p_value, const float p_max) :
+		m_normalized(p_value / p_max),
+	    m_max(p_max) {
+	}
+
+	inline float normalized() const {
+		return m_normalized;
+	}
+
+	inline float max() const {
+		return m_max;
+	}
+
+	inline bool operator<(const Score &p_score) const {
+		return m_normalized < p_score.m_normalized;
+	}
+
+	inline bool operator>(const Score &p_score) const {
+		return m_normalized > p_score.m_normalized;
+	}
+
+	inline bool operator>=(const Score &p_score) const {
+		return m_normalized >= p_score.m_normalized;
+	}
+
+	inline bool operator==(const Score &p_score) const {
+		return m_normalized == p_score.m_normalized;
+	}
+};
+
 class Match {
 private:
 	MatcherRef m_matcher;
 	const MatchDigest m_digest;
-	float m_score; // overall score
+	const Score m_score;
 
 public:
 	Match(
 		const MatcherRef &p_matcher,
 		MatchDigest &&p_digest,
-		float p_score);
+		const Score &p_score);
 
 	Match(
 		const MatcherRef &p_matcher,
 		const DocumentRef &p_document,
 		const int32_t p_slice_id,
 		const FlowRef<int16_t> &p_flow,
-		const float p_score);
+		const Score &p_score);
 
 	inline const MatcherRef &matcher() const {
 		return m_matcher;
@@ -323,8 +358,16 @@ public:
 		return metric()->name();
 	}
 
-	inline float score() const {
+	inline const Score &score() const {
 		return m_score;
+	}
+
+	inline float score_nrm() const {
+		return m_score.normalized();
+	}
+
+	inline float score_max() const {
+		return m_score.max();
 	}
 
 	inline int32_t slice_id() const {
