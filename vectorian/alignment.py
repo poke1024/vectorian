@@ -116,8 +116,9 @@ class AlignmentAlgorithm:
 
 
 class NeedlemanWunsch(AlignmentAlgorithm):
-	def __init__(self, gap: float = 0):
+	def __init__(self, gap: float = 0, gap_mask="s"):
 		self._gap = gap
+		self._gap_mask = gap_mask
 
 	def to_description(self, partition):
 		return {
@@ -129,13 +130,15 @@ class NeedlemanWunsch(AlignmentAlgorithm):
 	def to_args(self, partition):
 		return {
 			'algorithm': 'needleman-wunsch',
-			'gap': self._gap
+			'gap': self._gap,
+			'gap_mask': self._gap_mask
 		}
 
 
 class SmithWaterman(AlignmentAlgorithm):
-	def __init__(self, gap: float = 0, zero: float = 0.5):
+	def __init__(self, gap: float = 0, gap_mask="s", zero: float = 0.5):
 		self._gap = gap
+		self._gap_mask = gap_mask
 		self._zero = zero
 
 	def to_description(self, partition):
@@ -150,15 +153,17 @@ class SmithWaterman(AlignmentAlgorithm):
 		return {
 			'algorithm': 'smith-waterman',
 			'gap': self._gap,
+			'gap_mask': self._gap_mask,
 			'zero': self._zero
 		}
 
 
 class WatermanSmithBeyer(AlignmentAlgorithm):
-	def __init__(self, gap: GapCost = None, zero: float = 0.5):
+	def __init__(self, gap: GapCost = None, gap_mask="s", zero: float = 0.5):
 		if gap is None:
 			gap = ConstantGapCost(0)
 		self._gap = gap
+		self._gap_mask = gap_mask
 		self._zero = zero
 
 	def to_description(self, partition):
@@ -175,6 +180,7 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 		return {
 			'algorithm': 'waterman-smith-beyer',
 			'gap': np.clip(costs, 0, 1),
+			'gap_mask': self._gap_mask,
 			'zero': self._zero
 		}
 

@@ -9,6 +9,11 @@
 
 #include <xtensor/xsort.hpp>
 
+struct GapMask {
+	bool u;
+	bool v;
+};
+
 template<
 	typename Index=int16_t,
 	typename SimilarityScore=float>
@@ -141,8 +146,6 @@ private:
 			return false;
 		}
 
-		m_best_score = score;
-
 		flow.initialize(len_t);
 		//_best_match.resize(len_t);
 		//std::fill(_best_match.begin(), _best_match.end(), -1);
@@ -153,6 +156,12 @@ private:
 			flow.set(v, u);
 			//_best_match[v] = u;
 			std::tie(u, v) = traceback(u, v).to_pair();
+		}
+
+		if (u >= 0 && v >= 0) {
+			m_best_score = score - values(u, v);
+		} else {
+			m_best_score = score;
 		}
 
 		return true;
@@ -248,6 +257,7 @@ public:
 		Flow &flow,
 		const Similarity &similarity,
 		const SimilarityScore gap_cost, // linear
+		const GapMask &gap_mask,
 		const Index len_s,
 		const Index len_t) {
 
@@ -285,11 +295,11 @@ public:
 					std::make_pair(u - 1, v - 1));
 
 				best.update(
-					nwvalues(u - 1, v) - gap_cost,
+					nwvalues(u - 1, v) - (gap_mask.u ? gap_cost : 0),
 					std::make_pair(u - 1, v));
 
 				best.update(
-					nwvalues(u, v - 1) - gap_cost,
+					nwvalues(u, v - 1) - (gap_mask.v ? gap_cost : 0),
 					std::make_pair(u, v - 1));
 
 				values(u, v) = best.score();
@@ -305,6 +315,7 @@ public:
 		Flow &flow,
 		const Similarity &similarity,
 		const SimilarityScore gap_cost, // linear
+		const GapMask &gap_mask,
 		const Index len_s,
 		const Index len_t,
 		const SimilarityScore zero_similarity = 0) {
@@ -338,13 +349,13 @@ public:
 
 				if (u > 0) {
 					best.update(
-						values(u - 1, v) - gap_cost,
+						values(u - 1, v) - (gap_mask.u ? gap_cost : 0),
 						std::make_pair(u - 1, v));
 				}
 
 				if (v > 0) {
 					best.update(
-						values(u, v - 1) - gap_cost,
+						values(u, v - 1) - (gap_mask.v ? gap_cost: 0),
 						std::make_pair(u, v - 1));
 				}
 
@@ -361,6 +372,7 @@ public:
 		Flow &flow,
 		const Similarity &similarity,
 		const Gap &gap_cost,
+		const GapMask &gap_mask,
 		const Index len_s,
 		const Index len_t,
 		const SimilarityScore zero_similarity = 0) {
@@ -394,13 +406,13 @@ public:
 
 				for (Index k = 0; k < u; k++) {
 					best.update(
-						values(k, v) - gap_cost(u - k),
+						values(k, v) - (gap_mask.u ? gap_cost(u - k) : 0),
 						std::make_pair(k, v));
 				}
 
 				for (Index k = 0; k < v; k++) {
 					best.update(
-						values(u, k) - gap_cost(v - k),
+						values(u, k) - (gap_mask.v ? gap_cost(v - k) : 0),
 						std::make_pair(u, k));
 				}
 

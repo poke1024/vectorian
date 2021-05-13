@@ -502,6 +502,27 @@ class GapCostWidget(FineTuneableWidget):
 		return self._fine_tune.describe()
 
 
+class GapMaskWidget:
+	def __init__(self, iquery):
+		self._s = widgets.Checkbox(value=True, description="s (i.e. document)")
+		self._t = widgets.Checkbox(value=False, description="t (i.e. query)")
+		self._hbox = widgets.HBox([widgets.Label("Gap Mask:"), self._s, self._t])
+
+	@property
+	def widget(self):
+		return self._hbox
+
+	def get(self):
+		return "".join([
+			"s" if self._s.value else "",
+			"t" if self._t.value else ""
+		])
+
+	def describe(self):
+		text = " and ".join([f"**{x}**" for x in self.get()])
+		return f" (applied to {text})"
+
+
 class AlignmentAlgorithmWidget:
 	def __init__(self, iquery, parameters, indent='5em'):
 		self._token_sim = TokenSimilarityMetricWidget(iquery)
@@ -510,11 +531,12 @@ class AlignmentAlgorithmWidget:
 			self._vbox = widgets.VBox([
 				self._token_sim.widget])
 		else:
-			parameters.layout = widgets.Layout(margin=f'0 0 0 {indent}')
+			for p in parameters:
+				p.layout = widgets.Layout(margin=f'0 0 0 {indent}')
 			self._vbox = widgets.VBox([
 				self._token_sim.widget,
 				make_root_label('Alignment Args:'),
-				parameters])
+				*parameters])
 
 	@property
 	def widget(self):
@@ -533,19 +555,23 @@ class AlignmentAlgorithmWidget:
 class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
-		super().__init__(iquery, self._gap_cost.widget)
+		self._gap_mask = GapMaskWidget(iquery)
+		super().__init__(iquery, [
+			self._gap_cost.widget, self._gap_mask.widget])
 
 	def make(self):
 		return vectorian.alignment.NeedlemanWunsch(
-			gap=self._gap_cost.make().to_scalar())
+			gap=self._gap_cost.make().to_scalar(),
+			gap_mask=self._gap_mask.get())
 
 	def describe_alignment(self):
-		return "with " + self._gap_cost.describe()
+		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
 
 
 class SmithWatermanWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
+		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
 			value=0.25,
 			min=0,
@@ -555,19 +581,22 @@ class SmithWatermanWidget(AlignmentAlgorithmWidget):
 			disabled=False)
 		super().__init__(
 			iquery,
-			widgets.VBox([self._gap_cost.widget, self._zero]))
+			[self._gap_cost.widget, self._gap_mask.widget, self._zero])
 
 	def make(self):
 		return vectorian.alignment.SmithWaterman(
-			gap=self._gap_cost.make().to_scalar(), zero=self._zero.value)
+			gap=self._gap_cost.make().to_scalar(),
+			gap_mask=self._gap_mask.get(),
+			zero=self._zero.value)
 
 	def describe_alignment(self):
-		return "with " + self._gap_cost.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
+		return "with " + self._gap_cost.describe() + self._gap_mask.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
 
 
 class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
+		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
 			value=0.25,
 			min=0,
@@ -577,15 +606,16 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 			disabled=False)
 		super().__init__(
 			iquery,
-			widgets.VBox(
-				[self._gap_cost.widget, self._zero]))
+			[self._gap_cost.widget, self._gap_mask.widget, self._zero])
 
 	def make(self):
 		return vectorian.alignment.WatermanSmithBeyer(
-			gap=self._gap_cost.make(), zero=self._zero.value)
+			gap=self._gap_cost.make(),
+			gap_mask=self._gap_mask.get(),
+			zero=self._zero.value)
 
 	def describe_alignment(self):
-		return "with " + self._gap_cost.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
+		return "with " + self._gap_cost.describe() + self._gap_mask.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
 
 
 class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
