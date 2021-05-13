@@ -188,6 +188,7 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 class WordMoversDistance(AlignmentAlgorithm):
 	@staticmethod
 	def wmd(variant='kusner', **kwargs):
+		kwargs['builtin'] = f"wmd/{variant}"
 		if variant == 'kusner':
 			return WordMoversDistance(False, False, False, True, **kwargs)
 		elif variant == 'vectorian':
@@ -197,6 +198,7 @@ class WordMoversDistance(AlignmentAlgorithm):
 
 	@staticmethod
 	def rwmd(variant, **kwargs):
+		kwargs['builtin'] = f"rwmd/{variant}"
 		if variant == 'kusner':
 			return WordMoversDistance(True, True, True, True, **kwargs)
 		elif variant == 'jablonsky':
@@ -206,7 +208,10 @@ class WordMoversDistance(AlignmentAlgorithm):
 		else:
 			raise ValueError(variant)
 
-	def __init__(self, relaxed=True, injective=True, symmetric=False, normalize_bow=False, extra_mass_penalty=-1):
+	def __init__(
+		self, relaxed=True, injective=True, symmetric=False, normalize_bow=False,
+		extra_mass_penalty=-1, builtin=None):
+
 		self._options = {
 			'relaxed': relaxed,
 			'injective': injective,
@@ -214,6 +219,12 @@ class WordMoversDistance(AlignmentAlgorithm):
 			'symmetric': symmetric,
 			'extra_mass_penalty': extra_mass_penalty
 		}
+
+		self._builtin_name = builtin
+
+	@property
+	def builtin_name(self):
+		return self._builtin_name
 
 	def to_description(self, partition):
 		return {

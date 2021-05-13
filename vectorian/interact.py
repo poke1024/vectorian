@@ -553,7 +553,7 @@ class AlignmentAlgorithmWidget:
 
 
 class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery):
+	def __init__(self, iquery, alignment=None):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
 		self._gap_mask = GapMaskWidget(iquery)
 		super().__init__(iquery, [
@@ -569,7 +569,7 @@ class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
 
 
 class SmithWatermanWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery):
+	def __init__(self, iquery, alignment=None):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
 		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
@@ -594,7 +594,7 @@ class SmithWatermanWidget(AlignmentAlgorithmWidget):
 
 
 class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery):
+	def __init__(self, iquery, alignment=None):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
@@ -627,10 +627,15 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		'rwmd/vectorian'
 	]
 
-	def __init__(self, iquery):
+	def __init__(self, iquery, alignment=None):
+		if alignment is not None:
+			default_variant = alignment.builtin_name
+		else:
+			default_variant = "wmd/kusner"
+
 		self._variant = widgets.Dropdown(
 			options=self._variants,
-			value="wmd/kusner",
+			value=default_variant,
 			description="Variant:",
 			disabled=False)
 
@@ -640,10 +645,10 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 			disabled=False,
 			style={'description_width': 'initial'})
 
-		super().__init__(iquery, widgets.VBox([
+		super().__init__(iquery, [
 			self._variant,
 			self._extra_mass_penalty
-		]), indent='10em')
+		], indent='10em')
 
 	def make(self):
 		variant = self._variant.value.split("/")
@@ -657,11 +662,11 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 			raise ValueError(self._variant.value)
 
 	def describe_alignment(self):
-		return self._variant.value
+		return f"in the **{self._variant.value}** variant"
 
 
 class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery):
+	def __init__(self, iquery, alignment=None):
 		self._normalize_magnitudes = widgets.Checkbox(
 			value=False,
 			description='Normalize Magnitudes',
@@ -674,10 +679,10 @@ class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
 			disabled=False,
 			style={'description_width': 'initial'})
 
-		super().__init__(iquery, widgets.VBox([
+		super().__init__(iquery, [
 			self._normalize_magnitudes,
 			self._extra_mass_penalty
-		]), indent='10em')
+		], indent='10em')
 
 	def make(self):
 		return vectorian.alignment.WordRotatorsDistance(
@@ -703,6 +708,24 @@ class AlignmentWidget(FineTuneableWidget):
 	]
 
 	_default = 'Waterman-Smith-Beyer'
+
+	def __init__(self, iquery, alignment=None, **kwargs):
+		if alignment is not None:
+			mapping = {
+				'needleman-wunsch': 'Needleman-Wunsch',
+				'smith-waterman': 'Smith-Waterman',
+				'waterman-smith-beyer': 'Waterman-Smith-Beyer',
+				'word-movers-distance': 'Word Movers Distance (WMD)',
+				'word-rotators-distance': 'Word Rotators Distance (WRD)'
+			}
+
+			args = alignment.to_args(iquery.partition)
+			kwargs['default'] = mapping[args['algorithm']]
+			kwargs['default_options'] = {
+				'alignment': alignment
+			}
+
+		super().__init__(iquery, **kwargs)
 
 	def make_alignment(self):
 		return self._fine_tune.make()
