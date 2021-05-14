@@ -143,7 +143,7 @@ class VectorMetricWidget(FineTuneableWidget):
 		return self._fine_tune.make()
 
 	def describe(self):
-		return f"**{self.value.lower()}**"
+		return f"**{self.value.lower()} similarity**"
 
 	@property
 	def layout(self):
