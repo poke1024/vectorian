@@ -98,11 +98,11 @@ public:
 	}
 
 	inline void set(const Index i, const Index j) {
-		auto &m = m_mapping[i];
-		/*if (m.target >= 0) {
-			throw std::runtime_error("mapping is not injective.");
-		}*/
-		m.target = j;
+		m_mapping[i].target = j;
+	}
+
+	inline void reset(const Index i) {
+		m_mapping[i].target = -1;
 	}
 
 	virtual py::dict to_py() const;

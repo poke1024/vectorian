@@ -38,6 +38,8 @@ public:
 
 	virtual void match(const ResultSetRef &p_matches) = 0;
 
+	virtual GapMask gap_mask() const = 0;
+
 	virtual float gap_cost(size_t len) const = 0;
 };
 
@@ -123,6 +125,10 @@ public:
 
 	virtual float gap_cost(size_t len) const {
 		return 0.0f;
+	}
+
+	virtual GapMask gap_mask() const {
+		return GapMask{false, false};
 	}
 };
 

@@ -149,4 +149,9 @@ struct SliceStrategy {
 
 typedef std::shared_ptr<SliceStrategy> SliceStrategyRef;
 
+struct GapMask {
+	bool u; // apply gap penalty to document
+	bool v; // apply gap penalty to query
+};
+
 #endif // __VECTORIAN_COMMON_H__

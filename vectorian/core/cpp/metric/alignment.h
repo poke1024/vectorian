@@ -268,6 +268,10 @@ struct NeedlemanWunschKernel {
 	inline float gap_cost(size_t len) const {
 		return m_gap_cost * len;
 	}
+
+	inline const GapMask &gap_mask() const {
+		return m_gap_mask;
+	}
 };
 
 template<typename Index>
@@ -284,6 +288,10 @@ public:
 
 	inline float gap_cost(size_t len) const {
 		return this->m_kernel.gap_cost(len);
+	}
+
+	inline GapMask gap_mask() const {
+		return this->m_kernel.gap_mask();
 	}
 };
 
@@ -314,6 +322,10 @@ struct SmithWatermanKernel {
 	inline float gap_cost(size_t len) const {
 		return m_gap_cost * len;
 	}
+
+	inline const GapMask &gap_mask() const {
+		return m_gap_mask;
+	}
 };
 
 template<typename Index>
@@ -331,6 +343,10 @@ public:
 
 	inline float gap_cost(size_t len) const {
 		return this->m_kernel.gap_cost(len);
+	}
+
+	inline const GapMask &gap_mask() const {
+		return this->m_kernel.gap_mask();
 	}
 };
 
@@ -364,6 +380,10 @@ struct WatermanSmithBeyerKernel {
 		return m_gap_cost[
 			std::min(len, m_gap_cost.size() - 1)];
 	}
+
+	inline const GapMask &gap_mask() const {
+		return m_gap_mask;
+	}
 };
 
 template<typename Index>
@@ -383,6 +403,10 @@ public:
 
 	inline float gap_cost(size_t len) const {
 		return this->m_kernel.gap_cost(len);
+	}
+
+	inline const GapMask &gap_mask() const {
+		return this->m_kernel.gap_mask();
 	}
 };
 
@@ -497,6 +521,10 @@ public:
 		return 0;
 	}
 
+	inline GapMask gap_mask() const {
+		return GapMask{false, false};
+	}
+
 	template<bool Hook, typename Slice>
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
@@ -539,6 +567,10 @@ public:
 
 	inline float gap_cost(size_t len) const {
 		return 0;
+	}
+
+	inline GapMask gap_mask() const {
+		return GapMask{false, false};
 	}
 
 	template<bool Hook, typename Slice>

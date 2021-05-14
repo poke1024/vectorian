@@ -45,6 +45,10 @@ public:
 	virtual float gap_cost(size_t len) const {
 		return m_aligner.gap_cost(len);
 	}
+
+	virtual GapMask gap_mask() const {
+		return m_aligner.gap_mask();
+	}
 };
 
 inline void reverse_alignment(std::vector<int16_t> &match, int len_s) {

@@ -504,9 +504,9 @@ class GapCostWidget(FineTuneableWidget):
 
 class GapMaskWidget:
 	def __init__(self, iquery):
-		self._s = widgets.Checkbox(value=True, description="s (i.e. document)")
-		self._t = widgets.Checkbox(value=False, description="t (i.e. query)")
-		self._hbox = widgets.HBox([widgets.Label("Gap Mask:"), self._s, self._t])
+		self._s = widgets.Checkbox(value=True, description="document")
+		self._t = widgets.Checkbox(value=True, description="query")
+		self._hbox = widgets.HBox([make_root_label("Gap Mask:"), self._s, self._t])
 
 	@property
 	def widget(self):

@@ -116,7 +116,7 @@ class AlignmentAlgorithm:
 
 
 class NeedlemanWunsch(AlignmentAlgorithm):
-	def __init__(self, gap: float = 0, gap_mask="s"):
+	def __init__(self, gap: float = 0, gap_mask="st"):
 		self._gap = gap
 		self._gap_mask = gap_mask
 
@@ -136,7 +136,7 @@ class NeedlemanWunsch(AlignmentAlgorithm):
 
 
 class SmithWaterman(AlignmentAlgorithm):
-	def __init__(self, gap: float = 0, gap_mask="s", zero: float = 0.5):
+	def __init__(self, gap: float = 0, gap_mask="st", zero: float = 0.5):
 		self._gap = gap
 		self._gap_mask = gap_mask
 		self._zero = zero
@@ -159,7 +159,7 @@ class SmithWaterman(AlignmentAlgorithm):
 
 
 class WatermanSmithBeyer(AlignmentAlgorithm):
-	def __init__(self, gap: GapCost = None, gap_mask="s", zero: float = 0.5):
+	def __init__(self, gap: GapCost = None, gap_mask="st", zero: float = 0.5):
 		if gap is None:
 			gap = ConstantGapCost(0)
 		self._gap = gap

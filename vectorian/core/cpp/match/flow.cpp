@@ -87,14 +87,17 @@ py::list Flow<Index>::py_regions(
 
 	size_t edge_index = 0;
 
+	const auto gap_mask = p_match->matcher()->gap_mask();
+	int last_source = -1;
+
 	while (edge_index < edges.size()) {
 		const auto &edge = edges[edge_index];
 
-		auto target = edge.target;
-		PPK_ASSERT(target >= 0);
-		if (!index_map.empty()) {
-			target = index_map[target];
-		}
+		const auto target_filtered = edge.target;
+		PPK_ASSERT(target_filtered >= 0);
+
+		const auto target = index_map.empty() ?
+			target_filtered : index_map[target_filtered];
 
 		const auto &s = s_tokens.at(token_at + target);
 
@@ -102,7 +105,8 @@ py::list Flow<Index>::py_regions(
 		if (s.idx > idx0) {
 			float p;
 
-			if (last_matched) {
+			// compute gap cost over s (i.e, document)
+			if (last_matched && gap_mask.u) {
 				p = p_match->matcher()->gap_cost(
 					token_at + target - last_anchor);
 			} else {
@@ -117,6 +121,18 @@ py::list Flow<Index>::py_regions(
 
 		do {
 			const auto source = edges[edge_index].source;
+
+			// compute gap cost over t (i.e. query)
+			if (gap_mask.v && last_source >= 0) {
+				const float p = p_match->matcher()->gap_cost(
+					source - last_source - 1);
+				if (p > 0.0f) {
+					regions.append(std::make_shared<Region>(
+						Slice{s_tokens.at(last_anchor).idx, 0}, p));
+				}
+			}
+			last_source = source;
+
 			const auto &t = t_tokens.at(source);
 			region_edges.push_back(std::make_shared<MatchedRegion::HalfEdge>(
 				p_match->query()->vocabulary(),

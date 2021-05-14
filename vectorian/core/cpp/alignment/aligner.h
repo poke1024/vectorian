@@ -1,18 +1,12 @@
 #ifndef __VECTORIAN_ALIGNER__
 #define __VECTORIAN_ALIGNER__
 
-// Author: Bernhard Liebl, 2020
-// Released under a MIT license.
+#include "common.h"
 
 // Aligner always computes one best alignment, but there
 // might be multiple such alignments.
 
 #include <xtensor/xsort.hpp>
-
-struct GapMask {
-	bool u;
-	bool v;
-};
 
 template<
 	typename Index=int16_t,
@@ -152,9 +146,20 @@ private:
 
 		Index u = best_u;
 		Index v = best_v;
+
+		Index last_u = -1;
+		Index last_v = -1;
+
 		while (u >= 0 && v >= 0 && values(u, v) > zero_similarity) {
+			if (u == last_u) {
+				flow.reset(last_v);
+			}
+
 			flow.set(v, u);
 			//_best_match[v] = u;
+			last_u = u;
+			last_v = v;
+
 			std::tie(u, v) = traceback(u, v).to_pair();
 		}
 
@@ -181,9 +186,19 @@ private:
 		Index v = len_t - 1;
 		m_best_score = m_values(u, v);
 
+		Index last_u = -1;
+		Index last_v = -1;
+
 		while (u >= 0 && v >= 0) {
+			if (u == last_u) {
+				flow.reset(last_v);
+			}
+
 			flow.set(v, u);
 			//_best_match[v] = u;
+			last_u = u;
+			last_v = v;
+
 			std::tie(u, v) = m_traceback(u, v).to_pair();
 		}
 	}
