@@ -745,8 +745,8 @@ class AlignmentWidget(FineTuneableWidget):
 			"Token similarity is computed through ", self._fine_tune.describe_token_sim()])
 
 
-class TagWeightedAlignmentWidget():
-	def __init__(self, iquery):
+class TagWeightedAlignmentWidget:
+	def __init__(self, iquery, tag_weights=None):
 		self._pos_mismatch_penalty = widgets.FloatSlider(
 			value=1,
 			min=0,
@@ -756,14 +756,17 @@ class TagWeightedAlignmentWidget():
 			disabled=False,
 			style=ROOT_LEVEL_STYLE)
 
-		# weights from Batanovic et al.
-		self._tag_weights = dict((k, float(v)) for k, v in [
-			('CC', '0.7'), ('CD', '0.8'), ('DT', '0.7'), ('EX', '0.7'), ('FW', '0.7'), ('IN', '0.7'), ('JJ', '0.7'),
-			('JJR', '0.7'), ('JJS', '0.8'), ('LS', '0.7'), ('MD', '1.2'), ('NN', '0.8'), ('NNS', '1.0'), ('NNP', '0.8'),
-			('NNPS', '0.8'), ('PDT', '0.7'), ('POS', '0.7'), ('PRP', '0.7'), ('PRP$', '0.7'), ('RB', '1.3'), ('RBR', '1.2'),
-			('RBS', '1.0'), ('RP', '1.2'), ('SYM', '0.7'), ('TO', '0.8'), ('UH', '0.7'), ('VB', '1.2'), ('VBD', '1.2'),
-			('VBG', '1.1'), ('VBN', '0.8'), ('VBP', '1.2'), ('VBZ', '1.2'), ('WDT', '0.7'), ('WP', '0.7'), ('WP$', '0.7'),
-			('WRB', '1.3')])
+		if tag_weights is None:
+			# weights from Batanovic et al.
+			self._tag_weights = dict((k, float(v)) for k, v in [
+				('CC', '0.7'), ('CD', '0.8'), ('DT', '0.7'), ('EX', '0.7'), ('FW', '0.7'), ('IN', '0.7'), ('JJ', '0.7'),
+				('JJR', '0.7'), ('JJS', '0.8'), ('LS', '0.7'), ('MD', '1.2'), ('NN', '0.8'), ('NNS', '1.0'), ('NNP', '0.8'),
+				('NNPS', '0.8'), ('PDT', '0.7'), ('POS', '0.7'), ('PRP', '0.7'), ('PRP$', '0.7'), ('RB', '1.3'), ('RBR', '1.2'),
+				('RBS', '1.0'), ('RP', '1.2'), ('SYM', '0.7'), ('TO', '0.8'), ('UH', '0.7'), ('VB', '1.2'), ('VBD', '1.2'),
+				('VBG', '1.1'), ('VBN', '0.8'), ('VBP', '1.2'), ('VBZ', '1.2'), ('WDT', '0.7'), ('WP', '0.7'), ('WP$', '0.7'),
+				('WRB', '1.3')])
+		else:
+			self._tag_weights = tag_weights
 
 		'''
 		self._tag_weights = widgets.Dropdown(
@@ -803,7 +806,15 @@ class TagWeightedAlignmentWidget():
 		return self._vbox
 
 	def describe(self):
-		return "**tag-weighted** " + self._alignment.describe()
+		assignments = []
+		for k, v in self._tag_weights.items():
+			assignments.append(f"{k}={v}")
+		if len(assignments) <= 3:
+			desc_text = ", ".join(assignments)
+		else:
+			desc_text = ", ".join(assignments) + ", ..."
+
+		return f"**tag-weighted** ({desc_text}) " + self._alignment.describe()
 
 
 class PartitionEmbeddingWidget:
