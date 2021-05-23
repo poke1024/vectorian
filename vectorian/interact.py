@@ -183,7 +183,7 @@ class EmbeddingWidget:
 		self._iquery = iquery
 
 		options = []
-		for x in sorted(iquery.session.embeddings.keys()):
+		for x, _ in iquery.ordered_embedding:
 			options.append(x)
 
 		self._embedding = widgets.Dropdown(
@@ -256,7 +256,7 @@ class TokenSimilarityAtomWidget:
 
 
 class TokenSimilarityMetricWidget:
-	def __init__(self, iquery):
+	def __init__(self, iquery, similarity=None):
 		self._iquery = iquery
 
 		self._options = [
@@ -315,7 +315,13 @@ class TokenSimilarityMetricWidget:
 		])
 
 		self._num_operands = 1
-		self._update_operand_widgets()
+
+		if similarity is not None:
+			emb_i = [x for x, _ in iquery.ordered_embedding].index(
+				similarity['embedding'].name)
+			self._update_operand_widgets(default_embedding=emb_i)
+		else:
+			self._update_operand_widgets()
 
 		self._operator.observe(self.on_changed, names='value')
 
@@ -337,16 +343,24 @@ class TokenSimilarityMetricWidget:
 
 		self._iquery.on_changed()
 
-	def _update_operand_widgets(self):
+	def _update_operand_widgets(self, default_embedding=None):
 		option = self._option_info(self._operator.value)
 		max_i = len(self._iquery.session.embeddings) - 1
 
 		self._operands = []
-		for i in range(self._num_operands):
+		if default_embedding is None:
+			for i in range(self._num_operands):
+				self._operands.append(
+					TokenSimilarityAtomWidget(
+						self._iquery,
+						embedding=min(max_i, i),
+						add_weight=option['weights']))
+		else:
+			assert self._num_operands == 1
 			self._operands.append(
 				TokenSimilarityAtomWidget(
 					self._iquery,
-					embedding=min(max_i, i),
+					embedding=default_embedding,
 					add_weight=option['weights']))
 
 		if option['multiple']:
@@ -524,8 +538,8 @@ class GapMaskWidget:
 
 
 class AlignmentAlgorithmWidget:
-	def __init__(self, iquery, parameters, indent='5em'):
-		self._token_sim = TokenSimilarityMetricWidget(iquery)
+	def __init__(self, iquery, parameters, indent='5em', similarity=None):
+		self._token_sim = TokenSimilarityMetricWidget(iquery, similarity)
 
 		if parameters is None:
 			self._vbox = widgets.VBox([
@@ -553,11 +567,11 @@ class AlignmentAlgorithmWidget:
 
 
 class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None):
+	def __init__(self, iquery, alignment=None, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
 		self._gap_mask = GapMaskWidget(iquery)
-		super().__init__(iquery, [
-			self._gap_cost.widget, self._gap_mask.widget])
+		super().__init__(
+			iquery, [self._gap_cost.widget, self._gap_mask.widget], **kwargs)
 
 	def make(self):
 		return vectorian.alignment.NeedlemanWunsch(
@@ -569,7 +583,7 @@ class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
 
 
 class SmithWatermanWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None):
+	def __init__(self, iquery, alignment=None, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
 		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
@@ -581,7 +595,8 @@ class SmithWatermanWidget(AlignmentAlgorithmWidget):
 			disabled=False)
 		super().__init__(
 			iquery,
-			[self._gap_cost.widget, self._gap_mask.widget, self._zero])
+			[self._gap_cost.widget, self._gap_mask.widget, self._zero],
+			**kwargs)
 
 	def make(self):
 		return vectorian.alignment.SmithWaterman(
@@ -594,7 +609,7 @@ class SmithWatermanWidget(AlignmentAlgorithmWidget):
 
 
 class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None):
+	def __init__(self, iquery, alignment=None, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
 		self._zero = widgets.BoundedFloatText(
@@ -606,7 +621,8 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 			disabled=False)
 		super().__init__(
 			iquery,
-			[self._gap_cost.widget, self._gap_mask.widget, self._zero])
+			[self._gap_cost.widget, self._gap_mask.widget, self._zero],
+			**kwargs)
 
 	def make(self):
 		return vectorian.alignment.WatermanSmithBeyer(
@@ -627,7 +643,7 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		'rwmd/vectorian'
 	]
 
-	def __init__(self, iquery, alignment=None):
+	def __init__(self, iquery, alignment=None, **kwargs):
 		if alignment is not None:
 			default_variant = alignment.builtin_name
 		else:
@@ -648,7 +664,7 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		super().__init__(iquery, [
 			self._variant,
 			self._extra_mass_penalty
-		], indent='10em')
+		], indent='10em', **kwargs)
 
 	def make(self):
 		variant = self._variant.value.split("/")
@@ -666,7 +682,7 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 
 
 class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None):
+	def __init__(self, iquery, alignment=None, **kwargs):
 		self._normalize_magnitudes = widgets.Checkbox(
 			value=False,
 			description='Normalize Magnitudes',
@@ -682,7 +698,7 @@ class WordRotatorsDistanceWidget(AlignmentAlgorithmWidget):
 		super().__init__(iquery, [
 			self._normalize_magnitudes,
 			self._extra_mass_penalty
-		], indent='10em')
+		], indent='10em', **kwargs)
 
 	def make(self):
 		return vectorian.alignment.WordRotatorsDistance(
@@ -709,7 +725,10 @@ class AlignmentWidget(FineTuneableWidget):
 
 	_default = 'Waterman-Smith-Beyer'
 
-	def __init__(self, iquery, alignment=None, **kwargs):
+	def __init__(self, iquery, alignment=None, similarity=None, **kwargs):
+		if 'default_options' not in kwargs:
+			kwargs['default_options'] = {}
+
 		if alignment is not None:
 			mapping = {
 				'needleman-wunsch': 'Needleman-Wunsch',
@@ -721,9 +740,10 @@ class AlignmentWidget(FineTuneableWidget):
 
 			args = alignment.to_args(iquery.partition)
 			kwargs['default'] = mapping[args['algorithm']]
-			kwargs['default_options'] = {
-				'alignment': alignment
-			}
+			kwargs['default_options']['alignment'] = alignment
+
+		if similarity is not None:
+			kwargs['default_options']['similarity'] = similarity
 
 		super().__init__(iquery, **kwargs)
 
@@ -746,7 +766,7 @@ class AlignmentWidget(FineTuneableWidget):
 
 
 class TagWeightedAlignmentWidget:
-	def __init__(self, iquery, tag_weights=None):
+	def __init__(self, iquery, tag_weights=None, **kwargs):
 		self._pos_mismatch_penalty = widgets.FloatSlider(
 			value=1,
 			min=0,
@@ -786,7 +806,7 @@ class TagWeightedAlignmentWidget:
 			disabled=False,
 			style=ROOT_LEVEL_STYLE)
 
-		self._alignment = AlignmentWidget(iquery)
+		self._alignment = AlignmentWidget(iquery, **kwargs)
 
 		self._vbox = widgets.VBox([
 			self._pos_mismatch_penalty,
@@ -1107,3 +1127,7 @@ class InteractiveQuery:
 	@property
 	def widget(self):
 		return self._widget.widget
+
+	@property
+	def ordered_embedding(self):
+		return sorted(list(self._session.embeddings.items()), key=lambda x: x[0])

@@ -159,7 +159,7 @@ class Session:
 					if not doc.has_contextual_embedding(embedding.name):
 						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
 
-		self._embedding_instances = {}
+		self._embedding_instances = collections.OrderedDict()
 		for embedding in self._embeddings:
 			instance = embedding.create_instance(self)
 			self._embedding_instances[instance.name] = SessionEmbedding(
