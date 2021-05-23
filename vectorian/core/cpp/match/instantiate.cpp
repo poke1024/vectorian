@@ -115,6 +115,38 @@ public:
 	};
 };
 
+class TagWeightedContextualEmbeddingMatcherFactory : public MinimalMatcherFactory {
+	const TagWeightedOptions m_options;
+
+public:
+	TagWeightedContextualEmbeddingMatcherFactory(
+		const TagWeightedOptions &p_options) :
+
+		m_options(p_options) {
+	}
+
+    virtual MatcherRef create_matcher(
+		const QueryRef &p_query,
+		const MetricRef &p_metric,
+		const DocumentRef &p_document,
+		const MatcherOptions &p_matcher_options) const {
+
+		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
+		const ContextualSimilarityMatrixRef matrix = std::static_pointer_cast<ContextualSimilarityMatrix>(
+			metric->matrix_factory()->create(CONTEXTUAL, p_document));
+		const auto options = m_options;
+
+		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix, options] (
+			const size_t slice_id,
+			const TokenSpan &s,
+			const TokenSpan &t) {
+
+			return TagWeightedSlice(ContextualEmbeddingSlice<Index>(
+				*matrix.get(), slice_id, s, t), options);
+			});
+	};
+};
+
 MatcherFactoryRef create_matcher_factory(
 	const QueryRef &p_query,
 	const py::dict &sent_metric_def) {
@@ -149,7 +181,7 @@ MatcherFactoryRef create_matcher_factory(
 
 		return std::make_shared<MatcherFactory>(
 			std::make_shared<TagWeightedStaticEmbeddingMatcherFactory>(options),
-			MinimalMatcherFactoryRef(), // not supported right now.
+			std::make_shared<TagWeightedContextualEmbeddingMatcherFactory>(options),
 			matcher_options);
 
 	} else {
