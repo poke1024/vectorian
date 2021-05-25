@@ -636,18 +636,18 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 
 class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 	_variants = [
-		'wmd/kusner',
-		'wmd/vectorian',
-		'rwmd/kusner',
-		'rwmd/jablonsky',
-		'rwmd/vectorian'
+		'wmd/bow',
+		'wmd/nbow',
+		'rwmd/nbow',
+		'rwmd/nbow/distributed',
+		'rwmd/bow/fast'
 	]
 
 	def __init__(self, iquery, alignment=None, **kwargs):
 		if alignment is not None:
 			default_variant = alignment.builtin_name
 		else:
-			default_variant = "wmd/kusner"
+			default_variant = "wmd/nbow"
 
 		self._variant = widgets.Dropdown(
 			options=self._variants,
@@ -667,7 +667,7 @@ class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
 		], indent='10em', **kwargs)
 
 	def make(self):
-		variant = self._variant.value.split("/")
+		variant = self._variant.value.split("/", 1)
 		if variant[0] == 'wmd':
 			return vectorian.alignment.WordMoversDistance.wmd(
 				variant[1], extra_mass_penalty=self._extra_mass_penalty.value)

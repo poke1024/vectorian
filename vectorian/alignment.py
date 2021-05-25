@@ -187,11 +187,11 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 
 class WordMoversDistance(AlignmentAlgorithm):
 	@staticmethod
-	def wmd(variant='kusner', **kwargs):
+	def wmd(variant='bow', **kwargs):
 		kwargs['builtin'] = f"wmd/{variant}"
-		if variant == 'kusner':
+		if variant == 'bow':
 			return WordMoversDistance(False, False, False, True, **kwargs)
-		elif variant == 'vectorian':
+		elif variant == 'nbow':
 			return WordMoversDistance(False, False, False, False, **kwargs)
 		else:
 			raise ValueError(variant)
@@ -199,11 +199,11 @@ class WordMoversDistance(AlignmentAlgorithm):
 	@staticmethod
 	def rwmd(variant, **kwargs):
 		kwargs['builtin'] = f"rwmd/{variant}"
-		if variant == 'kusner':
+		if variant == 'nbow':
 			return WordMoversDistance(True, True, True, True, **kwargs)
-		elif variant == 'jablonsky':
+		elif variant == 'nbow/distributed':  # i.e. jablonsky
 			return WordMoversDistance(True, False, True, True, **kwargs)
-		elif variant == 'vectorian':
+		elif variant == 'bow/fast':  # non-symmetric, injective
 			return WordMoversDistance(True, True, False, False, **kwargs)
 		else:
 			raise ValueError(variant)
