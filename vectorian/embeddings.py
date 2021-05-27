@@ -913,9 +913,13 @@ class SpacyEmbedding(ContextualEmbedding):
 class SentenceBertEmbedding(SpacyEmbedding):
 	# a shim to spacy-sentence-bert
 
+	def __init__(self, nlp, dimension, **kwargs):
+		super().__init__(nlp, **kwargs)
+		self._dimension = dimension
+
 	@property
 	def dimension(self):
-		return self._nlp.meta["vectors"]["width"]
+		return self._dimension
 
 	def compressed(self, n_dims):
 		return SentenceBertEmbedding(self._nlp, PCACompression(n_dims))
