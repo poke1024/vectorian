@@ -850,7 +850,7 @@ class PartitionEmbeddingWidget:
 			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.PartitionEmbeddingSimilarity(
+		return vectorian.metrics.SpanEmbeddingSimilarity(
 			self._encoders[self._widget.value].to_cached())
 
 	def describe(self):

@@ -381,7 +381,7 @@ class MinimumTokenSimilarity(ExtremumTokenSimilarity):
 	_name = 'minimum'
 
 
-class PartitionSimilarity:
+class SpanSimilarity:
 	def create_index(self, partition):
 		raise NotImplementedError()
 
@@ -389,7 +389,7 @@ class PartitionSimilarity:
 		raise NotImplementedError()
 
 
-class AlignmentSimilarity(PartitionSimilarity):
+class AlignmentSimilarity(SpanSimilarity):
 	def __init__(self, token_sim: AbstractTokenSimilarity, alignment=None):
 		if not isinstance(token_sim, AbstractTokenSimilarity):
 			raise TypeError(token_sim)
@@ -422,7 +422,7 @@ class AlignmentSimilarity(PartitionSimilarity):
 		}
 
 
-class TagWeightedSimilarity(PartitionSimilarity):
+class TagWeightedSimilarity(SpanSimilarity):
 	def __init__(self, token_sim: AbstractTokenSimilarity, alignment, **kwargs):
 		assert isinstance(token_sim, AbstractTokenSimilarity)
 
@@ -456,7 +456,7 @@ class TagWeightedSimilarity(PartitionSimilarity):
 		}
 
 
-class PartitionEmbeddingSimilarity(PartitionSimilarity):
+class SpanEmbeddingSimilarity(SpanSimilarity):
 	def __init__(self, encoder, metric=None):
 		if metric is None:
 			metric = CosineSimilarity()
