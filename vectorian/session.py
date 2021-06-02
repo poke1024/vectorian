@@ -10,7 +10,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSimilarity, TokenSimilarity, AlignmentSimilarity, SpanSimilarity
+from vectorian.metrics import CosineSimilarity, TokenSimilarity, SpanFlowSimilarity, SpanSimilarity
 from vectorian.embeddings import VectorsCache, Vectors
 
 
@@ -183,7 +183,7 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._embeddings[0]
-		return AlignmentSimilarity(
+		return SpanFlowSimilarity(
 			TokenSimilarity(
 				embedding, CosineSimilarity()))
 

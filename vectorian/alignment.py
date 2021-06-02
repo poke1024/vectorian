@@ -107,7 +107,7 @@ class CustomGapCost(GapCost):
 		return c
 
 
-class AlignmentAlgorithm:
+class SpanFlowStrategy:
 	def to_description(self, partition):
 		raise NotImplementedError()
 
@@ -115,7 +115,7 @@ class AlignmentAlgorithm:
 		raise NotImplementedError()
 
 
-class NeedlemanWunsch(AlignmentAlgorithm):
+class NeedlemanWunsch(SpanFlowStrategy):
 	def __init__(self, gap: float = 0, gap_mask="st"):
 		self._gap = gap
 		self._gap_mask = gap_mask
@@ -135,7 +135,7 @@ class NeedlemanWunsch(AlignmentAlgorithm):
 		}
 
 
-class SmithWaterman(AlignmentAlgorithm):
+class SmithWaterman(SpanFlowStrategy):
 	def __init__(self, gap: float = 0, gap_mask="st", zero: float = 0.5):
 		self._gap = gap
 		self._gap_mask = gap_mask
@@ -158,7 +158,7 @@ class SmithWaterman(AlignmentAlgorithm):
 		}
 
 
-class WatermanSmithBeyer(AlignmentAlgorithm):
+class WatermanSmithBeyer(SpanFlowStrategy):
 	def __init__(self, gap: GapCost = None, gap_mask="st", zero: float = 0.5):
 		if gap is None:
 			gap = ConstantGapCost(0)
@@ -185,7 +185,7 @@ class WatermanSmithBeyer(AlignmentAlgorithm):
 		}
 
 
-class WordMoversDistance(AlignmentAlgorithm):
+class WordMoversDistance(SpanFlowStrategy):
 	@staticmethod
 	def wmd(variant='bow', **kwargs):
 		kwargs['builtin'] = f"wmd/{variant}"
@@ -242,7 +242,7 @@ class WordMoversDistance(AlignmentAlgorithm):
 		}
 
 
-class WordRotatorsDistance(AlignmentAlgorithm):
+class WordRotatorsDistance(SpanFlowStrategy):
 	def __init__(self, normalize_magnitudes=True, extra_mass_penalty=-1):
 		self._normalize_magnitudes = normalize_magnitudes
 		self._extra_mass_penalty = extra_mass_penalty
