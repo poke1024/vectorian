@@ -601,11 +601,14 @@ class PreparedDocument:
 		return self.compiled.n_tokens
 
 	def n_spans(self, partition):
-		n = self._spans[partition.level]['start'].shape[0]
-		k = n // partition.window_step
-		if (k * partition.window_step) < n:
-			k += 1
-		return k
+		if partition.level == "token":
+			return self.n_tokens
+		else:
+			n = self._spans[partition.level]['start'].shape[0]
+			k = n // partition.window_step
+			if (k * partition.window_step) < n:
+				k += 1
+			return k
 
 	def _spans_getter(self, p):
 		return self._cached_spans(
