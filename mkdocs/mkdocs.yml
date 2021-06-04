@@ -1,0 +1,15 @@
+site_name: Vectorian
+nav:
+  - Introduction: introduction.md
+  - Documents: documents.md
+  - Embeddings: embeddings.md
+  - Session: session.md
+  - Token Similarity: sim_token.md
+  - Span Similarity: sim_span.md
+  - Index: vec_index.md
+theme: readthedocs
+markdown_extensions:
+  - admonition
+  - fenced_code
+  - footnotes
+  - tables
