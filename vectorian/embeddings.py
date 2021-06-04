@@ -910,9 +910,7 @@ class SpacyEmbedding(ContextualEmbedding):
 		] + ([] if self._transform is None else [self._transform.name]))
 
 
-class SentenceBertEmbedding(SpacyEmbedding):
-	# a shim to spacy-sentence-bert
-
+class SpacyVectorEmbedding(SpacyEmbedding):
 	def __init__(self, nlp, dimension, **kwargs):
 		super().__init__(nlp, **kwargs)
 		self._dimension = dimension
@@ -926,6 +924,9 @@ class SentenceBertEmbedding(SpacyEmbedding):
 
 	def encode(self, doc):
 		return np.array([token.vector for token in doc])
+
+
+SentenceBertEmbedding = SpacyVectorEmbedding  # legacy
 
 
 class SpacyTransformerEmbedding(SpacyEmbedding):
