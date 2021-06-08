@@ -82,7 +82,8 @@ def _download(url, path, force_download=False):
 				if zi.filename[-1] == '/':
 					continue
 				zi.filename = os.path.basename(zi.filename)
-				zf.extract(zi, result_path.parent)
+				p = zf.extract(zi, result_path.parent)
+				Path(p).rename(result_path)
 
 		download_path.unlink()
 
@@ -639,7 +640,7 @@ class CompressedFastTextVectors(StaticEmbedding):
 
 
 def _zenodo_url(record, name):
-	return f'https://zenodo.org/record/{record}/files/{name}?download=1'
+	return f'https://zenodo.org/record/{record}/files/{name}'
 
 
 class Zoo:
