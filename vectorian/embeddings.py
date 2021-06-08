@@ -3,6 +3,7 @@ import vectorian.core as core
 from tqdm import tqdm
 from pathlib import Path
 from cached_property import cached_property
+from functools import partial
 
 import collections
 import numpy as np
@@ -77,7 +78,12 @@ def _download(url, path, force_download=False):
 
 	if download_path != result_path:
 		with zipfile.ZipFile(download_path, 'r') as zf:
-			zf.extractall(result_path.parent)
+			for zi in zf.infolist():
+				if zi.filename[-1] == '/':
+					continue
+				zi.filename = os.path.basename(zi.filename)
+				zf.extract(zi, result_path.parent)
+
 		download_path.unlink()
 
 	return result_path if result_path.exists() else None
@@ -423,11 +429,12 @@ class CachedWordEmbedding(StaticEmbedding):
 		def to_core(self, tokens):
 			return core.StaticEmbedding(self, tokens)
 
-	def __init__(self, embedding_sampling):
+	def __init__(self, embedding_sampling, transforms=None):
 		self._loaded = {}
 		self._embedding_sampling = embedding_sampling
 		self._cache = CachedWordEmbedding.Cache()
 		self._cache_path = _make_cache_path()
+		self._transforms = transforms or []
 
 	def _load(self):
 		raise NotImplementedError()
@@ -440,12 +447,25 @@ class CachedWordEmbedding(StaticEmbedding):
 	def unique_name(self):
 		raise NotImplementedError()
 
+	@property
+	def constructor_args(self):
+		return {
+			'embedding_sampling': self._embedding_sampling,
+			'transforms': self._transforms
+		}
+
+	def pca(self, n_dims):
+		kwargs = self.constructor_args
+		kwargs['transforms'] = kwargs['transforms'] + [PCACompression(n_dims)]
+		return self.__class__(**kwargs)
+
 	def create_instance(self, session):
 		normalizer = session.normalizer('text').to_callable()
 		key = json.dumps({
 			'emb': self.unique_name,
 			'nrm': normalizer.ident,
-			'sampling': self._embedding_sampling
+			'sampling': self._embedding_sampling,
+			'tfm': [t.name for t in self._transforms]
 		})
 
 		loaded = self._loaded.get(key)
@@ -469,6 +489,9 @@ class CachedWordEmbedding(StaticEmbedding):
 				tokens, vectors = _normalize_word2vec(
 					tokens, vectors, normalizer.unpack(), self._embedding_sampling)
 
+				for t in self._transforms:
+					vectors = t.apply(Vectors(vectors)).unmodified
+
 				dat_path = self._cache.create_new_data_path()
 
 				vectors_mmap = np.memmap(
@@ -491,9 +514,15 @@ class CachedWordEmbedding(StaticEmbedding):
 
 
 class GensimVectors(CachedWordEmbedding):
-	def __init__(self, name, embedding_sampling="nearest"):
-		super().__init__(embedding_sampling)
+	def __init__(self, name, embedding_sampling="nearest", **kwargs):
+		super().__init__(embedding_sampling, **kwargs)
 		self._name = name
+
+	@property
+	def constructor_args(self):
+		return dict({
+			'name': self._name
+		}, **super().constructor_args)
 
 	def _load_wv(self):
 		raise NotImplementedError()
@@ -518,19 +547,32 @@ class GensimVectors(CachedWordEmbedding):
 
 
 class PretrainedGensimVectors(GensimVectors):
-	def __init__(self, name, gensim_name, embedding_sampling="nearest"):
-		super().__init__(name, embedding_sampling)
+	def __init__(self, name, gensim_name, embedding_sampling="nearest", **kwargs):
+		super().__init__(name, embedding_sampling, **kwargs)
 		self._gensim_name = gensim_name
+
+	@property
+	def constructor_args(self):
+		return dict({
+			'gensim_name': self._gensim_name
+		}, **super().constructor_args)
 
 	def _load_wv(self):
 		return gensim.downloader.load(self._gensim_name)
 
 
 class Word2VecVectors(GensimVectors):
-	def __init__(self, name, path, binary=False, embedding_sampling="nearest"):
-		super().__init__(name, embedding_sampling)
+	def __init__(self, name, path, binary=False, embedding_sampling="nearest", **kwargs):
+		super().__init__(name, embedding_sampling, **kwargs)
 		self._path = path
 		self._binary = binary
+
+	@property
+	def constructor_args(self):
+		return dict({
+			'path': self._path,
+			'binary': self._binary
+		}, **super().constructor_args)
 
 	def _load_wv(self):
 		return gensim.models.KeyedVectors.load_word2vec_format(
@@ -596,28 +638,24 @@ class CompressedFastTextVectors(StaticEmbedding):
 		return self._name
 
 
+def _zenodo_url(record, name):
+	return f'https://zenodo.org/record/{record}/files/{name}?download=1'
+
+
 class Zoo:
 	_initialized = False
 
+	_numberbatch_lang_codes = [
+		'af', 'ang', 'ar', 'ast', 'az', 'be', 'bg', 'ca', 'cs', 'cy', 'da',
+		'de', 'el', 'en', 'eo', 'es', 'et', 'eu', 'fa', 'fi', 'fil', 'fo',
+		'fr', 'fro', 'ga', 'gd', 'gl', 'grc', 'gv', 'he', 'hi', 'hsb', 'hu',
+		'hy', 'io', 'is', 'it', 'ja', 'ka', 'kk', 'ko', 'ku', 'la', 'lt', 'lv',
+		'mg', 'mk', 'ms', 'mul', 'nl', 'no', 'non', 'nrf', 'nv', 'oc', 'pl',
+		'pt', 'ro', 'ru', 'rup', 'sa', 'se', 'sh', 'sk', 'sl', 'sq', 'sv', 'sw',
+		'ta', 'te', 'th', 'tr', 'uk', 'ur', 'vi', 'vo', 'xcl', 'zh'
+	]
+
 	_embeddings = {
-		'fasttext-en-mini': {
-			'constructor': CompressedFastTextVectors,
-			'url': 'https://www.dropbox.com/s/zj34mh3zp0pv1db/fasttext-en-mini.kv?dl=1'
-		},
-		'fasttext-de-mini': {
-			'constructor': CompressedFastTextVectors,
-			'url': 'https://www.dropbox.com/s/5u1742sqdww93ww/fasttext-de-mini.kv?dl=1'
-		},
-		'numberbatch-19.08-en-50': {
-			'constructor': Word2VecVectors,
-			'url': 'https://www.dropbox.com/s/9u29dsk1e0by9no/numberbatch-19.08-en-50.txt.zip?dl=1',
-			'name': 'numberbatch-19.08-en-50'
-		},
-		'numberbatch-19.08-de-50': {
-			'constructor': Word2VecVectors,
-			'url': 'https://www.dropbox.com/s/yyha7lw72r11z3f/numberbatch-19.08-de-50.txt.zip?dl=1',
-			'name': 'numberbatch-19.08-de-50'
-		}
 	}
 
 	@staticmethod
@@ -630,6 +668,18 @@ class Zoo:
 			Zoo._embeddings[f'fasttext-{lang}'] = {
 				'constructor': PretrainedFastText,
 				'lang': lang
+			}
+
+			Zoo._embeddings[f'fasttext-{lang}-mini'] = {
+				'constructor': CompressedFastTextVectors,
+				'url': _zenodo_url(4905385, f'fasttext-{lang}-mini')
+			}
+
+		for lang in Zoo._numberbatch_lang_codes:
+			Zoo._embeddings[f'numberbatch-19.08-{lang}'] = {
+				'constructor': partial(Word2VecVectors, binary=True),
+				'url': _zenodo_url(4911598, f'numberbatch-19.08-{lang}.zip'),
+				'name': f'numberbatch-19.08-{lang}'
 			}
 
 		for name, sizes in {
@@ -919,7 +969,7 @@ class SpacyVectorEmbedding(SpacyEmbedding):
 	def dimension(self):
 		return self._dimension
 
-	def compressed(self, n_dims):
+	def pca(self, n_dims):
 		return SentenceBertEmbedding(self._nlp, PCACompression(n_dims))
 
 	def encode(self, doc):
@@ -940,7 +990,7 @@ class SpacyTransformerEmbedding(SpacyEmbedding):
 			tfm = self._nlp.pipeline[self._nlp.pipe_names.index("transformer")][1]
 			return tfm.model.get_dim("nO")
 
-	def compressed(self, n_dims):
+	def pca(self, n_dims):
 		return SpacyTransformerEmbedding(self._nlp, PCACompression(n_dims))
 
 	def encode(self, doc):
