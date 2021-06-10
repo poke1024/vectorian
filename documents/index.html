@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Documents - Vectorian</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" />
+
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Documents";
+    var mkdocs_page_input_path = "documents.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> Vectorian</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../introduction/">Introduction</a>
+                    </li>
+                </ul>
+                <ul class="current">
+                    <li class="toctree-l1 current"><a class="reference internal current" href="./">Documents</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#what-is-a-document">What is a Document?</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#partitions-and-spans">Partitions and Spans</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#importers">Importers</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#persistence">Persistence</a>
+    </li>
+    </ul>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../embeddings/">Embeddings</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../session/">Session</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../sim_token/">Token Similarity</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../sim_span/">Span Similarity</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../vec_index/">Index</a>
+                    </li>
+                </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">Vectorian</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Documents</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="documents">Documents</h1>
+<h2 id="what-is-a-document">What is a Document?</h2>
+<p>A <code>Document</code> in Vectorian terminology is some text we can perform a
+search on, e.g. book, a web page, or a Shakespeare play. For example,
+the text of Shakespeare's <em>A Midsummer Night's Dream</em> and various metadata
+(such as speakers, acts and scenes) about it could be regarded as one <code>Document</code>.</p>
+<h2 id="partitions-and-spans">Partitions and Spans</h2>
+<p>A problem in this terminology arises when we want to search a text on a
+finer granularity level, e.g. when we aim to find all of the <code>Document</code>'s
+sentences that match some query. For example, let us assume we want to
+find all sentences in <em>A Midsummer Night's Dream</em> that contain a mention
+of <em>Titania</em>. If we regard the whole text of <em>A Midsummer Night's Dream</em>
+as one single <code>Document</code>, then the result of our search would be one single
+hit, telling us that <em>A Midsummer Night's Dream</em> indeed contains one
+occurence of <em>Titania</em>. This obviously is neither very useful nor not what
+we set out to achieve.</p>
+<p>A common approach to solving this problem is to change terminology
+and split the <code>Document</code> into its sentences beforehand and then regard
+those sentences as separate <code>Document</code>s. This approach can be confusing
+though and has a number of technical and conceptual drawbacks.</p>
+<p>The Vectorian takes a different approach and introduces a concept called
+<code>Partition</code>, which is a combination of granularity control (the Vectorian
+API calls this the <code>Partition</code>s level) and a sliding window specification.
+Search operations do not operate on <code>Document</code>s, but instead on <code>Span</code>s that
+are generated through applying a <code>Partition</code> on a <code>Document</code>. A <code>Span</code> is a
+section of a Document, e.g. a single sentence or a specific sequence of tokens.</p>
+<p>Here a three examples to illustrate the concepts - we assume that <code>doc</code> is
+a <code>Document</code> and that <code>session</code> is a <code>Session</code>:</p>
+<ul>
+<li><code>doc.spans(session.partition("document"))</code> produces one <code>Span</code> that represents
+the document as a whole.</li>
+<li><code>doc.spans(doc.partition("sentence"))</code> produces <code>Span</code>s such that each <code>Span</code>
+is one sentence of the <code>Document</code>.</li>
+<li><code>doc.spans(doc.partition("token", 5, 1))</code> produces <code>Span</code> by applying a sliding
+window of size 5 to the tokens of the <code>Document</code>.</li>
+</ul>
+<p>Which granularity levels (e.g. <code>"document"</code> or <code>"sentence"</code>) are available
+depends on the <code>Importer</code> used (see next section). The default <code>Importer</code>s
+support <code>"document"</code>, <code>"sentence"</code> and <code>"token"</code>.</p>
+<h2 id="importers">Importers</h2>
+<p>An <code>Importer</code> converts some input (e.g. plain text, a XML file, a Web URL, ...)
+into a <code>Document</code>. It will perform tokenization, partition detection (e.g.
+detection of sentence boundaries) and other related nlp tasks like lemmatization.
+The <code>Importer</code> is also responsible for computing contextual embeddings.</p>
+<p>Standard importers in the Vectorian include:</p>
+<ul>
+<li><code>StringImporter</code>: turns a string into a <code>Document</code></li>
+<li><code>TextImporter</code>: turns a plain text file into a <code>Document</code></li>
+<li><code>NovelImporter</code>: imports a novel provided as a plain text file and keeps
+additional data about the structure of the novel (e.g. chapter breaks) in
+the resulting <code>Document</code></li>
+<li><code>PlayShakespeareImporter</code>: imports data from an XML file from
+https://www.playshakespeare.com/ - the resulting <code>Document</code> knows
+about speakers, acts and scenes for each line</li>
+</ul>
+<p>Here is an example of using <code>StringImporter</code> to create a <code>Document</code> (you
+need a spaCy <code>nlp</code> object that knows about the used language):</p>
+<pre><code>im = vectorian.importers.StringImporter(nlp)
+doc = im(&quot;At the station is an art museum.&quot;)
+</code></pre>
+<p><code>Importer</code>s - once created - act like factories for <code>Document</code>s, i.e. they can
+be used to import multiple <code>Document</code>s.</p>
+<p><img alt="Available importers in the Vectorian" src="../images/importers_uml.png" /></p>
+<h2 id="persistence">Persistence</h2>
+<p>Since the task of importing <code>Document</code>s can take considerable time - due to
+various nlp pipeline steps and/or the computation of contextual embeddings -
+it is useful to save and load imported <code>Document</code>s to and from disk by using
+the <code>Document</code>'s <code>save</code> and the static <code>Document.load</code> methods. Note that these
+methods do not take a filename, but rather a path, since a single <code>Document</code>
+might consist of a number of files.</p>
+<p>For saving and loading multiple <code>Document</code>'s, the <code>Corpus</code> class provides
+some convenience functionality. First, construct a <code>Corpus</code> from your imported
+<code>Document</code>'s. Then use <code>Corpus.save</code> (and later <code>Corpus.load</code>). As with
+<code>Document</code>'s, these methods take a path (not a single filename). You can also
+construct a corpus by incrementally saving corpus sub sets to a path and then
+later on loading the whole <code>Corpus</code> in one go. Be aware that saving the
+same set of <code>Documents</code> to the same path will currently cause duplication.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../embeddings/" class="btn btn-neutral float-right" title="Embeddings">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../introduction/" class="btn btn-neutral" title="Introduction"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../introduction/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../embeddings/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Embeddings - Vectorian</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" />
+
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Embeddings";
+    var mkdocs_page_input_path = "embeddings.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> Vectorian</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../introduction/">Introduction</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../documents/">Documents</a>
+                    </li>
+                </ul>
+                <ul class="current">
+                    <li class="toctree-l1 current"><a class="reference internal current" href="./">Embeddings</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#token-embeddings-vs-document-embeddings">Token Embeddings vs. Document Embeddings</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#the-zoo">The Zoo</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#static-embeddings">Static Embeddings</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#keyed-values">Keyed Values</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fasttext">fastText</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#sampling">Sampling</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#contextual-embeddings">Contextual Embeddings</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#difference-from-static-embeddings">Difference from Static Embeddings</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#usage-in-the-vectorian">Usage in the Vectorian</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#compression">Compression</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#stacking-embeddings">Stacking Embeddings</a>
+    </li>
+    </ul>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../session/">Session</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../sim_token/">Token Similarity</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../sim_span/">Span Similarity</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../vec_index/">Index</a>
+                    </li>
+                </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">Vectorian</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Embeddings</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="embeddings">Embeddings</h1>
+<h2 id="token-embeddings-vs-document-embeddings">Token Embeddings vs. Document Embeddings</h2>
+<p>Note that the term <em>embedding</em> in this whole section always refers to
+<em>token embeddings</em>. Document or sentence embeddings are not handled
+via the <code>Embedding</code> class in the Vectorian. In order to use the latter,
+use a <code>SpanEmbeddingSimilarity</code> together with an <code>Index</code>, see the
+sections on <a href="../sim_span/">Span Similarity</a> and <a href="../vec_index/">Index</a>.</p>
+<h2 id="overview">Overview</h2>
+<p>Here is an overview of the different classes the API offers to load
+and specify embeddings:</p>
+<p><img alt="Classes implementing embeddings" src="../images/embeddings_uml.png" /></p>
+<p>The following sections will explain the different kinds of classes
+in detail.</p>
+<h2 id="the-zoo">The Zoo</h2>
+<p>One of the easiest way to create an <code>Embedding</code> instance is to use the
+<code>Zoo</code> class, which offers a small set of pretrained embeddings. Note that
+Vectorian's model zoo is not aimed at offering a wide variety of currently
+available embeddings and is more geared towards enabling quick and easy
+experimentation within memory-constrained environments like Binder by
+offering compressed versions of common standard embeddings.</p>
+<p>To get a list of all available models, call</p>
+<pre><code>vectorian.embeddings.Zoo.list()
+</code></pre>
+<p>To load one embedding by its name, e.g. <code>fasttext-en-mini</code> use:</p>
+<pre><code>fasttext_mini = Zoo.load('fasttext-en-mini')
+</code></pre>
+<h2 id="static-embeddings">Static Embeddings</h2>
+<p>Static Embeddings are embeddings that map one token string to one
+embedding vector, independent of the token's occurence in a text.</p>
+<p>All implementations derive from <code>StaticEmbedding</code>. The Vectorian supports
+two kinds of flavors:</p>
+<ul>
+<li>keyed values (e.g. Word2vec, GloVe, Numberbatch)</li>
+<li>variants of fastText</li>
+</ul>
+<p>Whereas the first variant is a simple key-value mapping, the structure
+of fastText embeddings is more complex (and powerful) due to its n-gram
+representation.</p>
+<p>A second criterion when loading embeddings is whether you use a standard
+pretrained embedding from an external provider (such as Facebook), or whether
+you want to load embeddings you trained yourself. In the first case, the
+Vectorian API takes care of downloading and caching the embedding data in
+order to make it easy to use for new users.</p>
+<h3 id="keyed-values">Keyed Values</h3>
+<p>Pretrained keyed values embeddings can be loaded either via Vectorian's
+<code>Zoo</code> or via <code>PretrainedGensimVectors</code>, if the embedding is available
+through <code>gensim-data</code> (see https://radimrehurek.com/gensim/downloader.html).
+For GloVe, there is also the <code>PretrainedGloVe</code> class.</p>
+<p>To load any other keyed values embedding, use  the <code>Word2VecVectors</code> class.
+It takes a unique name and a path to a Word2vec formatted
+file. Note that the contents of that file need not originate from Word2vec
+and can contain any key-value-form embedding such as GloVe or Numberbatch.</p>
+<h3 id="fasttext">fastText</h3>
+<p><code>PretrainedFastText</code> offers easy access to the official pretrained
+fastText embbeddings offered by Facebook (see https://fasttext.cc/).
+Simply specify the desired language code in the constructor and Vectorian
+will download the necessary data. Note that these downloads are large and
+will have memory requirements that are beyond what is provided by Binder.</p>
+<p><code>CompressedFastTextVectors</code> allows the loading of fastText data that has
+been compressed via https://github.com/avidale/compress-fasttext. This
+approach can reduce the memory requirements of fastText by several magnitudes
+without a huge loss in quality.</p>
+<h2 id="sampling">Sampling</h2>
+<p>A small but important topic with static topic is how embedding vectors are
+to be chosen given various tokens that have been normalized to the same
+base form. The approach taken is refered to as <code>sampling</code> in the Vectorian
+and can be configured in various <code>Embedding</code> classes (see the <code>embedding_sampling</code>
+argument in the <code>PretrainedGensimVectors</code> constructor for example).</p>
+<p>Let us assume we have two tokens, "behold" and "Behold", that have both been
+normalized to the same form "behold" through a lowercase-rule in the
+<code>Session</code>'s <code>normalizers</code> settings (see <a href="../session/">Session</a>). The
+Vectorian offers two options how to deal with this:</p>
+<ul>
+<li>By default (using the "nearest" setting for <code>sampling</code>), the Vectorian will
+choose the embedding of the nearest key, namely "behold", to look up the
+vector for <em>both</em> tokens. Thus, both "behold" and "Behold" will get the
+embedding vector that is given for "behold" in the embedding data.</li>
+<li>If specifying the "average" setting for <code>sampling</code>, the Vectorian will
+look up the vectors for both "behold" and "Behold", then average these,
+and then apply this averaged vector to both "behold" and "Behold".</li>
+</ul>
+<p>Note that <code>sampling</code> will not be an issue if no token text normalization
+is specified in the <code>Session</code> (i.e. if there are no unified tokens).</p>
+<h2 id="contextual-embeddings">Contextual Embeddings</h2>
+<h3 id="difference-from-static-embeddings">Difference from Static Embeddings</h3>
+<p>In contrast to static embeddings, contextual embeddings provide every token
+instance in a text with a potentially different embedding vector. For example,
+in "to be or not to be", the tokens "to" and "be" might get different embeddings
+depending on their occurrence in the phrase. Thus, the bold "to" in "<strong>to</strong> be
+or not to be" might be different from the bold "to" in "to be or not <strong>to</strong> be".</p>
+<p>Static embeddings on the other hand would map "to" to exactly one (static) vector
+all the time.</p>
+<p>Contextual embeddings are often generated from network architectures such as ELMO,
+BERT and various newer Transformer-based architectures.</p>
+<h3 id="usage-in-the-vectorian">Usage in the Vectorian</h3>
+<p>To use contextual embeddings in the Vectorian, there are two options that provide
+access to embeddings computed through a spaCy pipeline:</p>
+<ul>
+<li><code>SpacyVectorEmbedding</code> uses the <code>vector</code> attribute in spaCy's <code>Token</code>class to
+obtain embedding vectors.  This works well with dedicated packages auch as the
+spaCy Sentence-BERT wrapper (see https://pypi.org/project/spacy-sentence-bert/).</li>
+<li><code>SpacyTransformerEmbedding</code> obtains an embedding vector by access spaCy's
+internal Transformer state (when using a Transformer model such as <code>en_core_web_trf</code>).</li>
+</ul>
+<p>The second option is highly experimental and has a number of shortcomings (for
+example, it is debatable if the embeddings acquired in this way are even suitable
+as contextual embeddings since there is no control over the Transformer layers
+which contribute to them). In general, the first option is to be preferred.</p>
+<h3 id="compression">Compression</h3>
+<p>It can be useful to compress contextual embeddings, since they can take up
+a large amount of disk space (this can also impact search performance). Note
+that compression is always a tradeoff between size and quality.</p>
+<p>To obtain a PCA-compressed version of a contextual embedding, use the
+<code>compressed</code> method inside the embedding's class. The Vectorian will then
+automatically take care of compressing queries that run on those embeddings
+in the correct way.</p>
+<h2 id="stacking-embeddings">Stacking Embeddings</h2>
+<p>A common technique to combine the benefits of different existing embeddings
+into one new embedding is to stack them (i.e. appending their vectors).</p>
+<p>In the Vectorian, this can be achieved by using the <code>StackedEmbedding</code> class
+and providing the embeddings you want to stack.</p>
+<p>At the time of this writing, this is only supported for static embeddings.</p>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../session/" class="btn btn-neutral float-right" title="Session">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../documents/" class="btn btn-neutral" title="Documents"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../documents/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../session/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>
