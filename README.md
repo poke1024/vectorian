@@ -1,6 +1,11 @@
 # The Vectorian
 
-## design goals
+The Vectorian is a text search engine based on word embeddings and
+alignments. Its main intention is academic research and teaching purposes.
+
+API documentation can be found under https://poke1024.github.io/vectorian-2021/index.html
+
+## Design Goals
 
 The Vectorian started out as a high-performance system for interactive searches.
 
@@ -15,12 +20,12 @@ without the need of anewed preprocessing the whole data
 
 This is achieved by:
 
-* a highly optimized C++ core
+* a highly optimized C++17 core
 * an efficient storage of document data that allows to load large
 number of document data into memory without the need for disk access
 (using intellingent caching)
 
-## manual installation
+## Manual Installation
 
 ```
 conda create -f environment.yml
@@ -33,7 +38,7 @@ python -m spacy download en_core_web_sm
 this will give you a fully functional version of the vectorian API.
 depending on what you want to use you might also want to install:
 
-### jupyterlab
+### Jupyterlab
 
 ```
 jupyterlab>=3.0.7
@@ -41,16 +46,16 @@ ipywidgets>=7.6.3
 matplotlib>=3.3.4
 ```
 
-### flow visualizations
+### Flow Visualizations
 
 ```
 holoviews>=1.14.2
 bokeh>=2.3.0
 ```
 
-## changes over last 2020 web-based version
+## Changes over previous web-based version (pre 2021)
 
-### features
+### Features
 
 * full support for fasttext (ngram-based construction)
 * support for compressed fasttext embeddings
@@ -65,7 +70,7 @@ bokeh>=2.3.0
 * completely redesigned document storage and caching architecture
 * support for text and matrix visualizations
 
-### technical
+### Technical
 
 * switched from Eigen to xtensor
 * prospective support for GPU-based vector operations via cupy

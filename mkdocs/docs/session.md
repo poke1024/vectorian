@@ -28,7 +28,7 @@ option (which is usually set to "default").
 It is in these settings that users declare whether two tokens like "the"
 and "The" should be regarded identical or not. If they are to be unified,
 the selection of embedding vectors depends on the configured embedding's
-`sampling` setting (see [Embeddings](../embeddings.md)).
+`sampling` setting (see [Embeddings](embeddings.md)).
 
 ## The Default Normalization
 

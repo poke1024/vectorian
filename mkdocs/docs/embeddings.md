@@ -6,7 +6,7 @@ Note that the term *embedding* in this whole section always refers to
 *token embeddings*. Document or sentence embeddings are not handled
 via the `Embedding` class in the Vectorian. In order to use the latter,
 use a `SpanEmbeddingSimilarity` together with an `Index`, see the
-sections on [Span Similarity](../sim_span.md) and [Index](../vec_index.md).
+sections on [Span Similarity](sim_span.md) and [Index](vec_index.md).
 
 ## Overview
 
@@ -95,7 +95,7 @@ argument in the `PretrainedGensimVectors` constructor for example).
 
 Let us assume we have two tokens, "behold" and "Behold", that have both been
 normalized to the same form "behold" through a lowercase-rule in the
-`Session`'s `normalizers` settings (see [Session](../session.md)). The
+`Session`'s `normalizers` settings (see [Session](session.md)). The
 Vectorian offers two options how to deal with this:
 
 * By default (using the "nearest" setting for `sampling`), the Vectorian will
