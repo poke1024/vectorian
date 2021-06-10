@@ -24,6 +24,8 @@ import requests
 import zipfile
 import urllib.parse
 import cachetools
+import sqlite3
+import uuid
 
 
 _gensim_version = int(gensim.__version__.split(".")[0])
@@ -366,8 +368,6 @@ class StaticEmbeddingInstance:
 class CachedWordEmbedding(StaticEmbedding):
 	class Cache:
 		def __init__(self):
-			import sqlite3
-
 			self._cache_path = _make_cache_path() / 'cache'
 			self._cache_path.mkdir(exist_ok=True, parents=True)
 
@@ -961,23 +961,79 @@ class SpacyEmbedding(ContextualEmbedding):
 		] + ([] if self._transform is None else [self._transform.name]))
 
 
+class VectorCache:
+	def __init__(self, path, readonly=False):
+		self._path = Path(path)
+		self._readonly = readonly
+
+		self._conn = sqlite3.connect(self._path / 'cache.db')
+		self._conn.execute("create table if not exists cache (key varchar primary key, stem varchar)")
+
+	def _get_stem(self, key):
+		cur = self._conn.cursor()
+		try:
+			cur.execute('select stem from cache where key=?', (key, ))
+			r = cur.fetchone()
+		finally:
+			cur.close()
+
+		if r is None:
+			return None
+		else:
+			return r[0]
+
+	def put(self, key, array):
+		if self._readonly:
+			return
+
+		stem = self._get_stem(key)
+		if stem is not None:
+			npy_path = self._path / (stem + ".npy")
+			np.save(npy_path, array)
+		else:
+			stem = uuid.uuid1().hex
+			npy_path = self._path / (stem + ".npy")
+			assert not npy_path.exists()
+
+			with self._conn:
+				self._conn.execute("insert into cache(key, stem) values (?, ?)", (
+					key, stem))
+
+				np.save(npy_path, array)
+
+	def get(self, key):
+		stem = self._get_stem(key)
+		if stem is None:
+			return None
+		else:
+			return np.load(self._path / (stem + ".npy"))
+
+
 class SpacyVectorEmbedding(SpacyEmbedding):
-	def __init__(self, nlp, dimension, **kwargs):
+	def __init__(self, nlp, dimension, cache=None, **kwargs):
 		super().__init__(nlp, **kwargs)
 		self._dimension = dimension
+		self._cache = cache
 
 	@property
 	def dimension(self):
 		return self._dimension
 
 	def pca(self, n_dims):
-		return SentenceBertEmbedding(self._nlp, PCACompression(n_dims))
+		return SpacyVectorEmbedding(self._nlp, PCACompression(n_dims))
 
 	def encode(self, doc):
-		return np.array([token.vector for token in doc])
+		if self._cache is not None:
+			array = self._cache.get(doc.text)
+			if array is not None:
+				return array
 
+		array = np.array([token.vector for token in doc])
 
-SentenceBertEmbedding = SpacyVectorEmbedding  # legacy
+		if self._cache is not None:
+			self._cache.put(doc.text, array)
+
+		return array
 
 
 class SpacyTransformerEmbedding(SpacyEmbedding):
