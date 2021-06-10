@@ -14,7 +14,7 @@ import functools
 
 from cached_property import cached_property
 from collections import namedtuple
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from pathlib import Path
 from vectorian.corpus.document import TokenTable, InternalMemoryText
 from vectorian.embeddings import Vectors, ProxyVectorsRef, prepare_docs

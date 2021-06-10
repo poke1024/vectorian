@@ -1,6 +1,6 @@
 import vectorian.core as core
 
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from pathlib import Path
 from cached_property import cached_property
 from functools import partial
@@ -28,6 +28,9 @@ import sqlite3
 import uuid
 
 
+pbar_on_open = False
+
+
 _gensim_version = int(gensim.__version__.split(".")[0])
 if _gensim_version >= 4:
 	raise RuntimeError("Vectorian needs gensim < 4.0.0")
@@ -48,6 +51,10 @@ def _make_cache_path():
 		cache_path = _custom_cache_path / "embeddings"
 	cache_path.mkdir(exist_ok=True, parents=True)
 	return cache_path
+
+
+def _extraction_tqdm(tokens, name):
+	return tqdm(tokens, desc=f"Extracting {name}", disable=len(tokens) < 5000)
 
 
 def _download(url, path, force_download=False):
@@ -92,7 +99,7 @@ def _download(url, path, force_download=False):
 	return result_path if result_path.exists() else None
 
 
-def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
+def _normalize_word2vec(name, tokens, embeddings, normalizer, sampling='nearest'):
 	if sampling not in ('nearest', 'average'):
 		raise ValueError(f'Expected "nearest" or "average", got "{sampling}"')
 
@@ -102,7 +109,7 @@ def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
 	f_tokens = []
 	token_to_ids = dict()
 
-	for i, t in enumerate(tqdm(tokens, desc="Normalizing Tokens")):
+	for i, t in enumerate(tqdm(tokens, desc=f"Normalizing tokens in {name}")):
 		nt = normalizer(t)
 		if nt is None:
 			continue
@@ -117,7 +124,7 @@ def _normalize_word2vec(tokens, embeddings, normalizer, sampling='nearest'):
 			indices.append(i)
 
 	if sampling == 'average':
-		for indices in tqdm(token_to_ids.values(), desc="Merging Tokens", total=len(token_to_ids)):
+		for indices in tqdm(token_to_ids.values(), desc=f"Merging tokens in {name}", total=len(token_to_ids)):
 			if len(indices) > 1:
 				i = indices[0]
 				embeddings[i] = np.mean(embeddings[indices], axis=0)
@@ -478,7 +485,7 @@ class CachedWordEmbedding(StaticEmbedding):
 			#dat_path = normalized_cache_path / f"{name}-{normalizer.name}-{self._embedding_sampling}.dat"
 
 			if dat_path and dat_path.exists():
-				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}') as pbar:
+				with tqdm(desc="Opening " + self.name, total=1,  bar_format='{l_bar}{bar}', disable=not pbar_on_open) as pbar:
 					with open(dat_path.with_suffix('.json'), 'r') as f:
 						data = json.loads(f.read())
 					tokens = data['tokens']
@@ -488,7 +495,7 @@ class CachedWordEmbedding(StaticEmbedding):
 			else:
 				tokens, vectors = self._load()
 				tokens, vectors = _normalize_word2vec(
-					tokens, vectors, normalizer.unpack(), self._embedding_sampling)
+					self.name, tokens, vectors, normalizer.unpack(), self._embedding_sampling)
 
 				for t in self._transforms:
 					vectors = t.apply(Vectors(vectors)).unmodified
@@ -602,7 +609,7 @@ class KeyedVectors(StaticEmbedding):
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
+			for i, t in enumerate(_extraction_tqdm(tokens, self.name)):
 				data[i, :] = self._wv.word_vec(t)
 			return Vectors(data)
 
@@ -769,7 +776,7 @@ class PretrainedFastText(StaticEmbedding):
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
+			for i, t in enumerate(_extraction_tqdm(tokens, self.name)):
 				data[i, :] = self._ft.get_word_vector(t)
 			return Vectors(data)
 
@@ -858,7 +865,7 @@ class StackedEmbedding(StaticEmbedding):
 
 		def get_embeddings(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
-			for i, t in tqdm(enumerate(tokens), disable=len(tokens) < 1000):
+			for i, t in enumerate(_extraction_tqdm(tokens, self.name)):
 				data[i, :] = self.word_vec(t)
 			return Vectors(data)
 

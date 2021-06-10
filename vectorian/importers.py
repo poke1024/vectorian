@@ -4,7 +4,7 @@ import datetime
 import numpy as np
 import download
 
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from pathlib import Path
 from collections import namedtuple
 

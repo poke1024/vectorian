@@ -3,7 +3,7 @@ import vectorian.core as core
 from vectorian.corpus.document import Document
 from vectorian.importers import Importer
 from pathlib import Path
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from collections import namedtuple
 
 
