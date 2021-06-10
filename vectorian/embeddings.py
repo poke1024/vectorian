@@ -36,7 +36,7 @@ if _gensim_version >= 4:
 	raise RuntimeError("Vectorian needs gensim < 4.0.0")
 
 
-_custom_cache_path = None
+_custom_cache_path = os.environ.get("VECTORIAN_CACHE_HOME")
 
 
 def set_cache_path(path):
@@ -48,7 +48,7 @@ def _make_cache_path():
 	if _custom_cache_path is None:
 		cache_path = Path.home() / ".vectorian" / "embeddings"
 	else:
-		cache_path = _custom_cache_path / "embeddings"
+		cache_path = Path(_custom_cache_path) / "embeddings"
 	cache_path.mkdir(exist_ok=True, parents=True)
 	return cache_path
 
