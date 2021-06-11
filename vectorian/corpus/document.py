@@ -553,6 +553,10 @@ class PreparedDocument:
 
 		self._tokens = self._compiled.tokens
 
+	def cache_contextual_embeddings(self):
+		self._contextual_embeddings = dict(
+			(k, v.to_internal_memory()) for k, v in self._contextual_embeddings.items())
+
 	@property
 	def doc(self):
 		return self._doc

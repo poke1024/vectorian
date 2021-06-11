@@ -193,6 +193,13 @@ class StaticEmbedding(Embedding):
 
 
 class AbstractVectors:
+	def __enter__(self):
+		return self
+
+	def __exit__(self, exc_type, exc_value, exc_traceback):
+		self.close()
+		return False
+
 	def _save_transform(self, hf):
 		pass
 
@@ -221,13 +228,6 @@ class AbstractVectors:
 class Vectors(AbstractVectors):
 	def __init__(self, unmodified):
 		self._unmodified = unmodified
-
-	def __enter__(self):
-		return self
-
-	def __exit__(self, exc_type, exc_value, exc_traceback):
-		self.close()
-		return False
 
 	def close(self):
 		pass  # a no op
@@ -1137,7 +1137,7 @@ class ExternalMemoryVectors:
 		return vectors
 
 
-class VectorsCache:
+class OpenedVectorsCache:
 	def __init__(self):
 		self._cache = dict()
 
@@ -1181,6 +1181,9 @@ class ProxyVectorsRef(VectorsRef):
 	def open(self):
 		return self._vectors
 
+	def to_internal_memory(self):
+		return self
+
 
 class ExternalMemoryVectorsRef(VectorsRef):
 	def __init__(self, path):
@@ -1188,6 +1191,10 @@ class ExternalMemoryVectorsRef(VectorsRef):
 
 	def open(self):
 		return ExternalMemoryVectors.load(self._path)
+
+	def to_internal_memory(self):
+		with self.open() as vectors:
+			return ProxyVectorsRef(Vectors(vectors.unmodified))
 
 
 class MaskedVectorsRef(VectorsRef):
@@ -1198,6 +1205,11 @@ class MaskedVectorsRef(VectorsRef):
 	def open(self):
 		return MaskedVectors(
 			self._vectors.open(), self._mask)
+
+	def to_internal_memory(self):
+		return MaskedVectorsRef(
+			self._vectors.to_internal_memory(), self._mask)
+
 
 # === sentence/partition encoders.
 

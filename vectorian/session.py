@@ -7,11 +7,13 @@ import numpy as np
 
 from cached_property import cached_property
 from functools import lru_cache
+from tqdm.autonotebook import tqdm
+
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, SpanFlowSimilarity, SpanSimilarity
-from vectorian.embeddings import VectorsCache, Vectors
+from vectorian.embeddings import OpenedVectorsCache, Vectors
 
 
 class Result:
@@ -175,7 +177,7 @@ class Session:
 		self._vocab.compile_embeddings()  # i.e. static embeddings
 		self._embedding_manager.compile_contextual()
 
-		self._vectors_cache = VectorsCache()
+		self._vectors_cache = OpenedVectorsCache()
 
 	@property
 	def vocab(self):
@@ -201,6 +203,10 @@ class Session:
 
 	def to_embedding_instance(self, embedding):
 		return self._embedding_instances[embedding.name].instance
+
+	def cache_contextual_embeddings(self):
+		for doc in tqdm(self.documents, desc="Loading Vectors"):
+			doc.cache_contextual_embeddings()
 
 	@property
 	def vectors_cache(self):
