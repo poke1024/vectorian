@@ -690,8 +690,14 @@ class Zoo:
 				'name': f'numberbatch-19.08-{lang}'
 			}
 
+		for d in [50, 100, 200, 300]:
+			Zoo._embeddings[f'glove-6B-{d}'] = {
+				'constructor': partial(Word2VecVectors, binary=True),
+				'url': _zenodo_url(4925376, f'glove.6B.{d}d.zip'),
+				'name': f'glove-6B-{d}'
+			}
+
 		for name, sizes in {
-			'6B': [50, 100, 200, 300],
 			'42B': [300],
 			'840B': [300],
 			'twitter.27B': [25, 50, 100, 200]}.items():
@@ -702,14 +708,6 @@ class Zoo:
 					'name': name,
 					'ndims': size
 				}
-
-		# add special glove source for faster downloads.
-
-		Zoo._embeddings['glove-6B-50'] = {
-			'constructor': PretrainedGensimVectors,
-			'name': 'glove-6B-50',
-			'gensim_name': 'glove-wiki-gigaword-50'
-		}
 
 		Zoo._initialized = True
 
