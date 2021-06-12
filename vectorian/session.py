@@ -294,7 +294,7 @@ class Session:
 			else:
 				raise ValueError()
 
-			token_sim.metric(va, vb, out)
+			token_sim.similarity(va, vb, out)
 
 		return out[0, 0]
 

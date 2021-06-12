@@ -39,7 +39,7 @@ cosine similarity over a pretrained GloVe embedding of dimension 50:
 vectorian.metrics.SpanFlowSimilarity(
     token_sim=vectorian.metrics(
         vectorian.embeddings.PretrainedGloVe('6B', ndims=50),
-        vectorian.metrics.CosineSimilarity()
+        vectorian.sim.vector.CosineSimilarity()
     ),
     flow_strategy=vectorian.alignment.WatermanSmithBeyer(
         gap=vectorian.alignment.ExponentialGapCost(cutoff=5),

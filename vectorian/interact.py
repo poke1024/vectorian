@@ -122,7 +122,7 @@ class PNormWidget:
 		return self._vbox
 
 	def make(self):
-		return vectorian.metrics.ModifiedMetric(
+		return vectorian.metrics.ModifiedVectorSimilarity(
 			vectorian.metrics.PNormDistance(p=self._p.value),
 			vectorian.metrics.RadialBasis(self._scale.value)
 		)

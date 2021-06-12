@@ -1,6 +1,7 @@
 from vectorian.alignment import SpanFlowStrategy, WatermanSmithBeyer
 from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
-from vectorian.sim.token import AbstractTokenSimilarity, SimilarityOperator, CosineSimilarity
+from vectorian.sim.token import AbstractTokenSimilarity
+from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
 
 
 class SpanSimilarity:
@@ -66,14 +67,14 @@ class SpanFlowSimilarity(SpanSimilarity):
 
 
 class SpanEmbeddingSimilarity(SpanSimilarity):
-	def __init__(self, encoder, metric=None):
-		if metric is None:
-			metric = CosineSimilarity()
-		assert isinstance(metric, SimilarityOperator)
-		if not isinstance(metric, CosineSimilarity):
+	def __init__(self, encoder, sim=None):
+		if sim is None:
+			sim = CosineSimilarity()
+		assert isinstance(sim, VectorSimilarity)
+		if not isinstance(sim, CosineSimilarity):
 			raise NotImplementedError()
 		self._encoder = encoder
-		self._metric = metric
+		self._sim = sim
 
 	def create_index(self, partition, **kwargs):
 		return PartitionEmbeddingIndex(
@@ -88,4 +89,4 @@ class SpanEmbeddingSimilarity(SpanSimilarity):
 
 	@property
 	def name(self):
-		return "PartitionEmbeddingMetric"
+		return "SpanEmbeddingSimilarity"
