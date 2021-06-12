@@ -66,9 +66,15 @@
                 <ul class="current">
                     <li class="toctree-l1 current"><a class="reference internal current" href="./">Token Similarity</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    <li class="toctree-l2"><a class="reference internal" href="#tokensimilarity">TokenSimilarity</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#modifying-token-similarity">Modifying Token Similarity</a>
+    <li class="toctree-l2"><a class="reference internal" href="#vectorsimilarity">VectorSimilarity</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#modifiers-on-vectorsimilarity">Modifiers on VectorSimilarity</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#modifiers-on-tokensimilarity">Modifiers on TokenSimilarity</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#distances-and-similarities">Distances and Similarities</a>
     </li>
     </ul>
                     </li>
@@ -114,11 +120,91 @@
             <div class="section">
               
                 <h1 id="token-similarity">Token Similarity</h1>
-<h2 id="overview">Overview</h2>
+<h2 id="tokensimilarity">TokenSimilarity</h2>
+<p><code>vectorian.sim.token.TokenSimilarity</code> describes a strategy to compute a similarity
+score from embeddings. It consists of two things:</p>
+<ul>
+<li>a specific embedding which serves as the source of vectors (e.g. fastText)</li>
+<li>a strategy to compute a scalar similarity value from two vectors</li>
+</ul>
+<p>The first item is modelled by <code>vectorian.embedding.Embedding</code> in the Vectorian, the
+latter by <code>vectorian.sim.vector.VectorSimilarity</code>.</p>
 <p><img alt="Basic Operators implementing TokenSimilarity" src="../images/sim_token.png" /></p>
-<h2 id="modifying-token-similarity">Modifying Token Similarity</h2>
-<p><img alt="Classes implementing modified tokens similarity computations" src="../images/sim_modifier.png" /></p>
+<h2 id="vectorsimilarity">VectorSimilarity</h2>
+<p><code>vectorian.sim.vector.VectorSimilarity</code> is a strategy that describes how to
+compute a scalar similarity value from two given embedding vectors. The resulting
+value is expected to lie between 0 (which implies minimum similarity) and 1 (which
+implies maximum similarity). Negative values will be clipped to 0 later in the
+pipeline.</p>
+<p>An obvious choice for <code>VectorSimilarity</code> is <code>vectorian.sim.token.CosineSimilarity</code>,
+which computes the cosine of the angle between two embedding vectors.</p>
+<p>Other <code>VectorSimilarity</code> implementations based on other metrics are possible. It is
+also possible to compute distances and later convert them to similarities (see
+example further below).</p>
+<p>The following diagram shows which <code>VectorSimilarity</code>s are currently implemented
+in the Vectorian.</p>
+<p><img alt="Basic Operators implementing TokenSimilarity" src="../images/sim_vector.png" /></p>
+<h2 id="modifiers-on-vectorsimilarity">Modifiers on VectorSimilarity</h2>
+<p>Using <code>vectorian.sim.token.ModifiedVectorSimilarity</code> and one or more
+<code>vectorian.sim.kernel.UnaryOperator</code>s it is possible to perform additional
+operations on a <code>VectorSimilarity</code>.</p>
+<p>Note that this kind of operations are always based eventually on <em>one</em> single
+embedding, since all such computations boil down to one root <code>VectorSimilarity</code>,
+which usually operates on a single embedding.</p>
+<p>For example the following code models a similarity based on the embedding stored
+in <code>fastText</code>, where similarity between two vectors <strong>u</strong> and <strong>v</strong> is calculated
+as <code>cos(phi) - 0.2</code>, if <code>phi</code> is the angle between <strong>u</strong> and <strong>v</strong>.</p>
+<pre><code>vectorian.sim.token.TokenSimilarity(
+    fastText,
+    vectorian.sim.vector.ModifiedVectorSimilarity(
+        vectorian.sim.vector.CosineSimilarity(),
+        vectorian.sim.kernel.Bias(-0.2)
+    ))
+</code></pre>
+<p>The currently available unary operators (like e.g. <code>Bias</code>) that can be used
+with <code>ModifiedVectorSimilarity</code> are shown in the following diagram:</p>
 <p><img alt="Kernels for modifying similarities" src="../images/sim_kernel.png" /></p>
+<h2 id="modifiers-on-tokensimilarity">Modifiers on TokenSimilarity</h2>
+<p>The Vectorian also allows you to build completely new <code>TokenSimilarity</code>
+strategies that are capable of combining different <code>TokenSimilarity</code> instances
+that employ different embeddings.</p>
+<p>One such example is <code>vectorian.sim.modifier.MixedTokenSimilarity</code>, which takes a
+number of <code>TokenSimilarity</code> instances and combines them in a weighted sum.</p>
+<p>Here is an example that combines two different <code>TokenSimilarity</code> instances to
+build a new mixed <code>TokenSimilarity</code>:</p>
+<pre><code>vectorian.sim.modifier.MixedTokenSimilarity(
+    [
+        vectorian.sim.token.TokenSimilarity(
+            fastText,
+            vectorian.sim.vector.CosineSimilarity(),
+        ),
+        vectorian.sim.token.TokenSimilarity(
+            glove,
+            vectorian.sim.vector.ModifiedVectorSimilarity(
+                vectorian.sim.vector.CosineSimilarity(),
+                vectorian.sim.kernel.Bias(-0.2)
+            )),
+    ],
+    weights=[0.3, 0.7])
+</code></pre>
+<p>Other combinators are possible. For example, <code>MaximumTokenSimilarity</code> takes the
+highest similarity of a number of given <code>TokenSimilarity</code>s for each token.
+Accordingly, <code>MinimumTokenSimilarity</code> takes the lowest similarity.</p>
+<p>The following diagram shows all such multi-embedding combinators which are
+currently implemented:</p>
+<p><img alt="Classes implementing modified tokens similarity computations" src="../images/sim_modifier.png" /></p>
+<h2 id="distances-and-similarities">Distances and Similarities</h2>
+<p>Here is an example of using a Euclidean distance as a <code>VectorSimilarity</code>:</p>
+<pre><code>vectorian.metrics.ModifiedVectorSimilarity(
+    vectorian.sim.token.PNormDistance(p=2),
+    vectorian.sim.kernel.RadialBasis(gamma=2.5),
+    vectorian.sim.kernel.DistanceToSimilarity()
+)
+</code></pre>
+<p>Using <code>RadialBasis</code>, the distance <code>d</code> is first calibrated such that the range
+[0, 1] contains a meaningful distance (with 1 being minimum similarity), then
+<code>DistanceToSimilarity</code> is used to compute <code>1 - d</code>, i.e. to turn the distance
+into a scalar similarity value.</p>
               
             </div>
           </div>
