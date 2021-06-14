@@ -7,3 +7,4 @@ __pycache__
 Vectorian.egg-info
 /dist
 /mkdocs/site
+/pdoc/build

@@ -276,6 +276,20 @@ public:
 		const Index len_s,
 		const Index len_t) {
 
+		// relevant papers:
+
+		// Needleman, S. B., & Wunsch, C. D. (1970). A general method applicable
+		// to the search for similarities in the amino acid sequence of two proteins.
+		// Journal of Molecular Biology, 48(3), 443–453. https://doi.org/10.1016/0022-2836(70)90057-4
+
+		// Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
+		// the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
+
+		// Kruskal, J. B. (1983). An Overview of Sequence Comparison: Time Warps,
+		// String Edits, and Macromolecules. SIAM Review, 25(2), 201–237. https://doi.org/10.1137/1025045
+
+		// For the implementation, we follow Sankoff and Kruskal.
+
 		if (len_t < 1 || len_s < 1) {
 			throw std::invalid_argument("len must be >= 1");
 		}
@@ -335,6 +349,30 @@ public:
 		const Index len_t,
 		const SimilarityScore zero_similarity = 0) {
 
+		// relevant papers:
+
+		// Smith, T. F., & Waterman, M. S. (1981). Identification of common
+		// molecular subsequences. Journal of Molecular Biology, 147(1), 195–197.
+		// https://doi.org/10.1016/0022-2836(81)90087-5
+
+		// Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
+		// the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
+
+		// Kruskal, J. B. (1983). An Overview of Sequence Comparison: Time Warps,
+		// String Edits, and Macromolecules. SIAM Review, 25(2), 201–237. https://doi.org/10.1137/1025045
+
+		// Aluru, S. (Ed.). (2005). Handbook of Computational Molecular Biology.
+		// Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
+
+		// Hendrix, D. A. Applied Bioinformatics. https://open.oregonstate.education/appliedbioinformatics/.
+
+		// We pose the problem as a Needleman-Wunsch problem modified for local alignments by
+		// adding a fourth zero case and modifying the traceback (see Aluru or Hendrix).
+		//
+		// For the basic implementation, we follow Sankoff and Kruskal.
+		//
+		// The original paper by Waterman and Smith seems to contain an error in formula (3).
+
 		if (len_t < 1 || len_s < 1) {
 			throw std::invalid_argument("len must be >= 1");
 		}
@@ -350,7 +388,7 @@ public:
 
 			for (Index v = 0; v < len_t; v++) {
 
-				Fold best(zero_similarity);
+				Fold best(zero_similarity); // fourth zero condition.
 
 				{
 					const SimilarityScore s0 =
@@ -391,6 +429,11 @@ public:
 		const Index len_s,
 		const Index len_t,
 		const SimilarityScore zero_similarity = 0) {
+
+		// original paper:
+
+		// Waterman, M. S., Smith, T. F., & Beyer, W. A. (1976). Some biological sequence metrics.
+		// Advances in Mathematics, 20(3), 367–387. https://doi.org/10.1016/0001-8708(76)90202-4
 
 		if (len_t < 1 || len_s < 1) {
 			throw std::invalid_argument("len must be >= 1");

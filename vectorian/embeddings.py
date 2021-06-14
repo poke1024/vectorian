@@ -221,6 +221,18 @@ class AbstractVectors:
 	def size(self):
 		return self.shape[0]
 
+	@property
+	def unmodified(self):
+		raise NotImplementedError()
+
+	@property
+	def normalized(self):
+		raise NotImplementedError()
+
+	@property
+	def magnitudes(self):
+		raise NotImplementedError()
+
 	def transform(self, vectors):
 		return vectors
 

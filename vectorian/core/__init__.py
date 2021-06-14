@@ -1,5 +1,11 @@
 import os
 
+__pdoc__ = {
+	'vectorian_core': False,
+	'cpp': False,
+	'lib': False
+}
+
 
 def build_vectorian():
 	import cppimport
