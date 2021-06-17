@@ -1,4 +1,4 @@
-from vectorian.alignment import SpanFlowStrategy, WatermanSmithBeyer
+from vectorian.alignment import SpanFlowStrategy, LocalAlignment
 from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
 from vectorian.sim.token import AbstractTokenSimilarity
 from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
@@ -24,7 +24,7 @@ class SpanFlowSimilarity(SpanSimilarity):
 			raise TypeError(token_sim)
 
 		if flow_strategy is None:
-			flow_strategy = WatermanSmithBeyer()
+			flow_strategy = LocalAlignment()
 
 		if not isinstance(flow_strategy, SpanFlowStrategy):
 			raise TypeError(flow_strategy)

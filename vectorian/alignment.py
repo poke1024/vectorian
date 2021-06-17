@@ -1,8 +1,14 @@
 import numpy as np
 import io
 
+from typing import Dict
+
 
 class GapCost:
+	@property
+	def is_affine(self):
+		return False
+
 	def costs(self, n):
 		raise NotImplementedError
 
@@ -47,6 +53,14 @@ class ConstantGapCost(GapCost):
 	def __init__(self, cost):
 		self._cost = cost
 
+	@property
+	def is_affine(self):
+		return self._cost == 0
+
+	def to_scalar(self):
+		assert self._cost == 0
+		return 0
+
 	def to_description(self):
 		return f'ConstantGapCost({self._cost})'
 
@@ -57,31 +71,38 @@ class ConstantGapCost(GapCost):
 		return c
 
 
-class LinearGapCost(GapCost):
+class GotohGapCost(GapCost):
 	"""
-	Models a gap cost C of the form \( C(t) = c_0 + t \\dot d \),
-	with \( c_0 \) being an initial cost and \( d \) being an affine
-	factor.
+	\( w_k = u k + v \)
+	"""
+	pass
+
+
+class AffineGapCost(GapCost):
+	"""
+	\( w_k = u k \)
 	"""
 
-	def __init__(self, step, start=None):
-		self._step = step
-		self._start = step if start is None else start
+	def __init__(self, u):
+		self._u = u
+
+	@property
+	def is_affine(self):
+		return True
 
 	def to_scalar(self):
-		assert self._start == self._step
-		return self._step
+		return self._u
 
 	def to_description(self):
-		return f'LinearGapCost({self._step}, {self._start})'
+		return f'AffineGapCost({self.u})'
 
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
 		c[0] = 0
-		x = self._start
+		x = 0
 		for i in range(1, n):
 			c[i] = x
-			x += self._step
+			x += self._u
 		return c
 
 
@@ -145,69 +166,23 @@ class TransportStrategy(SpanFlowStrategy):
 	pass
 
 
-class NeedlemanWunsch(AlignmentStrategy):
+class GlobalAlignment(AlignmentStrategy):
 	"""
-	Models the global alignment algorithm by Needleman and Wunsch (1970).
+	Models global alignments as originally described by Needleman and Wunsch (1970).
 
-	The runtime of Needleman and Wunsch's original algorithm is cubic and does not include
-	gap costs, the implementation therefore follows Sankoff (1972) and adopts linear (affine)
+	To align two sequences of length n, the runtime complexity is \\( O(n^2) \\) if
+	the gap cost is affine, and \\( O(n^3) \\) otherwise.
+
+	As the runtime of Needleman and Wunsch's original algorithm is always cubic and does not
+	include gap costs, the implementation follows Sankoff (1972) and adopts linear (affine)
 	gap costs as described by Kruskal (1983).
 
-	To align two sequences of length m and n, runtime complexity is \\( O(m n) \\).
+	The case with affine gap costs is sometimes referred to as Needleman-Wunsch algorithm.
+
 
 	Needleman, S. B., & Wunsch, C. D. (1970). A general method applicable
 	to the search for similarities in the amino acid sequence of two proteins.
 	Journal of Molecular Biology, 48(3), 443–453. https://doi.org/10.1016/0022-2836(70)90057-4
-
-	Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
-	the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
-
-	Kruskal, J. B. (1983). An Overview of Sequence Comparison: Time Warps,
-	String Edits, and Macromolecules. SIAM Review, 25(2), 201–237. https://doi.org/10.1137/1025045
-	"""
-
-	def __init__(self, gap: float = 0, gap_mask="st"):
-		"""
-		Args:
-			gap (float): the cost of inserting or deleting a token
-			gap_mask (str): whether to apply `gap` to s, t, or both
-		"""
-
-
-		self._gap = gap
-		self._gap_mask = gap_mask
-
-	def to_description(self, partition):
-		return {
-			'NeedlemanWunsch': {
-				'gap': self._gap
-			}
-		}
-
-	def to_args(self, partition):
-		return {
-			'algorithm': 'needleman-wunsch',
-			'gap': self._gap,
-			'gap_mask': self._gap_mask
-		}
-
-
-class SmithWaterman(AlignmentStrategy):
-	"""
-	Models the local alignment algorithm by Smith and Waterman (for affine gap costs).
-
-	This is basically the global alignment algorithm by Needleman and Wunsch
-	(1970), adapted to produce a local alignment by using an additional "zero" case and
-	a slightly modified traceback (for details, see Aluru, for example).
-
-	The runtime of Needleman and Wunsch's original algorithm is cubic and does not include
-	gap costs, the implementation therefore follows Sankoff (1972) and adopts linear (affine)
-	gap costs as described by Kruskal (1983).
-
-	To align two sequences of length m and n, runtime complexity is \\( O(m n) \\).
-
-	Smith, T. F., & Waterman, M. S. (1981). Identification of common molecular subsequences.
-	Journal of Molecular Biology, 147(1), 195–197. https://doi.org/10.1016/0022-2836(81)90087-5
 
 	Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
 	the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
@@ -219,76 +194,97 @@ class SmithWaterman(AlignmentStrategy):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: float = 0, gap_mask="st", zero: float = 0.5):
-		"""
-		Args
-			gap (float): the cost of inserting or deleting a token
-			gap_mask (str): whether to apply `gap` to s, t, or both
-			zero (float): a measure of when two elements (tokens) are not similar enough - this
-				is a crucial parameter in constructing a local alignment.
-		"""
-
+	def __init__(self, gap: Dict[str, GapCost]):
 		self._gap = gap
-		self._gap_mask = gap_mask
-		self._zero = zero
+		if not all(k in ("s", "t") for k in gap.keys()):
+			raise ValueError(gap)
 
 	def to_description(self, partition):
 		return {
-			'WatermanSmithBeyer': {
+			'GlobalAlignment': {
+				'gap': self._gap
+			}
+		}
+
+	def to_args(self, partition):
+		if all(x.is_affine for x in self._gap.values()):
+			return {
+				'algorithm': 'alignment/global/affine',
+				'gap': dict((k, v.to_scalar()) for k, v in self._gap.items())
+			}
+		else:
+			len = partition.max_len()
+			return {
+				'algorithm': 'alignment/global/general',
+				'gap': dict((k, v.costs(len)) for k, v in self._gap.items())
+			}
+
+
+#class SemiGlobalAlignment(AlignmentStrategy):
+#	def __init__(self, gap: Dict[str, GapCost]):
+#		pass
+
+
+class LocalAlignment(AlignmentStrategy):
+	"""
+	Models local alignments as described by Smith, Waterman and Beyer (1976).
+
+	The dynamic programming approach used is similar to that used in global alignments,
+	but adds an additional "zero" case and a modified traceback (for details see Aluru)
+	to generate local alignments.
+
+	To align two sequences of length n, the runtime complexity is \\( O(n^2) \\) if
+	the gap cost is affine, and \\( O(n^3) \\) otherwise.
+
+	The case dealing with general gap costs is sometimes referred to as Waterman-Smith-Beyer
+	algorithm, whereas the simpler case assuming affine gap costs is sometimes called the
+	Smith-Waterman algorithm.
+
+
+	Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
+	the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
+
+	Waterman, M. S., Smith, T. F., & Beyer, W. A. (1976). Some biological sequence metrics.
+	Advances in Mathematics, 20(3), 367–387. https://doi.org/10.1016/0001-8708(76)90202-4
+
+	Smith, T. F., & Waterman, M. S. (1981). Identification of common molecular subsequences.
+	Journal of Molecular Biology, 147(1), 195–197. https://doi.org/10.1016/0022-2836(81)90087-5
+
+	Kruskal, J. B. (1983). An Overview of Sequence Comparison: Time Warps,
+	String Edits, and Macromolecules. SIAM Review, 25(2), 201–237. https://doi.org/10.1137/1025045
+
+	Aluru, S. (Ed.). (2005). Handbook of Computational Molecular Biology.
+	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
+	"""
+
+	def __init__(self, gap: Dict[str, GapCost], zero: float = 0):
+		self._gap = gap
+		self._zero = zero
+		if not all(k in ("s", "t") for k in gap.keys()):
+			raise ValueError(gap)
+
+	def to_description(self, partition):
+		return {
+			'LocalAlignment': {
 				'gap': self._gap,
 				'zero': self._zero
 			}
 		}
 
 	def to_args(self, partition):
-		return {
-			'algorithm': 'smith-waterman',
-			'gap': self._gap,
-			'gap_mask': self._gap_mask,
-			'zero': self._zero
-		}
-
-
-class WatermanSmithBeyer(AlignmentStrategy):
-	"""
-	Models the local alignment algorithm by Waterman, Smith and Beyer.
-
-	This does not impose any restrictions on the structure of the gap cost, e.g. gap cost
-	need to be affine (i.e. a linear function of gap length as with Waterman-Smith).
-
-	To align two sequences of length n, runtime complexity is \\( O(n^3) \\).
-
-	.. note::
-	   Some literature refers to this algorithm as Smith-Waterman.
-
-	Waterman, M. S., Smith, T. F., & Beyer, W. A. (1976). Some biological sequence metrics.
-	Advances in Mathematics, 20(3), 367–387. https://doi.org/10.1016/0001-8708(76)90202-4
-	"""
-
-	def __init__(self, gap: GapCost = None, gap_mask="st", zero: float = 0.5):
-		if gap is None:
-			gap = ConstantGapCost(0)
-		self._gap = gap
-		self._gap_mask = gap_mask
-		self._zero = zero
-
-	def to_description(self, partition):
-		return {
-			'WatermanSmithBeyer': {
-				'gap': self._gap.to_description(),
+		if all(x.is_affine for x in self._gap.values()):
+			return {
+				'algorithm': 'alignment/local/affine',
+				'gap': dict((k, v.to_scalar()) for k, v in self._gap.items()),
 				'zero': self._zero
 			}
-		}
-
-	def to_args(self, partition):
-		costs = self._gap.costs(partition.max_len())
-
-		return {
-			'algorithm': 'waterman-smith-beyer',
-			'gap': np.clip(costs, 0, 1),
-			'gap_mask': self._gap_mask,
-			'zero': self._zero
-		}
+		else:
+			len = partition.max_len()
+			return {
+				'algorithm': 'alignment/local/general',
+				'gap': dict((k, v.costs(len)) for k, v in self._gap.items()),
+				'zero': self._zero
+			}
 
 
 class WordMoversDistance(TransportStrategy):
@@ -345,6 +341,12 @@ class WordMoversDistance(TransportStrategy):
 	def __init__(
 		self, relaxed=True, injective=True, symmetric=False, normalize_bow=False,
 		extra_mass_penalty=-1, builtin=None):
+		"""
+		Args:
+			symmetric: indicates whether to also solve the symmetric RWMD problem,
+				which gives a tighter lower bound of WMD, but doubles the computation
+				cost
+		"""
 
 		self._options = {
 			'relaxed': relaxed,

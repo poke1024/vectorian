@@ -38,9 +38,8 @@ public:
 
 	virtual void match(const ResultSetRef &p_matches) = 0;
 
-	virtual GapMask gap_mask() const = 0;
-
-	virtual float gap_cost(size_t len) const = 0;
+	virtual float gap_cost_s(size_t len) const = 0;
+	virtual float gap_cost_t(size_t len) const = 0;
 };
 
 typedef std::shared_ptr<Matcher> MatcherRef;
@@ -123,12 +122,12 @@ public:
 			"ExternalMatcher::match is not allowed");
 	}
 
-	virtual float gap_cost(size_t len) const {
+	virtual float gap_cost_s(size_t len) const {
 		return 0.0f;
 	}
 
-	virtual GapMask gap_mask() const {
-		return GapMask{false, false};
+	virtual float gap_cost_t(size_t len) const {
+		return 0.0f;
 	}
 };
 

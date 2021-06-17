@@ -87,7 +87,6 @@ py::list Flow<Index>::py_regions(
 
 	size_t edge_index = 0;
 
-	const auto gap_mask = p_match->matcher()->gap_mask();
 	int last_source = -1;
 
 	while (edge_index < edges.size()) {
@@ -106,8 +105,8 @@ py::list Flow<Index>::py_regions(
 			float p;
 
 			// compute gap cost over s (i.e, document)
-			if (last_matched && gap_mask.u) {
-				p = p_match->matcher()->gap_cost(
+			if (last_matched) {
+				p = p_match->matcher()->gap_cost_s(
 					token_at + target - last_anchor);
 			} else {
 				p = 0.0f;
@@ -123,8 +122,8 @@ py::list Flow<Index>::py_regions(
 			const auto source = edges[edge_index].source;
 
 			// compute gap cost over t (i.e. query)
-			if (gap_mask.v && last_source >= 0) {
-				const float p = p_match->matcher()->gap_cost(
+			if (last_source >= 0) {
+				const float p = p_match->matcher()->gap_cost_t(
 					source - last_source - 1);
 				if (p > 0.0f) {
 					regions.append(std::make_shared<Region>(

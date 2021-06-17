@@ -25,7 +25,8 @@ cfg['include_dirs'].append('../lib/ppk_assert/src')
 
 cfg['compiler_args'] = [
 	'-Wall',
-	'-std=c++17']
+	'-std=c++17',
+	'-ftemplate-backtrace-limit=0']
 cfg['extra_link_args'] = []
 
 if platform.system() == 'Linux':
@@ -82,10 +83,10 @@ cfg['dependencies'] = [
 ]
 
 cfg['sources'] = [
+	'match/instantiate.cpp',
 	'match/flow.cpp',
 	'match/match.cpp',
 	'query.cpp',
-	'match/instantiate.cpp',
 	'vocabulary.cpp',
 	'metric/contextual.cpp',
 	'metric/modifier.cpp',

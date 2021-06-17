@@ -8,126 +8,150 @@
 
 #include <xtensor/xsort.hpp>
 
-template<
-	typename Index=int16_t,
-	typename SimilarityScore=float>
+namespace alignments {
 
-class Aligner {
-private:
-	class Fold {
-	private:
-		SimilarityScore m_score;
-		std::pair<Index, Index> m_traceback;
+template<typename Index, typename Value>
+class Matrix;
 
-	public:
-		inline Fold(const SimilarityScore zero_score) :
-			m_score(zero_score),
-			m_traceback(std::make_pair(-1, -1)) {
-		}
+template<typename Index, typename Value>
+struct MatrixFactory {
+protected:
+	friend class Matrix<Index, Value>;
 
-		inline Fold(
-			const SimilarityScore score,
-			const std::pair<Index, Index> &traceback) :
+	xt::xtensor<Value, 2> values;
+	xt::xtensor<Index, 3> traceback;
+	xt::xtensor<Index, 1> best_column;
 
-			m_score(score),
-			m_traceback(traceback) {
+	const Index max_len_s;
+	const Index max_len_t;
 
-		}
+public:
+	inline MatrixFactory(
+		const Index p_max_len_s,
+		const Index p_max_len_t) :
 
-		inline void update(
-			const SimilarityScore score,
-			const std::pair<Index, Index> &traceback) {
+		max_len_s(p_max_len_s),
+		max_len_t(p_max_len_t) {
 
-			if (score > m_score) {
-				m_score = score;
-				m_traceback = traceback;
-			}
-		}
+		values.resize({
+			static_cast<size_t>(max_len_s) + 1,
+			static_cast<size_t>(max_len_t) + 1
+		});
+		traceback.resize({
+			static_cast<size_t>(max_len_s),
+			static_cast<size_t>(max_len_t),
+			2
+		});
+		best_column.resize({
+			static_cast<size_t>(max_len_s)
+		});
 
-		inline SimilarityScore score() const {
-			return m_score;
-		}
+		xt::view(values, xt::all(), 0).fill(0);
+		xt::view(values, 0, xt::all()).fill(0);
+	}
 
-		inline const std::pair<Index, Index> &traceback() const {
-			return m_traceback;
-		}
-	};
+	inline Matrix<Index, Value> make(const Index len_s, const Index len_t);
 
-	const size_t m_max_len_s;
-	const size_t m_max_len_t;
+	inline Index max_len() const {
+		return std::max(max_len_s, max_len_t);
+	}
+};
 
-	struct TracebackMatrix {
-		xt::xtensor<Index, 3> matrix;
+template<typename Index, typename Value>
+class Matrix {
+	MatrixFactory<Index, Value> &m_factory;
+	const Index m_len_s;
+	const Index m_len_t;
 
-		struct ConstElement {
-			const xt::xtensor<Index, 3> &matrix;
-			const Index i;
-			const Index j;
-
-			inline std::pair<Index, Index> to_pair() const {
-				return std::make_pair(matrix(i, j, 0), matrix(i, j, 1));
-			}
-
-			inline operator std::pair<Index, Index>() const {
-				return to_pair();
-			}
-		};
-
-		struct Element {
-			xt::xtensor<Index, 3> &matrix;
-			const Index i;
-			const Index j;
-
-			inline std::pair<Index, Index> to_pair() const {
-				return std::make_pair(matrix(i, j, 0), matrix(i, j, 1));
-			}
-
-			inline operator std::pair<Index, Index>() const {
-				return to_pair();
-			}
-
-			inline Element &operator=(const std::pair<Index, Index> &value) {
-				matrix(i, j, 0) = value.first;
-				matrix(i, j, 1) = value.second;
-				return *this;
-			}
-		};
-
-		inline ConstElement operator()(const Index i, const Index j) const {
-			return ConstElement{matrix, i, j};
-		}
-
-		inline Element operator()(const Index i, const Index j) {
-			return Element{matrix, i, j};
-		}
-	};
-
-	xt::xtensor<SimilarityScore, 2> m_values;
-	TracebackMatrix m_traceback;
-	xt::xtensor<Index, 1> m_best_column;
-
-	SimilarityScore m_best_score;
-	std::vector<Index> m_best_match;
-
-	template<typename Flow>
-	inline bool reconstruct_local_alignment(
-		Flow &flow,
-		const Index len_t,
+public:
+	inline Matrix(
+		MatrixFactory<Index, Value> &factory,
 		const Index len_s,
-		const SimilarityScore zero_similarity) {
+		const Index len_t) :
 
-		const auto &values = m_values;
-		const auto &traceback = m_traceback;
+	    m_factory(factory),
+	    m_len_s(len_s),
+	    m_len_t(len_t) {
+	}
 
-		xt::view(m_best_column, xt::range(0, len_s)) = xt::argmax(
-			xt::view(values, xt::range(0, len_s), xt::range(0, len_t)), 1);
+	inline Index len_s() const {
+		return m_len_s;
+	}
 
-		SimilarityScore score = 0.0f;
+	inline Index len_t() const {
+		return m_len_t;
+	}
+
+	inline auto values() const {
+		return xt::view(
+			m_factory.values,
+			xt::range(1, m_len_s + 1),
+			xt::range(1, m_len_t + 1));
+	}
+
+	inline auto traceback() const {
+		return xt::view(
+			m_factory.traceback,
+			xt::range(0, m_len_s),
+			xt::range(0, m_len_t));
+	}
+
+	inline auto best_column() const {
+		return xt::view(
+			m_factory.best_column,
+			xt::range(0, m_len_s));
+	}
+};
+
+template<typename Index, typename Value>
+inline Matrix<Index, Value> MatrixFactory<Index, Value>::make(
+	const Index len_s, const Index len_t) {
+
+	if (len_s > max_len_s) {
+		throw std::invalid_argument("len of s larger than max");
+	}
+	if (len_t > max_len_t) {
+		throw std::invalid_argument("len of t larger than max");
+	}
+	return Matrix(*this, len_s, len_t);
+}
+
+template<typename Value>
+class Local {
+private:
+	const Value m_zero;
+
+public:
+	inline Local(const Value p_zero) : m_zero(p_zero) {
+	}
+
+	template<typename Fold>
+	inline void update_best(Fold &fold) const {
+		fold.update(m_zero, -1, -1);
+	}
+
+	template<typename Flow, typename Index>
+	inline Value traceback(
+		Flow &flow,
+		Matrix<Index, Value> &matrix) const {
+
+		const auto len_s = matrix.len_s();
+		const auto len_t = matrix.len_t();
+
+		const auto values = matrix.values();
+		const auto traceback = matrix.traceback();
+		auto best_column = matrix.best_column();
+
+		const auto zero_similarity = m_zero;
+
+		best_column = xt::argmax(values, 1);
+
+		Value score = zero_similarity;
 		Index best_u = 0, best_v = 0;
 
 		for (Index u = 0; u < len_s; u++) {
-			const Index v = m_best_column[u];
-			const SimilarityScore s = values(u, v);
+			const Index v = best_column(u);
+			const Value s = values(u, v);
 			if (s > score) {
 				score = s;
 				best_u = u;
@@ -136,8 +160,7 @@ private:
 		}
 
 		if (score <= zero_similarity) {
-			m_best_score = 0.0f;
-			return false;
+			return 0;
 		}
 
 		flow.initialize(len_t);
@@ -160,23 +183,37 @@ private:
 			last_u = u;
 			last_v = v;
 
-			std::tie(u, v) = traceback(u, v).to_pair();
+			const auto t = xt::view(traceback, u, v, xt::all());
+			u = t(0);
+			v = t(1);
 		}
 
 		if (u >= 0 && v >= 0) {
-			m_best_score = score - values(u, v);
+			return score - values(u, v);
 		} else {
-			m_best_score = score;
+			return score;
 		}
+	}
+};
 
-		return true;
+
+template<typename Value>
+class Global {
+public:
+	template<typename Fold>
+	inline void update_best(Fold &fold) const {
 	}
 
-	template<typename Flow>
-	inline void reconstruct_global_alignment(
+	template<typename Flow, typename Index>
+	inline float traceback(
 		Flow &flow,
-		const Index len_t,
-		const Index len_s) {
+		Matrix<Index, Value> &matrix) const {
+
+		const auto len_s = matrix.len_s();
+		const auto len_t = matrix.len_t();
+
+		const auto values = matrix.values();
+		const auto traceback = matrix.traceback();
 
 		flow.initialize(len_t);
 		//_best_match.resize(len_t);
@@ -184,7 +221,7 @@ private:
 
 		Index u = len_s - 1;
 		Index v = len_t - 1;
-		m_best_score = m_values(u, v);
+		const Value best_score = values(u, v);
 
 		Index last_u = -1;
 		Index last_v = -1;
@@ -199,30 +236,90 @@ private:
 			last_u = u;
 			last_v = v;
 
-			std::tie(u, v) = m_traceback(u, v).to_pair();
+			const auto t = xt::view(traceback, u, v, xt::all());
+			u = t(0);
+			v = t(1);
+		}
+
+		return best_score;
+	}
+};
+
+template<typename Index, typename Value>
+class MaxFold {
+public:
+	typedef xt::xtensor_fixed<Index, xt::xshape<2>> Coord;
+
+private:
+	Value m_score;
+	Coord m_traceback;
+
+public:
+	inline MaxFold() {
+	}
+
+	inline MaxFold(
+		const Value score,
+		const Coord &traceback) :
+
+		m_score(score),
+		m_traceback(traceback) {
+
+	}
+
+	inline void set(
+		const Value score,
+		const Index u,
+		const Index v) {
+
+		m_score = score;
+		m_traceback[0] = u;
+		m_traceback[1] = v;
+	}
+
+	inline void update(
+		const Value score,
+		const Index u,
+		const Index v) {
+
+		if (score > m_score) {
+			m_score = score;
+			m_traceback[0] = u;
+			m_traceback[1] = v;
 		}
 	}
 
+	inline Value score() const {
+		return m_score;
+	}
+
+	inline const Coord &traceback() const {
+		return m_traceback;
+	}
+};
+
+
+
+template<typename Index=int16_t, typename Value=float>
+class Aligner {
+private:
+	MatrixFactory<Index, Value> m_factory;
+	Value m_best_score;
+
 public:
-	Aligner(Index max_len_s, Index max_len_t) :
-		m_max_len_s(max_len_s),
-		m_max_len_t(max_len_t) {
-
-		m_values.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t)});
-		m_traceback.matrix.resize({static_cast<size_t>(max_len_s), static_cast<size_t>(max_len_t), 2});
-		m_best_column.resize({static_cast<size_t>(max_len_s)});
+	Aligner(const Index max_len_s, const Index max_len_t) : m_factory(max_len_s, max_len_t) {
 	}
 
-	auto value_matrix(Index len_s, Index len_t) {
-		return xt::view(m_values, xt::range(0, len_s), xt::range(0, len_t));
+	inline Index max_len() const {
+		return m_factory.max_len();
 	}
 
-	auto traceback_matrix(Index len_s, Index len_t) {
-		return xt::view(m_traceback.matrix, xt::range(0, len_s), xt::range(0, len_t));
-	}
-
-	inline SimilarityScore score() const {
+	inline Value score() const {
 		return m_best_score;
+	}
+
+	auto matrix(const Index len_s, const Index len_t) {
+		return m_factory.make(len_s, len_t);
 	}
 
 #if 0 && !defined(ALIGNER_SLIM)
@@ -267,89 +364,27 @@ public:
 	}
 #endif
 
-	template<typename Flow, typename Similarity>
-	void needleman_wunsch(
+	template<typename Locality, typename Flow, typename Similarity>
+	void affine_gap(
+		const Locality &locality,
 		Flow &flow,
 		const Similarity &similarity,
-		const SimilarityScore gap_cost, // linear
-		const GapMask &gap_mask,
+		const Value gap_cost_s,
+		const Value gap_cost_t,
 		const Index len_s,
 		const Index len_t) {
 
-		// relevant papers:
+		// For global alignment, we pose the problem as a Needleman-Wunsch problem, but follow the
+		// implementation of Sankoff and Kruskal.
+
+		// For local alignments, we modify the problem for local  by adding a fourth zero case and
+		// modifying the traceback (see Aluru or Hendrix).
+
+		// The original paper by Smith and Waterman seems to contain an error in formula (3).
 
 		// Needleman, S. B., & Wunsch, C. D. (1970). A general method applicable
 		// to the search for similarities in the amino acid sequence of two proteins.
 		// Journal of Molecular Biology, 48(3), 443–453. https://doi.org/10.1016/0022-2836(70)90057-4
-
-		// Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
-		// the National Academy of Sciences, 69(1), 4–6. https://doi.org/10.1073/pnas.69.1.4
-
-		// Kruskal, J. B. (1983). An Overview of Sequence Comparison: Time Warps,
-		// String Edits, and Macromolecules. SIAM Review, 25(2), 201–237. https://doi.org/10.1137/1025045
-
-		// For the implementation, we follow Sankoff and Kruskal.
-
-		if (len_t < 1 || len_s < 1) {
-			throw std::invalid_argument("len must be >= 1");
-		}
-
-		if (size_t(len_t) > m_max_len_t || size_t(len_s) > m_max_len_s) {
-			throw std::invalid_argument("len larger than max");
-		}
-
-		auto &values = m_values;
-		auto &traceback = m_traceback;
-
-		const auto nwvalues = [&values, &gap_cost] (Index u, Index v) {
-			if (u >= 0 && v >= 0) {
-				return values(u, v);
-			} else if (u < 0) {
-				return -gap_cost * (v + 1);
-			} else {
-				return -gap_cost * (u + 1);
-			}
-		};
-
-		for (Index u = 0; u < len_s; u++) {
-
-			for (Index v = 0; v < len_t; v++) {
-
-				const SimilarityScore s0 =
-					nwvalues(u - 1, v - 1);
-				const SimilarityScore s1 =
-					similarity(u, v);
-				Fold best(
-					s0 + s1,
-					std::make_pair(u - 1, v - 1));
-
-				best.update(
-					nwvalues(u - 1, v) - (gap_mask.u ? gap_cost : 0),
-					std::make_pair(u - 1, v));
-
-				best.update(
-					nwvalues(u, v - 1) - (gap_mask.v ? gap_cost : 0),
-					std::make_pair(u, v - 1));
-
-				values(u, v) = best.score();
-				traceback(u, v) = best.traceback();
-			}
-		}
-
-		reconstruct_global_alignment(flow, len_t, len_s);
-	}
-
-	template<typename Flow, typename Similarity>
-	void smith_waterman(
-		Flow &flow,
-		const Similarity &similarity,
-		const SimilarityScore gap_cost, // linear
-		const GapMask &gap_mask,
-		const Index len_s,
-		const Index len_t,
-		const SimilarityScore zero_similarity = 0) {
-
-		// relevant papers:
 
 		// Smith, T. F., & Waterman, M. S. (1981). Identification of common
 		// molecular subsequences. Journal of Molecular Biology, 147(1), 195–197.
@@ -366,121 +401,113 @@ public:
 
 		// Hendrix, D. A. Applied Bioinformatics. https://open.oregonstate.education/appliedbioinformatics/.
 
-		// We pose the problem as a Needleman-Wunsch problem modified for local alignments by
-		// adding a fourth zero case and modifying the traceback (see Aluru or Hendrix).
-		//
-		// For the basic implementation, we follow Sankoff and Kruskal.
-		//
-		// The original paper by Waterman and Smith seems to contain an error in formula (3).
-
 		if (len_t < 1 || len_s < 1) {
 			throw std::invalid_argument("len must be >= 1");
 		}
 
-		if (size_t(len_t) > m_max_len_t || size_t(len_s) > m_max_len_s) {
-			throw std::invalid_argument("len larger than max");
-		}
+		auto matrix = m_factory.make(len_s, len_t);
 
-		auto &values = m_values;
-		auto &traceback = m_traceback;
+		auto values = matrix.values();
+		auto traceback = matrix.traceback();
 
 		for (Index u = 0; u < len_s; u++) {
 
 			for (Index v = 0; v < len_t; v++) {
 
-				Fold best(zero_similarity); // fourth zero condition.
+				MaxFold<Index, Value> best;
 
-				{
-					const SimilarityScore s0 =
-						(v > 0 && u > 0) ? values(u - 1, v - 1) : 0;
-					const SimilarityScore s1 =
-						similarity(u, v);
-					best.update(
-						s0 + s1,
-						std::make_pair(u - 1, v - 1));
-				}
+				best.set(
+					values(u - 1, v - 1) + similarity(u, v),
+					u - 1, v - 1);
 
-				if (u > 0) {
-					best.update(
-						values(u - 1, v) - (gap_mask.u ? gap_cost : 0),
-						std::make_pair(u - 1, v));
-				}
+				best.update(
+					values(u - 1, v) - gap_cost_s,
+					u - 1, v);
 
-				if (v > 0) {
-					best.update(
-						values(u, v - 1) - (gap_mask.v ? gap_cost: 0),
-						std::make_pair(u, v - 1));
-				}
+				best.update(
+					values(u, v - 1) - gap_cost_t,
+					u, v - 1);
+
+				locality.update_best(best);
 
 				values(u, v) = best.score();
-				traceback(u, v) = best.traceback();
+				xt::view(traceback, u, v, xt::all()) = best.traceback();
 			}
 		}
 
-		reconstruct_local_alignment(flow, len_t, len_s, zero_similarity);
+		m_best_score = locality.traceback(flow, matrix);
 	}
 
-	template<typename Flow, typename Similarity, typename Gap>
-	void waterman_smith_beyer(
+	template<typename Locality, typename Flow, typename Similarity>
+	void general_gap(
+		const Locality &locality,
 		Flow &flow,
 		const Similarity &similarity,
-		const Gap &gap_cost,
-		const GapMask &gap_mask,
+		const xt::xtensor<Value, 1> &gap_cost_s,
+		const xt::xtensor<Value, 1> &gap_cost_t,
 		const Index len_s,
-		const Index len_t,
-		const SimilarityScore zero_similarity = 0) {
+		const Index len_t) {
 
-		// original paper:
+		// Our implementation follows what is commonly referred to as Waterman-Smith-Beyer, i.e.
+		// an O(n^3) algorithm for generic gap costs. Waterman-Smith-Beyer generates a local alignment.
+
+		// We use the same implementation approach as in the "affine_gap" method to differentiate
+		// between local and global alignments.
 
 		// Waterman, M. S., Smith, T. F., & Beyer, W. A. (1976). Some biological sequence metrics.
 		// Advances in Mathematics, 20(3), 367–387. https://doi.org/10.1016/0001-8708(76)90202-4
 
+		// Aluru, S. (Ed.). (2005). Handbook of Computational Molecular Biology.
+		// Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
+
+		// Hendrix, D. A. Applied Bioinformatics. https://open.oregonstate.education/appliedbioinformatics/.
+
 		if (len_t < 1 || len_s < 1) {
-			throw std::invalid_argument("len must be >= 1");
+			throw std::invalid_argument("length in general_gap must be >= 1");
 		}
 
-		if (size_t(len_t) > m_max_len_t || size_t(len_s) > m_max_len_s) {
-			throw std::invalid_argument("len larger than max");
+		if (gap_cost_s.shape(0) < size_t(len_s) || gap_cost_t.shape(0) < size_t(len_t)) {
+			throw std::invalid_argument("illegal gap cost tensor shape");
 		}
 
-		auto &values = m_values;
-		auto &traceback = m_traceback;
+		auto matrix = m_factory.make(len_s, len_t);
+
+		auto values = matrix.values();
+		auto traceback = matrix.traceback();
 
 		for (Index u = 0; u < len_s; u++) {
 
 			for (Index v = 0; v < len_t; v++) {
 
-				Fold best(zero_similarity);
+				MaxFold<Index, Value> best;
 
-				{
-					const SimilarityScore s0 =
-						(v > 0 && u > 0) ? values(u - 1, v - 1) : 0;
-					const SimilarityScore s1 =
-						similarity(u, v);
-					best.update(
-						s0 + s1,
-						std::make_pair(u - 1, v - 1));
-				}
+				best.set(
+					values(u - 1, v - 1) + similarity(u, v),
+					u - 1, v - 1);
 
 				for (Index k = 0; k < u; k++) {
 					best.update(
-						values(k, v) - (gap_mask.u ? gap_cost(u - k) : 0),
-						std::make_pair(k, v));
+						values(k, v) - gap_cost_s(u - k),
+						k, v);
 				}
 
 				for (Index k = 0; k < v; k++) {
 					best.update(
-						values(u, k) - (gap_mask.v ? gap_cost(v - k) : 0),
-						std::make_pair(u, k));
+						values(u, k) - gap_cost_t(v - k),
+						u, k);
 				}
 
+				locality.update_best(best);
+
 				values(u, v) = best.score();
-				traceback(u, v) = best.traceback();
+				xt::view(traceback, u, v, xt::all()) = best.traceback();
 			}
 		}
 
-		reconstruct_local_alignment(flow, len_t, len_s, zero_similarity);
+		m_best_score = locality.traceback(flow, matrix);
 	}
 };
+
+} // namespace alignments
 
 #endif // __VECTORIAN_ALIGNER__

@@ -109,7 +109,7 @@ class InjectiveAlignment {
 protected:
 	const char *m_callback_name;
 	const Kernel m_kernel;
-	std::shared_ptr<Aligner<Index, float>> m_aligner;
+	std::shared_ptr<alignments::Aligner<Index, float>> m_aligner;
 	size_t m_max_len_t;
 	mutable InjectiveFlowRef<Index> m_cached_flow;
 
@@ -133,10 +133,10 @@ protected:
 		py::dict data;
 		data["slice"] = p_slice.id();
 		data["similarity"] = sim;
-		data["values"] = xt::pyarray<float>(m_aligner->value_matrix(
-			p_slice.len_s(), p_slice.len_t()));
-		data["traceback"] = xt::pyarray<float>(m_aligner->traceback_matrix(
-			p_slice.len_s(), p_slice.len_t()));
+		data["values"] = xt::pyarray<float>(m_aligner->matrix(
+			p_slice.len_s(), p_slice.len_t()).values());
+		data["traceback"] = xt::pyarray<float>(m_aligner->matrix(
+			p_slice.len_s(), p_slice.len_t()).traceback());
 		data["flow"] = p_flow->to_py();
 		data["score"] = p_score;
 
@@ -155,7 +155,7 @@ public:
 	}
 
 	void init(Index max_len_s, Index max_len_t) {
-		m_aligner = std::make_shared<Aligner<Index, float>>(
+		m_aligner = std::make_shared<alignments::Aligner<Index, float>>(
 			max_len_s, max_len_t);
 		m_max_len_t = max_len_t;
 	}
@@ -243,9 +243,11 @@ public:
 	}
 };
 
-struct NeedlemanWunschKernel {
-	const float m_gap_cost;
-	const GapMask m_gap_mask;
+template<typename Locality>
+struct AffineGapCostKernel {
+	const float m_gap_cost_s;
+	const float m_gap_cost_t;
+	const Locality m_locality;
 
 	template<typename Aligner, typename Slice, typename Flow>
 	inline void operator()(
@@ -254,51 +256,54 @@ struct NeedlemanWunschKernel {
 		const Slice &p_slice,
 		Flow &p_flow) const {
 
-		p_aligner.needleman_wunsch(
+		p_aligner.affine_gap(
+			m_locality,
 			p_flow,
 			[&p_slice] (auto i, auto j) -> float {
 				return p_slice.similarity(i, j);
 			},
-			m_gap_cost,
-			m_gap_mask,
+			m_gap_cost_s,
+			m_gap_cost_t,
 			p_slice.len_s(),
 			p_slice.len_t());
 	}
 
-	inline float gap_cost(size_t len) const {
-		return m_gap_cost * len;
+	inline float gap_cost_s(size_t len) const {
+		return m_gap_cost_s * len;
 	}
 
-	inline const GapMask &gap_mask() const {
-		return m_gap_mask;
+	inline float gap_cost_t(size_t len) const {
+		return m_gap_cost_t * len;
 	}
 };
 
-template<typename Index>
-class NeedlemanWunsch : public InjectiveAlignment<Index, NeedlemanWunschKernel> {
+template<typename Index, typename Locality>
+class AlignmentWithAffineGapCost : public InjectiveAlignment<Index, AffineGapCostKernel<Locality>> {
 public:
-	NeedlemanWunsch(
-		const float p_gap_cost,
-		const GapMask &p_gap_mask) :
+	AlignmentWithAffineGapCost(
+		const float p_gap_cost_s,
+		const float p_gap_cost_t,
+		const Locality &p_locality) :
 
-		InjectiveAlignment<Index, NeedlemanWunschKernel>(
-			"alignment/needleman-wunsch",
-			NeedlemanWunschKernel{p_gap_cost, p_gap_mask}) {
+		InjectiveAlignment<Index, AffineGapCostKernel<Locality>>(
+			"alignment/affine-gap-cost",
+			AffineGapCostKernel<Locality>{p_gap_cost_s, p_gap_cost_t, p_locality}) {
 	}
 
-	inline float gap_cost(size_t len) const {
-		return this->m_kernel.gap_cost(len);
+	inline float gap_cost_s(size_t len) const {
+		return this->m_kernel.gap_cost_s(len);
 	}
 
-	inline GapMask gap_mask() const {
-		return this->m_kernel.gap_mask();
+	inline float gap_cost_t(size_t len) const {
+		return this->m_kernel.gap_cost_t(len);
 	}
 };
 
-struct SmithWatermanKernel {
-	const float m_gap_cost;
-	const GapMask m_gap_mask;
-	const float m_zero;
+template<typename Locality>
+struct GeneralGapCostKernel {
+	const xt::xtensor<float, 1> m_gap_cost_s;
+	const xt::xtensor<float, 1> m_gap_cost_t;
+	const Locality m_locality;
 
 	template<typename Aligner, typename Slice, typename Flow>
 	inline void operator()(
@@ -307,106 +312,48 @@ struct SmithWatermanKernel {
 		const Slice &p_slice,
 		Flow &p_flow) const {
 
-		p_aligner.smith_waterman(
+		p_aligner.general_gap(
+			m_locality,
 			p_flow,
 			[&p_slice] (auto i, auto j) -> float {
 				return p_slice.similarity(i, j);
 			},
-			m_gap_cost,
-			m_gap_mask,
+			m_gap_cost_s,
+			m_gap_cost_t,
 			p_slice.len_s(),
-			p_slice.len_t(),
-			m_zero);
-	}
-
-	inline float gap_cost(size_t len) const {
-		return m_gap_cost * len;
-	}
-
-	inline const GapMask &gap_mask() const {
-		return m_gap_mask;
-	}
-};
-
-template<typename Index>
-class SmithWaterman : public InjectiveAlignment<Index, SmithWatermanKernel> {
-public:
-	SmithWaterman(
-		const float p_gap_cost,
-		const GapMask &p_gap_mask,
-		const float p_zero=0.5) :
-
-		InjectiveAlignment<Index, SmithWatermanKernel>(
-			"alignment/smith-waterman",
-			SmithWatermanKernel{p_gap_cost, p_gap_mask, p_zero}) {
-	}
-
-	inline float gap_cost(size_t len) const {
-		return this->m_kernel.gap_cost(len);
-	}
-
-	inline const GapMask &gap_mask() const {
-		return this->m_kernel.gap_mask();
-	}
-};
-
-struct WatermanSmithBeyerKernel {
-	const std::vector<float> m_gap_cost;
-	const GapMask m_gap_mask;
-	const float m_zero;
-
-	template<typename Aligner, typename Slice, typename Flow>
-	inline void operator()(
-		Aligner &p_aligner,
-		const QueryRef &,
-		const Slice &p_slice,
-		Flow &p_flow) const {
-
-		p_aligner.waterman_smith_beyer(
-			p_flow,
-			[&p_slice] (auto i, auto j) -> float {
-				return p_slice.similarity(i, j);
-			},
-			[this] (auto len) -> float {
-				return this->gap_cost(len);
-			},
-			m_gap_mask,
-			p_slice.len_s(),
-			p_slice.len_t(),
-			m_zero);
+			p_slice.len_t());
 		}
 
-	inline float gap_cost(size_t len) const {
-		return m_gap_cost[
-			std::min(len, m_gap_cost.size() - 1)];
+	inline float gap_cost_s(size_t len) const {
+		return m_gap_cost_s(
+			std::min(len, m_gap_cost_s.shape(0) - 1));
 	}
 
-	inline const GapMask &gap_mask() const {
-		return m_gap_mask;
+	inline float gap_cost_t(size_t len) const {
+		return m_gap_cost_t(
+			std::min(len, m_gap_cost_t.shape(0) - 1));
 	}
 };
 
-template<typename Index>
-class WatermanSmithBeyer : public InjectiveAlignment<Index, WatermanSmithBeyerKernel> {
+template<typename Index, typename Locality>
+class AlignmentWithGeneralGapCost : public InjectiveAlignment<Index, GeneralGapCostKernel<Locality>> {
 public:
-	WatermanSmithBeyer(
-		const std::vector<float> &p_gap_cost,
-		const GapMask &p_gap_mask,
-		const float p_zero=0.5) :
+	AlignmentWithGeneralGapCost(
+		const xt::xtensor<float, 1> &p_gap_cost_s,
+		const xt::xtensor<float, 1> &p_gap_cost_t,
+		const Locality &p_locality) :
 
-		InjectiveAlignment<Index, WatermanSmithBeyerKernel>(
-			"alignment/waterman-smith-beyer",
-			WatermanSmithBeyerKernel{p_gap_cost, p_gap_mask, p_zero}) {
-
-		PPK_ASSERT(p_gap_cost.size() >= 1);
+		InjectiveAlignment<Index, GeneralGapCostKernel<Locality>>(
+			"alignment/general-gap-cost",
+			GeneralGapCostKernel<Locality>{p_gap_cost_s, p_gap_cost_t, p_locality}) {
 	}
 
-	inline float gap_cost(size_t len) const {
-		return this->m_kernel.gap_cost(len);
+	inline float gap_cost_s(size_t len) const {
+		return this->m_kernel.gap_cost_s(len);
 	}
 
-	inline const GapMask &gap_mask() const {
-		return this->m_kernel.gap_mask();
+	inline float gap_cost_t(size_t len) const {
+		return this->m_kernel.gap_cost_t(len);
 	}
 };
 
@@ -517,12 +464,12 @@ public:
 		m_wmd.allocate(max_len_s, max_len_t);
 	}
 
-	inline float gap_cost(size_t len) const {
+	inline float gap_cost_s(size_t len) const {
 		return 0;
 	}
 
-	inline GapMask gap_mask() const {
-		return GapMask{false, false};
+	inline float gap_cost_t(size_t len) const {
+		return 0;
 	}
 
 	template<bool Hook, typename Slice>
@@ -565,12 +512,12 @@ public:
 		m_wrd.resize(max_len_s, max_len_t);
 	}
 
-	inline float gap_cost(size_t len) const {
+	inline float gap_cost_s(size_t len) const {
 		return 0;
 	}
 
-	inline GapMask gap_mask() const {
-		return GapMask{false, false};
+	inline float gap_cost_t(size_t len) const {
+		return 0;
 	}
 
 	template<bool Hook, typename Slice>
@@ -607,7 +554,7 @@ inline std::string get_alignment_algorithm(
 	if (alignment_def.contains("algorithm")) {
 		return alignment_def["algorithm"].cast<py::str>();
 	} else {
-		return "wsb"; // default
+		return "alignment/local"; // default
 	}
 }
 
@@ -630,6 +577,33 @@ inline GapMask parse_gap_mask(const py::dict &alignment_def) {
 	return gap;
 }
 
+template<
+	template<typename, typename> typename Alignment,
+	typename Index, typename SliceFactory, typename Locality, typename GapCost>
+MatcherRef make_alignment_matcher(
+	const QueryRef &p_query,
+	const DocumentRef &p_document,
+	const MetricRef &p_metric,
+	const SliceFactory &p_factory,
+	const Locality &p_locality,
+	const GapCost &p_gap_cost_s,
+	const GapCost &p_gap_cost_t) {
+
+	return make_matcher(p_query, p_document, p_metric, p_factory,
+		std::move(Alignment<Index, Locality>(p_gap_cost_s, p_gap_cost_t, p_locality)),
+		Alignment<Index, Locality>::create_score_computer(p_factory));
+}
+
+inline std::vector<std::string> split_str(const std::string &s, const char sep) {
+	std::istringstream is(s);
+	std::string token;
+	std::vector<std::string> parts;
+	while (std::getline(is, token, sep)) {
+		parts.push_back(token);
+	}
+	return parts;
+}
+
 template<typename Index, typename SliceFactory>
 MatcherRef create_alignment_matcher(
 	const QueryRef &p_query,
@@ -639,7 +613,9 @@ MatcherRef create_alignment_matcher(
 	const SliceFactory &p_factory) {
 
 	const py::dict &alignment_def = p_matcher_options.alignment_def;
+
 	const std::string algorithm = get_alignment_algorithm(alignment_def);
+	std::vector<std::string> algo_parts = split_str(algorithm, '/');
 
 	/*if (algorithm == "cosine-vector-space-model") {
 
@@ -650,65 +626,65 @@ MatcherRef create_alignment_matcher(
 
 	} else*/
 
-	if (algorithm == "waterman-smith-beyer") {
-		float zero = 0.5;
-		if (alignment_def.contains("zero")) {
-			zero = alignment_def["zero"].cast<float>();
-		}
+	if (algo_parts.size() == 3 && algo_parts[0] == "alignment") {
 
-		std::vector<float> gap_cost;
-		if (alignment_def.contains("gap")) {
-			auto cost = alignment_def["gap"].cast<py::array_t<float>>();
-			auto r = cost.unchecked<1>();
-			const ssize_t n = r.shape(0);
-			gap_cost.resize(n);
-			for (ssize_t i = 0; i < n; i++) {
-				gap_cost[i] = r(i);
+		if (algo_parts[2] == "general") { // general gap costs
+
+			xt::xtensor<float, 1> gap_cost_s;
+			xt::xtensor<float, 1> gap_cost_t;
+
+			PPK_ASSERT(alignment_def.contains("gap"));
+			const auto costs_dict = alignment_def["gap"].cast<py::dict>();
+
+			gap_cost_s = xt::pyarray<float>(costs_dict["s"].cast<py::array_t<float>>());
+			gap_cost_t = xt::pyarray<float>(costs_dict["t"].cast<py::array_t<float>>());
+
+			if (algo_parts[1] == "local") {
+				float zero = 0.5;
+				if (alignment_def.contains("zero")) {
+					zero = alignment_def["zero"].cast<float>();
+				}
+
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::Local<float>(zero), gap_cost_s, gap_cost_t);
+			} else if (algo_parts[1] == "global") {
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+			} else {
+				throw std::invalid_argument(algo_parts[2]);
 			}
 		}
-		if (gap_cost.empty()) {
-			gap_cost.push_back(std::numeric_limits<float>::infinity());
+
+		else if (algo_parts[2] == "affine") { // affine gap costs
+
+			PPK_ASSERT (alignment_def.contains("gap"));
+			const auto costs_dict = alignment_def["gap"].cast<py::dict>();
+			const float gap_cost_s = costs_dict["s"].cast<float>();
+			const float gap_cost_t = costs_dict["t"].cast<float>();
+
+			if (algo_parts[1] == "local") {
+				float zero = 0.5f;
+				if (alignment_def.contains("zero")) {
+					zero = alignment_def["zero"].cast<float>();
+				}
+
+				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::Local<float>(zero), gap_cost_s, gap_cost_t);
+			} else if (algo_parts[1] == "global") {
+				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+			} else {
+				throw std::invalid_argument(algo_parts[2]);
+			}
 		}
 
-		const auto gap_mask = parse_gap_mask(alignment_def);
-
-		return make_matcher(
-			p_query, p_document, p_metric, p_factory,
-			std::move(WatermanSmithBeyer<Index>(gap_cost, gap_mask, zero)),
-			WatermanSmithBeyer<Index>::create_score_computer(p_factory));
-
-	} else if (algorithm == "smith-waterman") {
-
-		float gap_cost = 0.0f;
-		if (alignment_def.contains("gap_cost")) {
-			gap_cost = alignment_def["gap_cost"].cast<float>();
+		else {
+			throw std::invalid_argument(algo_parts[1]);
 		}
-
-		float zero = 0.5f;
-		if (alignment_def.contains("zero")) {
-			zero = alignment_def["zero"].cast<float>();
-		}
-
-		const auto gap_mask = parse_gap_mask(alignment_def);
-
-		return make_matcher(
-			p_query, p_document, p_metric, p_factory,
-			std::move(SmithWaterman<Index>(gap_cost, gap_mask, zero)),
-			SmithWaterman<Index>::create_score_computer(p_factory));
-
-	} else if (algorithm == "needleman-wunsch") {
-
-		float gap_cost = 0.0f;
-		if (alignment_def.contains("gap_cost")) {
-			gap_cost = alignment_def["gap_cost"].cast<float>();
-		}
-
-		const auto gap_mask = parse_gap_mask(alignment_def);
-
-		return make_matcher(
-			p_query, p_document, p_metric, p_factory,
-			std::move(NeedlemanWunsch<Index>(gap_cost, gap_mask)),
-			NeedlemanWunsch<Index>::create_score_computer(p_factory));
 
 	} else if (algorithm == "word-movers-distance") {
 

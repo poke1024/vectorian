@@ -483,7 +483,7 @@ class ConstantGapCostWidget(SlidingGapCostWidget):
 
 class LinearGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
-		super().__init__(iquery, 'Cost:', vectorian.alignment.LinearGapCost)
+		super().__init__(iquery, 'Cost:', vectorian.alignment.AffineGapCost)
 
 	def describe(self):
 		return "**linear gap cost** of **%.2f**" % self._cost.value
@@ -566,49 +566,27 @@ class AlignmentAlgorithmWidget:
 		raise NotImplementedError()
 
 
-class NeedlemanWunschWidget(AlignmentAlgorithmWidget):
+class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery, alignment=None, **kwargs):
-		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
+		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
 		super().__init__(
 			iquery, [self._gap_cost.widget, self._gap_mask.widget], **kwargs)
 
 	def make(self):
-		return vectorian.alignment.NeedlemanWunsch(
-			gap=self._gap_cost.make().to_scalar(),
-			gap_mask=self._gap_mask.get())
+		gap = self._gap_cost.make()
+		mask = self._gap_mask.get()
+		return vectorian.alignment.GlobalAlignment(
+			gap={
+				's': gap if 's' in mask else vectorian.alignment.ConstantGapCost(0),
+				't': gap if 't' in mask else vectorian.alignment.ConstantGapCost(0)
+			})
 
 	def describe_alignment(self):
 		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
 
 
-class SmithWatermanWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None, **kwargs):
-		self._gap_cost = GapCostWidget(iquery, fix_to="Linear")
-		self._gap_mask = GapMaskWidget(iquery)
-		self._zero = widgets.BoundedFloatText(
-			value=0.25,
-			min=0,
-			max=1,
-			step=0.1,
-			description='Zero:',
-			disabled=False)
-		super().__init__(
-			iquery,
-			[self._gap_cost.widget, self._gap_mask.widget, self._zero],
-			**kwargs)
-
-	def make(self):
-		return vectorian.alignment.SmithWaterman(
-			gap=self._gap_cost.make().to_scalar(),
-			gap_mask=self._gap_mask.get(),
-			zero=self._zero.value)
-
-	def describe_alignment(self):
-		return "with " + self._gap_cost.describe() + self._gap_mask.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
-
-
-class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
+class LocalAlignmentWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery, alignment=None, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
@@ -625,9 +603,13 @@ class WatermanSmithBeyerWidget(AlignmentAlgorithmWidget):
 			**kwargs)
 
 	def make(self):
-		return vectorian.alignment.WatermanSmithBeyer(
-			gap=self._gap_cost.make(),
-			gap_mask=self._gap_mask.get(),
+		gap = self._gap_cost.make()
+		mask = self._gap_mask.get()
+		return vectorian.alignment.LocalAlignment(
+			gap={
+				's': gap if 's' in mask else vectorian.alignment.ConstantGapCost(0),
+				't': gap if 't' in mask else vectorian.alignment.ConstantGapCost(0)
+			},
 			zero=self._zero.value)
 
 	def describe_alignment(self):
@@ -716,14 +698,13 @@ class AlignmentWidget(FineTuneableWidget):
 	_description = 'Alignment:'
 
 	_types = [
-		('Needleman-Wunsch', NeedlemanWunschWidget),
-		('Smith-Waterman', SmithWatermanWidget),
-		('Waterman-Smith-Beyer', WatermanSmithBeyerWidget),
+		('Global Alignment', GlobalAlignmentWidget),
+		('Local Alignment', LocalAlignmentWidget),
 		('Word Movers Distance (WMD)', WordMoversDistanceWidget),
 		('Word Rotators Distance (WRD)', WordRotatorsDistanceWidget)
 	]
 
-	_default = 'Waterman-Smith-Beyer'
+	_default = 'Local Alignment'
 
 	def __init__(self, iquery, alignment=None, similarity=None, **kwargs):
 		if 'default_options' not in kwargs:
@@ -731,9 +712,9 @@ class AlignmentWidget(FineTuneableWidget):
 
 		if alignment is not None:
 			mapping = {
-				'needleman-wunsch': 'Needleman-Wunsch',
-				'smith-waterman': 'Smith-Waterman',
-				'waterman-smith-beyer': 'Waterman-Smith-Beyer',
+				#'needleman-wunsch': 'Needleman-Wunsch',
+				#'smith-waterman': 'Smith-Waterman',
+				'alignment/local/general': 'Local Alignment',
 				'word-movers-distance': 'Word Movers Distance (WMD)',
 				'word-rotators-distance': 'Word Rotators Distance (WRD)'
 			}

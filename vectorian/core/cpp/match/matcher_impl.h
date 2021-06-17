@@ -42,12 +42,12 @@ public:
 		);
 	}
 
-	virtual float gap_cost(size_t len) const {
-		return m_aligner.gap_cost(len);
+	virtual float gap_cost_s(size_t len) const {
+		return m_aligner.gap_cost_s(len);
 	}
 
-	virtual GapMask gap_mask() const {
-		return m_aligner.gap_mask();
+	virtual float gap_cost_t(size_t len) const {
+		return m_aligner.gap_cost_t(len);
 	}
 };
 
