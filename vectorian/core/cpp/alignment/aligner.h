@@ -14,46 +14,48 @@ template<typename Index, typename Value>
 class Matrix;
 
 template<typename Index, typename Value>
-struct MatrixFactory {
+class MatrixFactory {
 protected:
 	friend class Matrix<Index, Value>;
 
-	xt::xtensor<Value, 2> values;
-	xt::xtensor<Index, 3> traceback;
-	xt::xtensor<Index, 1> best_column;
+	xt::xtensor<Value, 2> m_values;
+	xt::xtensor<Index, 3> m_traceback;
+	xt::xtensor<Index, 1> m_best_column;
 
-	const Index max_len_s;
-	const Index max_len_t;
+	const Index m_max_len_s;
+	const Index m_max_len_t;
 
 public:
 	inline MatrixFactory(
 		const Index p_max_len_s,
 		const Index p_max_len_t) :
 
-		max_len_s(p_max_len_s),
-		max_len_t(p_max_len_t) {
+		m_max_len_s(p_max_len_s),
+		m_max_len_t(p_max_len_t) {
 
-		values.resize({
-			static_cast<size_t>(max_len_s) + 1,
-			static_cast<size_t>(max_len_t) + 1
+		m_values.resize({
+			static_cast<size_t>(m_max_len_s) + 1,
+			static_cast<size_t>(m_max_len_t) + 1
 		});
-		traceback.resize({
-			static_cast<size_t>(max_len_s),
-			static_cast<size_t>(max_len_t),
+		m_traceback.resize({
+			static_cast<size_t>(m_max_len_s),
+			static_cast<size_t>(m_max_len_t),
 			2
 		});
-		best_column.resize({
-			static_cast<size_t>(max_len_s)
+		m_best_column.resize({
+			static_cast<size_t>(m_max_len_s)
 		});
-
-		xt::view(values, xt::all(), 0).fill(0);
-		xt::view(values, 0, xt::all()).fill(0);
 	}
 
-	inline Matrix<Index, Value> make(const Index len_s, const Index len_t);
+	inline Matrix<Index, Value> make(
+		const Index len_s, const Index len_t);
 
 	inline Index max_len() const {
-		return std::max(max_len_s, max_len_t);
+		return std::max(m_max_len_s, m_max_len_t);
+	}
+
+	inline auto &values() {
+		return this->m_values;
 	}
 };
 
@@ -84,21 +86,21 @@ public:
 
 	inline auto values() const {
 		return xt::view(
-			m_factory.values,
+			m_factory.m_values,
 			xt::range(1, m_len_s + 1),
 			xt::range(1, m_len_t + 1));
 	}
 
 	inline auto traceback() const {
 		return xt::view(
-			m_factory.traceback,
+			m_factory.m_traceback,
 			xt::range(0, m_len_s),
 			xt::range(0, m_len_t));
 	}
 
 	inline auto best_column() const {
 		return xt::view(
-			m_factory.best_column,
+			m_factory.m_best_column,
 			xt::range(0, m_len_s));
 	}
 };
@@ -107,14 +109,15 @@ template<typename Index, typename Value>
 inline Matrix<Index, Value> MatrixFactory<Index, Value>::make(
 	const Index len_s, const Index len_t) {
 
-	if (len_s > max_len_s) {
+	if (len_s > m_max_len_s) {
 		throw std::invalid_argument("len of s larger than max");
 	}
-	if (len_t > max_len_t) {
+	if (len_t > m_max_len_t) {
 		throw std::invalid_argument("len of t larger than max");
 	}
 	return Matrix(*this, len_s, len_t);
 }
+
 
 template<typename Value>
 class Local {
@@ -123,6 +126,15 @@ private:
 
 public:
 	inline Local(const Value p_zero) : m_zero(p_zero) {
+	}
+
+	void init_border(
+		xt::xtensor<Value, 2> &p_values,
+		const xt::xtensor<Value, 1> &p_gap_cost_s,
+		const xt::xtensor<Value, 1> &p_gap_cost_t) const {
+
+		xt::view(p_values, xt::all(), 0).fill(0);
+		xt::view(p_values, 0, xt::all()).fill(0);
 	}
 
 	template<typename Fold>
@@ -200,6 +212,15 @@ public:
 template<typename Value>
 class Global {
 public:
+	void init_border(
+		xt::xtensor<Value, 2> &p_values,
+		const xt::xtensor<Value, 1> &p_gap_cost_s,
+		const xt::xtensor<Value, 1> &p_gap_cost_t) const {
+
+		xt::view(p_values, xt::all(), 0) = -p_gap_cost_s;
+		xt::view(p_values, 0, xt::all()) = -p_gap_cost_t;
+	}
+
 	template<typename Fold>
 	inline void update_best(Fold &fold) const {
 	}
@@ -244,6 +265,7 @@ public:
 		return best_score;
 	}
 };
+
 
 template<typename Index, typename Value>
 class MaxFold {
@@ -300,14 +322,21 @@ public:
 
 
 
-template<typename Index=int16_t, typename Value=float>
+template<typename Locality, typename Index=int16_t, typename Value=float>
 class Aligner {
-private:
+protected:
+	const Locality m_locality;
 	MatrixFactory<Index, Value> m_factory;
 	Value m_best_score;
 
 public:
-	Aligner(const Index max_len_s, const Index max_len_t) : m_factory(max_len_s, max_len_t) {
+	inline Aligner(
+		const Locality &p_locality,
+		const Index p_max_len_s,
+		const Index p_max_len_t) :
+
+		m_locality(p_locality),
+		m_factory(p_max_len_s, p_max_len_t) {
 	}
 
 	inline Index max_len() const {
@@ -363,14 +392,35 @@ public:
 		return r.str();
 	}
 #endif
+};
 
-	template<typename Locality, typename Flow, typename Similarity>
-	void affine_gap(
-		const Locality &locality,
+template<typename Locality, typename Index=int16_t, typename Value=float>
+class AffineGapCostAligner : public Aligner<Locality, Index, Value> {
+	const Value m_gap_cost_s;
+	const Value m_gap_cost_t;
+
+public:
+	inline AffineGapCostAligner(
+		const Locality &p_locality,
+		const Value p_gap_cost_s,
+		const Value p_gap_cost_t,
+		const Index p_max_len_s,
+		const Index p_max_len_t) :
+
+		Aligner<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
+		m_gap_cost_s(p_gap_cost_s),
+		m_gap_cost_t(p_gap_cost_t) {
+
+		p_locality.init_border(
+			this->m_factory.values(),
+			xt::arange<Index>(0, p_max_len_s) * p_gap_cost_s,
+			xt::arange<Index>(0, p_max_len_t) * p_gap_cost_t);
+	}
+
+	template<typename Flow, typename Similarity>
+	void compute(
 		Flow &flow,
 		const Similarity &similarity,
-		const Value gap_cost_s,
-		const Value gap_cost_t,
 		const Index len_s,
 		const Index len_t) {
 
@@ -405,7 +455,7 @@ public:
 			throw std::invalid_argument("len must be >= 1");
 		}
 
-		auto matrix = m_factory.make(len_s, len_t);
+		auto matrix = this->m_factory.make(len_s, len_t);
 
 		auto values = matrix.values();
 		auto traceback = matrix.traceback();
@@ -421,30 +471,56 @@ public:
 					u - 1, v - 1);
 
 				best.update(
-					values(u - 1, v) - gap_cost_s,
+					values(u - 1, v) - this->m_gap_cost_s,
 					u - 1, v);
 
 				best.update(
-					values(u, v - 1) - gap_cost_t,
+					values(u, v - 1) - this->m_gap_cost_t,
 					u, v - 1);
 
-				locality.update_best(best);
+				this->m_locality.update_best(best);
 
 				values(u, v) = best.score();
 				xt::view(traceback, u, v, xt::all()) = best.traceback();
 			}
 		}
 
-		m_best_score = locality.traceback(flow, matrix);
+		this->m_best_score = this->m_locality.traceback(flow, matrix);
+	}
+};
+
+template<typename Locality, typename Index=int16_t, typename Value=float>
+class GeneralGapCostAligner : public Aligner<Locality, Index, Value> {
+	const xt::xtensor<Value, 1> m_gap_cost_s;
+	const xt::xtensor<Value, 1> m_gap_cost_t;
+
+public:
+	inline GeneralGapCostAligner(
+		const Locality &p_locality,
+		const xt::xtensor<Value, 1> &p_gap_cost_s,
+		const xt::xtensor<Value, 1> &p_gap_cost_t,
+		const Index p_max_len_s,
+		const Index p_max_len_t) :
+
+		Aligner<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
+		m_gap_cost_s(p_gap_cost_s),
+		m_gap_cost_t(p_gap_cost_t) {
+
+		if (m_gap_cost_s.shape(0) != size_t(p_max_len_s) ||
+			m_gap_cost_t.shape(0) != size_t(p_max_len_t)) {
+			throw std::invalid_argument("illegal gap cost tensor shape");
+		}
+
+		p_locality.init_border(
+			this->m_factory.values(),
+			p_gap_cost_s,
+			p_gap_cost_t);
 	}
 
-	template<typename Locality, typename Flow, typename Similarity>
-	void general_gap(
-		const Locality &locality,
+	template<typename Flow, typename Similarity>
+	void compute(
 		Flow &flow,
 		const Similarity &similarity,
-		const xt::xtensor<Value, 1> &gap_cost_s,
-		const xt::xtensor<Value, 1> &gap_cost_t,
 		const Index len_s,
 		const Index len_t) {
 
@@ -466,11 +542,7 @@ public:
 			throw std::invalid_argument("length in general_gap must be >= 1");
 		}
 
-		if (gap_cost_s.shape(0) < size_t(len_s) || gap_cost_t.shape(0) < size_t(len_t)) {
-			throw std::invalid_argument("illegal gap cost tensor shape");
-		}
-
-		auto matrix = m_factory.make(len_s, len_t);
+		auto matrix = this->m_factory.make(len_s, len_t);
 
 		auto values = matrix.values();
 		auto traceback = matrix.traceback();
@@ -487,24 +559,24 @@ public:
 
 				for (Index k = 0; k < u; k++) {
 					best.update(
-						values(k, v) - gap_cost_s(u - k),
+						values(k, v) - this->m_gap_cost_s(u - k),
 						k, v);
 				}
 
 				for (Index k = 0; k < v; k++) {
 					best.update(
-						values(u, k) - gap_cost_t(v - k),
+						values(u, k) - this->m_gap_cost_t(v - k),
 						u, k);
 				}
 
-				locality.update_best(best);
+				this->m_locality.update_best(best);
 
 				values(u, v) = best.score();
 				xt::view(traceback, u, v, xt::all()) = best.traceback();
 			}
 		}
 
-		m_best_score = locality.traceback(flow, matrix);
+		this->m_best_score = this->m_locality.traceback(flow, matrix);
 	}
 };
 

@@ -230,8 +230,8 @@ class LocalAlignment(AlignmentStrategy):
 	Models local alignments as described by Smith, Waterman and Beyer (1976).
 
 	The dynamic programming approach used is similar to that used in global alignments,
-	but adds an additional "zero" case and a modified traceback (for details see Aluru)
-	to generate local alignments.
+	but adds an additional "zero" case and a modified traceback to generate local alignments
+	(for details see Aluru).
 
 	To align two sequences of length n, the runtime complexity is \\( O(n^2) \\) if
 	the gap cost is affine, and \\( O(n^3) \\) otherwise.
@@ -239,6 +239,8 @@ class LocalAlignment(AlignmentStrategy):
 	The case dealing with general gap costs is sometimes referred to as Waterman-Smith-Beyer
 	algorithm, whereas the simpler case assuming affine gap costs is sometimes called the
 	Smith-Waterman algorithm.
+
+	For the affine gap cost case, the implementation follows Sankoff (1972) and Kruskal (1983).
 
 
 	Sankoff, D. (1972). Matching Sequences under Deletion/Insertion Constraints. Proceedings of
