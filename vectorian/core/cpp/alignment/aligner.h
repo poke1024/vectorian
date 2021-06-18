@@ -91,6 +91,17 @@ public:
 	}
 
 	inline auto values() const {
+		// a custom view to make sure that negative
+		// indexes, e.g. m(-1, 2), are handled ok.
+
+		auto &v = m_factory.m_data->values;
+
+		return [&v] (const Index i, const Index j) -> typename xt::xtensor<Value, 2>::reference {
+			return v(i + 1, j + 1);
+		};
+	}
+
+	inline auto values_11() const {
 		return xt::view(
 			m_factory.m_data->values,
 			xt::range(1, m_len_s + 1),
@@ -125,6 +136,27 @@ inline Matrix<Index, Value> MatrixFactory<Index, Value>::make(
 	return Matrix(*this, len_s, len_t);
 }
 
+template<typename V>
+inline size_t argmax(const V &v) {
+	// we do not use xt::argmax here,
+	// since we want a guaranteed behaviour
+	// (lowest index) on ties.
+
+	const size_t n = v.shape(0);
+
+	auto best = v(0);
+	size_t best_i = 0;
+
+	for (size_t i = 1; i < n; i++) {
+		const auto x = v(i);
+		if (x > best) {
+			best = x;
+			best_i = i;
+		}
+	}
+
+	return best_i;
+}
 
 template<typename Value>
 class Local {
@@ -163,7 +195,7 @@ public:
 
 		const auto zero_similarity = m_zero;
 
-		best_column = xt::argmax(values, 1);
+		best_column = xt::argmax(matrix.values_11(), 1);
 
 		Value score = zero_similarity;
 		Index best_u = 0, best_v = 0;
@@ -246,11 +278,85 @@ public:
 		const auto traceback = matrix.traceback();
 
 		flow.initialize(len_t);
-		//_best_match.resize(len_t);
-		//std::fill(_best_match.begin(), _best_match.end(), -1);
 
 		Index u = len_s - 1;
 		Index v = len_t - 1;
+		const Value best_score = values(u, v);
+
+		Index last_u = -1;
+		Index last_v = -1;
+
+		// note: we omit initial pairs of the form (x, -1) and
+		// (-1, x) here, even though they are part of the global
+		// alignment. They are considered in the score though.
+
+		while (u >= 0 && v >= 0) {
+			if (u == last_u) {
+				flow.reset(last_v);
+			}
+
+			flow.set(v, u);
+			//_best_match[v] = u;
+			last_u = u;
+			last_v = v;
+
+			const auto t = xt::view(traceback, u, v, xt::all());
+			u = t(0);
+			v = t(1);
+		}
+
+		return best_score;
+	}
+};
+
+
+template<typename Value>
+class SemiGlobal {
+public:
+	void init_border(
+		xt::xtensor<Value, 2> &p_values,
+		const xt::xtensor<Value, 1> &p_gap_cost_s,
+		const xt::xtensor<Value, 1> &p_gap_cost_t) const {
+
+		xt::view(p_values, xt::all(), 0).fill(0);
+		xt::view(p_values, 0, xt::all()).fill(0);
+	}
+
+	template<typename Fold>
+	inline void update_best(Fold &fold) const {
+	}
+
+	template<typename Flow, typename Index>
+	inline float traceback(
+		Flow &flow,
+		Matrix<Index, Value> &matrix) const {
+
+		const auto len_s = matrix.len_s();
+		const auto len_t = matrix.len_t();
+
+		const auto values = matrix.values();
+		const auto traceback = matrix.traceback();
+
+		flow.initialize(len_t);
+
+		const Index last_row = len_s - 1;
+		const Index last_col = len_t - 1;
+
+		const auto values_11 = matrix.values_11();
+		const Index best_col_in_last_row = argmax(xt::row(values_11, last_row));
+		const Index best_row_in_last_col = argmax(xt::col(values_11, last_col));
+
+		Index u;
+		Index v;
+
+		if (values(best_row_in_last_col, last_col) > values(last_row, best_col_in_last_row)) {
+			u = best_row_in_last_col;
+			v = last_col;
+		} else {
+			u = last_row;
+			v = best_col_in_last_row;
+		}
+
 		const Value best_score = values(u, v);
 
 		Index last_u = -1;
@@ -262,7 +368,6 @@ public:
 			}
 
 			flow.set(v, u);
-			//_best_match[v] = u;
 			last_u = u;
 			last_v = v;
 

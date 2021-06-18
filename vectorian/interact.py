@@ -567,16 +567,17 @@ class AlignmentAlgorithmWidget:
 
 
 class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None, **kwargs):
+	def __init__(self, iquery, alignment=None, klass=vectorian.alignment.GlobalAlignment, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
+		self._klass = klass
 		super().__init__(
 			iquery, [self._gap_cost.widget, self._gap_mask.widget], **kwargs)
 
 	def make(self):
 		gap = self._gap_cost.make()
 		mask = self._gap_mask.get()
-		return vectorian.alignment.GlobalAlignment(
+		return self._klass(
 			gap={
 				's': gap if 's' in mask else vectorian.alignment.ConstantGapCost(0),
 				't': gap if 't' in mask else vectorian.alignment.ConstantGapCost(0)
@@ -584,6 +585,11 @@ class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
 
 	def describe_alignment(self):
 		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
+
+
+class SemiGlobalAlignmentWidget(GlobalAlignmentWidget):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs, klass=vectorian.alignment.SemiGlobalAlignment)
 
 
 class LocalAlignmentWidget(AlignmentAlgorithmWidget):
@@ -699,6 +705,7 @@ class AlignmentWidget(FineTuneableWidget):
 
 	_types = [
 		('Global Alignment', GlobalAlignmentWidget),
+		('Semiglobal Alignment', SemiGlobalAlignmentWidget),
 		('Local Alignment', LocalAlignmentWidget),
 		('Word Movers Distance (WMD)', WordMoversDistanceWidget),
 		('Word Rotators Distance (WRD)', WordRotatorsDistanceWidget)

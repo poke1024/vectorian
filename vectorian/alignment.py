@@ -154,7 +154,17 @@ class AlignmentStrategy(SpanFlowStrategy):
 	the order of both sequences.
 	"""
 
-	pass
+	def _make_args(self, locality, gaps, **kwargs):
+		if all(x.is_affine for x in gaps.values()):
+			return dict({
+				'algorithm': f'alignment/{locality}/affine',
+				'gap': dict((k, v.to_scalar()) for k, v in gaps.items())
+			}, **kwargs)
+		else:
+			return dict({
+				'algorithm': f'alignment/{locality}/general',
+				'gap': dict((k, v.costs) for k, v in gaps.items())
+			}, **kwargs)
 
 
 class TransportStrategy(SpanFlowStrategy):
@@ -207,22 +217,31 @@ class GlobalAlignment(AlignmentStrategy):
 		}
 
 	def to_args(self, partition):
-		if all(x.is_affine for x in self._gap.values()):
-			return {
-				'algorithm': 'alignment/global/affine',
-				'gap': dict((k, v.to_scalar()) for k, v in self._gap.items())
-			}
-		else:
-			len = partition.max_len() + 1
-			return {
-				'algorithm': 'alignment/global/general',
-				'gap': dict((k, v.costs) for k, v in self._gap.items())
-			}
+		return self._make_args("global", self._gap)
 
 
-#class SemiGlobalAlignment(AlignmentStrategy):
-#	def __init__(self, gap: Dict[str, GapCost]):
-#		pass
+class SemiGlobalAlignment(AlignmentStrategy):
+	"""
+	Models semiglobal (end gaps free) alignments.
+
+	Aluru, S. (Ed.). (2005). Handbook of Computational Molecular Biology.
+	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
+	"""
+
+	def __init__(self, gap: Dict[str, GapCost]):
+		self._gap = gap
+		if not all(k in ("s", "t") for k in gap.keys()):
+			raise ValueError(gap)
+
+	def to_description(self, partition):
+		return {
+			'SemiGlobalAlignment': {
+				'gap': self._gap
+			}
+		}
+
+	def to_args(self, partition):
+		return self._make_args("semiglobal", self._gap)
 
 
 class LocalAlignment(AlignmentStrategy):
@@ -274,19 +293,7 @@ class LocalAlignment(AlignmentStrategy):
 		}
 
 	def to_args(self, partition):
-		if all(x.is_affine for x in self._gap.values()):
-			return {
-				'algorithm': 'alignment/local/affine',
-				'gap': dict((k, v.to_scalar()) for k, v in self._gap.items()),
-				'zero': self._zero
-			}
-		else:
-			len = partition.max_len() + 1
-			return {
-				'algorithm': 'alignment/local/general',
-				'gap': dict((k, v.costs) for k, v in self._gap.items()),
-				'zero': self._zero
-			}
+		return self._make_args("local", self._gap, zero=self._zero)
 
 
 class WordMoversDistance(TransportStrategy):

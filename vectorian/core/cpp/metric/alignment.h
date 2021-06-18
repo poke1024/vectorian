@@ -158,7 +158,7 @@ protected:
 		data["slice"] = p_slice.id();
 		data["similarity"] = sim;
 		data["values"] = xt::pyarray<float>(m_aligner->matrix(
-			p_slice.len_s(), p_slice.len_t()).values());
+			p_slice.len_s(), p_slice.len_t()).values_11());
 		data["traceback"] = xt::pyarray<float>(m_aligner->matrix(
 			p_slice.len_s(), p_slice.len_t()).traceback());
 		data["flow"] = p_flow->to_py();
@@ -615,6 +615,10 @@ MatcherRef create_alignment_matcher(
 				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
 					p_query, p_document, p_metric, p_factory,
 					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+			} else if (algo_parts[1] == "semiglobal") {
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::SemiGlobal<float>(), gap_cost_s, gap_cost_t);
 			} else {
 				throw std::invalid_argument(algo_parts[2]);
 			}
@@ -640,6 +644,10 @@ MatcherRef create_alignment_matcher(
 				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
 					p_query, p_document, p_metric, p_factory,
 					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+			} else if (algo_parts[1] == "semiglobal") {
+				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory,
+					alignments::SemiGlobal<float>(), gap_cost_s, gap_cost_t);
 			} else {
 				throw std::invalid_argument(algo_parts[2]);
 			}
