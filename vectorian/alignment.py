@@ -213,10 +213,10 @@ class GlobalAlignment(AlignmentStrategy):
 				'gap': dict((k, v.to_scalar()) for k, v in self._gap.items())
 			}
 		else:
-			len = partition.max_len()
+			len = partition.max_len() + 1
 			return {
 				'algorithm': 'alignment/global/general',
-				'gap': dict((k, v.costs(len)) for k, v in self._gap.items())
+				'gap': dict((k, v.costs) for k, v in self._gap.items())
 			}
 
 
@@ -281,10 +281,10 @@ class LocalAlignment(AlignmentStrategy):
 				'zero': self._zero
 			}
 		else:
-			len = partition.max_len()
+			len = partition.max_len() + 1
 			return {
 				'algorithm': 'alignment/local/general',
-				'gap': dict((k, v.costs(len)) for k, v in self._gap.items()),
+				'gap': dict((k, v.costs) for k, v in self._gap.items()),
 				'zero': self._zero
 			}
 

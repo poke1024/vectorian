@@ -104,11 +104,35 @@ inline float reference_score(
 	return reference_score;
 }
 
-template<typename Index, typename Aligner, typename Kernel>
+template<typename Aligner>
+struct AlignerFactory {
+	typedef typename Aligner::IndexType Index;
+
+	const typename Aligner::LocalityType m_locality;
+	const typename Aligner::GapCostSpec m_gap_cost_s;
+	const typename Aligner::GapCostSpec m_gap_cost_t;
+
+	std::shared_ptr<Aligner> make(
+		const Index max_len_s,
+		const Index max_len_t) const {
+
+		return std::make_shared<Aligner>(
+			m_locality,
+			m_gap_cost_s,
+			m_gap_cost_t,
+			max_len_s,
+			max_len_t);
+	}
+};
+
+template<typename Index, typename Aligner>
 class InjectiveAlignment {
+public:
+	typedef AlignerFactory<Aligner> AlignerFactory;
+
 protected:
 	const char *m_callback_name;
-	const Kernel m_kernel;
+	const AlignerFactory m_factory;
 	std::shared_ptr<Aligner> m_aligner;
 	size_t m_max_len_t;
 	mutable InjectiveFlowRef<Index> m_cached_flow;
@@ -147,20 +171,15 @@ protected:
 public:
 	InjectiveAlignment(
 		const char *p_callback_name,
-		const Kernel &p_kernel) :
+		const AlignerFactory &p_factory) :
 
 		m_callback_name(p_callback_name),
-		m_kernel(p_kernel),
+		m_factory(p_factory),
 		m_max_len_t(0) {
 	}
 
 	void init(const Index max_len_s, const Index max_len_t) {
-		m_aligner = std::make_shared<Aligner>(
-			m_kernel.locality(),
-			m_kernel.gap_cost_s(),
-			m_kernel.gap_cost_t(),
-			max_len_s,
-			max_len_t);
+		m_aligner = m_factory.make(max_len_s, max_len_t);
 		m_max_len_t = max_len_t;
 	}
 
@@ -175,14 +194,21 @@ public:
 			m_cached_flow->reserve(m_max_len_t);
 		}
 
-		m_kernel(*m_aligner.get(), p_matcher->query(), p_slice, *m_cached_flow.get());
+		const float aligner_score = m_aligner->compute(
+			*m_cached_flow.get(),
+			[&p_slice] (auto i, auto j) -> float {
+				return p_slice.similarity(i, j);
+			},
+			p_slice.len_s(),
+			p_slice.len_t());
 
 		const float score_max = reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
-		const auto score = Score(m_aligner->score(), score_max);
+		const auto score = Score(aligner_score, score_max);
 
 		if (Hook) {
-			call_debug_hook(p_matcher->query(), p_slice, m_cached_flow, m_aligner->score());
+			call_debug_hook(
+				p_matcher->query(), p_slice, m_cached_flow, aligner_score);
 		}
 
 		if (score > p_result_set->worst_score()) {
@@ -247,139 +273,53 @@ public:
 	}
 };
 
-template<typename Locality>
-struct AffineGapCostKernel {
-	const float m_gap_cost_s;
-	const float m_gap_cost_t;
-	const Locality m_locality;
-
-	template<typename Aligner, typename Slice, typename Flow>
-	inline void operator()(
-		Aligner &p_aligner,
-		const QueryRef &,
-		const Slice &p_slice,
-		Flow &p_flow) const {
-
-		p_aligner.compute(
-			p_flow,
-			[&p_slice] (auto i, auto j) -> float {
-				return p_slice.similarity(i, j);
-			},
-			p_slice.len_s(),
-			p_slice.len_t());
-	}
-
-	inline const Locality locality() const {
-		return m_locality;
-	}
-
-	inline float gap_cost_s() const {
-		return m_gap_cost_s;
-	}
-
-	inline float gap_cost_t() const {
-		return m_gap_cost_t;
-	}
-
-	inline float gap_cost_s(size_t len) const {
-		return m_gap_cost_s * len;
-	}
-
-	inline float gap_cost_t(size_t len) const {
-		return m_gap_cost_t * len;
-	}
-};
-
 template<typename Index, typename Locality>
 class AlignmentWithAffineGapCost : public InjectiveAlignment<
-	Index,
-	alignments::AffineGapCostAligner<Locality, Index, float>,
-	AffineGapCostKernel<Locality>> {
+	Index, alignments::AffineGapCostAligner<Locality, Index, float>> {
 public:
+	typedef alignments::AffineGapCostAligner<Locality, Index, float> Aligner;
+
 	AlignmentWithAffineGapCost(
 		const float p_gap_cost_s,
 		const float p_gap_cost_t,
 		const Locality &p_locality) :
 
-		InjectiveAlignment<Index, alignments::AffineGapCostAligner<Locality, Index, float>, AffineGapCostKernel<Locality>>(
+		InjectiveAlignment<Index, Aligner>(
 			"alignment/affine-gap-cost",
-			AffineGapCostKernel<Locality>{p_gap_cost_s, p_gap_cost_t, p_locality}) {
+			AlignerFactory<Aligner>{p_locality, p_gap_cost_s, p_gap_cost_t}) {
 	}
 
 	inline float gap_cost_s(size_t len) const {
-		return this->m_kernel.gap_cost_s(len);
+		return this->m_aligner->gap_cost_s(len);
 	}
 
 	inline float gap_cost_t(size_t len) const {
-		return this->m_kernel.gap_cost_t(len);
-	}
-};
-
-template<typename Locality>
-struct GeneralGapCostKernel {
-	const xt::xtensor<float, 1> m_gap_cost_s;
-	const xt::xtensor<float, 1> m_gap_cost_t;
-	const Locality m_locality;
-
-	template<typename Aligner, typename Slice, typename Flow>
-	inline void operator()(
-		Aligner &p_aligner,
-		const QueryRef &,
-		const Slice &p_slice,
-		Flow &p_flow) const {
-
-		p_aligner.compute(
-			p_flow,
-			[&p_slice] (auto i, auto j) -> float {
-				return p_slice.similarity(i, j);
-			},
-			p_slice.len_s(),
-			p_slice.len_t());
-		}
-
-	inline const Locality locality() const {
-		return m_locality;
-	}
-
-	inline const auto &gap_cost_s() const {
-		return m_gap_cost_s;
-	}
-
-	inline const auto &gap_cost_t() const {
-		return m_gap_cost_t;
-	}
-
-	inline float gap_cost_s(size_t len) const {
-		return m_gap_cost_s(
-			std::min(len, m_gap_cost_s.shape(0) - 1));
-	}
-
-	inline float gap_cost_t(size_t len) const {
-		return m_gap_cost_t(
-			std::min(len, m_gap_cost_t.shape(0) - 1));
+		return this->m_aligner->gap_cost_t(len);
 	}
 };
 
 template<typename Index, typename Locality>
 class AlignmentWithGeneralGapCost : public InjectiveAlignment<
-	Index, alignments::GeneralGapCostAligner<Locality, Index, float>, GeneralGapCostKernel<Locality>> {
+	Index, alignments::GeneralGapCostAligner<Locality, Index, float>> {
 public:
+	typedef alignments::GeneralGapCostAligner<Locality, Index, float> Aligner;
+
 	AlignmentWithGeneralGapCost(
-		const xt::xtensor<float, 1> &p_gap_cost_s,
-		const xt::xtensor<float, 1> &p_gap_cost_t,
+		const alignments::GapTensorFactory &p_gap_cost_s,
+		const alignments::GapTensorFactory &p_gap_cost_t,
 		const Locality &p_locality) :
 
-		InjectiveAlignment<Index, alignments::GeneralGapCostAligner<Locality, Index, float>, GeneralGapCostKernel<Locality>>(
+		InjectiveAlignment<Index, alignments::GeneralGapCostAligner<Locality, Index, float>>(
 			"alignment/general-gap-cost",
-			GeneralGapCostKernel<Locality>{p_gap_cost_s, p_gap_cost_t, p_locality}) {
+			AlignerFactory<Aligner>{p_locality, p_gap_cost_s, p_gap_cost_t}) {
 	}
 
 	inline float gap_cost_s(size_t len) const {
-		return this->m_kernel.gap_cost_s(len);
+		return this->m_aligner->gap_cost_s(len);
 	}
 
 	inline float gap_cost_t(size_t len) const {
-		return this->m_kernel.gap_cost_t(len);
+		return this->m_aligner->gap_cost_t(len);
 	}
 };
 
@@ -656,14 +596,11 @@ MatcherRef create_alignment_matcher(
 
 		if (algo_parts[2] == "general") { // general gap costs
 
-			xt::xtensor<float, 1> gap_cost_s;
-			xt::xtensor<float, 1> gap_cost_t;
-
 			PPK_ASSERT(alignment_def.contains("gap"));
 			const auto costs_dict = alignment_def["gap"].cast<py::dict>();
 
-			gap_cost_s = xt::pyarray<float>(costs_dict["s"].cast<py::array_t<float>>());
-			gap_cost_t = xt::pyarray<float>(costs_dict["t"].cast<py::array_t<float>>());
+			const auto gap_cost_s = costs_dict["s"].cast<alignments::GapTensorFactory>();
+			const auto gap_cost_t = costs_dict["t"].cast<alignments::GapTensorFactory>();
 
 			if (algo_parts[1] == "local") {
 				float zero = 0.5;

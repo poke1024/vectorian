@@ -15,6 +15,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/functional.h>
 
 #include <vector>
 #include <set>
