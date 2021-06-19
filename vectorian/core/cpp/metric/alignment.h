@@ -113,8 +113,8 @@ struct AlignerFactory {
 	const typename Aligner::GapCostSpec m_gap_cost_t;
 
 	std::shared_ptr<Aligner> make(
-		const Index max_len_s,
-		const Index max_len_t) const {
+		const size_t max_len_s,
+		const size_t max_len_t) const {
 
 		return std::make_shared<Aligner>(
 			m_locality,
@@ -158,7 +158,7 @@ protected:
 		data["slice"] = p_slice.id();
 		data["similarity"] = sim;
 		data["values"] = xt::pyarray<float>(m_aligner->matrix(
-			p_slice.len_s(), p_slice.len_t()).values_11());
+			p_slice.len_s(), p_slice.len_t()).values_non_neg_ij());
 		data["traceback"] = xt::pyarray<float>(m_aligner->matrix(
 			p_slice.len_s(), p_slice.len_t()).traceback());
 		data["flow"] = p_flow->to_py();
@@ -178,7 +178,7 @@ public:
 		m_max_len_t(0) {
 	}
 
-	void init(const Index max_len_s, const Index max_len_t) {
+	void init(const size_t max_len_s, const size_t max_len_t) {
 		m_aligner = m_factory.make(max_len_s, max_len_t);
 		m_max_len_t = max_len_t;
 	}

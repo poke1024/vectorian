@@ -27,29 +27,50 @@ protected:
 	};
 
 	const std::unique_ptr<Data> m_data;
-	const Index m_max_len_s;
-	const Index m_max_len_t;
+	const size_t m_max_len_s;
+	const size_t m_max_len_t;
+
+	inline void check_size_against_max(const size_t p_len, const size_t p_max) const {
+		if (p_len > p_max) {
+			std::stringstream err;
+			err << "sequence of length " << p_len << " exceeds configured maximum length " << p_max;
+			throw std::invalid_argument(err.str());
+		}
+	}
+
+	inline void check_size_against_implementation_limit(const size_t p_len) const {
+		const size_t max = size_t(std::numeric_limits<Index>::max()) - 4;
+		if (p_len > max) {
+			std::stringstream err;
+			err << "maximum supported sequence length in this implementation is " <<
+				max << ", but given sequence has length " << p_len;
+			throw std::invalid_argument(err.str());
+		}
+	}
 
 public:
 	inline MatrixFactory(
-		const Index p_max_len_s,
-		const Index p_max_len_t) :
+		const size_t p_max_len_s,
+		const size_t p_max_len_t) :
 
 		m_data(std::make_unique<Data>()),
 		m_max_len_s(p_max_len_s),
 		m_max_len_t(p_max_len_t) {
 
+		check_size_against_implementation_limit(p_max_len_s);
+		check_size_against_implementation_limit(p_max_len_t);
+
 		m_data->values.resize({
-			static_cast<size_t>(m_max_len_s) + 1,
-			static_cast<size_t>(m_max_len_t) + 1
+			m_max_len_s + 1,
+			m_max_len_t + 1
 		});
 		m_data->traceback.resize({
-			static_cast<size_t>(m_max_len_s),
-			static_cast<size_t>(m_max_len_t),
+			m_max_len_s,
+			m_max_len_t,
 			2
 		});
 		m_data->best_column.resize({
-			static_cast<size_t>(m_max_len_s)
+			m_max_len_s
 		});
 	}
 
@@ -91,8 +112,7 @@ public:
 	}
 
 	inline auto values() const {
-		// a custom view to make sure that negative
-		// indexes, e.g. m(-1, 2), are handled ok.
+		// a custom view to make sure that negative indexes, e.g. m(-1, 2), are handled correctly.
 
 		auto &v = m_factory.m_data->values;
 
@@ -101,7 +121,7 @@ public:
 		};
 	}
 
-	inline auto values_11() const {
+	inline auto values_non_neg_ij() const {
 		return xt::view(
 			m_factory.m_data->values,
 			xt::range(1, m_len_s + 1),
@@ -126,13 +146,8 @@ template<typename Index, typename Value>
 inline Matrix<Index, Value> MatrixFactory<Index, Value>::make(
 	const Index len_s, const Index len_t) const {
 
-	if (len_s > m_max_len_s) {
-		throw std::invalid_argument("len of s larger than max");
-	}
-	if (len_t > m_max_len_t) {
-		throw std::invalid_argument("len of t larger than max");
-	}
-
+	check_size_against_max(len_s, m_max_len_s);
+	check_size_against_max(len_t, m_max_len_t);
 	return Matrix(*this, len_s, len_t);
 }
 
@@ -195,7 +210,7 @@ public:
 
 		const auto zero_similarity = m_zero;
 
-		best_column = xt::argmax(matrix.values_11(), 1);
+		best_column = xt::argmax(matrix.values_non_neg_ij(), 1);
 
 		Value score = zero_similarity;
 		Index best_u = 0, best_v = 0;
@@ -342,9 +357,9 @@ public:
 		const Index last_row = len_s - 1;
 		const Index last_col = len_t - 1;
 
-		const auto values_11 = matrix.values_11();
-		const Index best_col_in_last_row = argmax(xt::row(values_11, last_row));
-		const Index best_row_in_last_col = argmax(xt::col(values_11, last_col));
+		const auto values_non_neg_ij = matrix.values_non_neg_ij();
+		const Index best_col_in_last_row = argmax(xt::row(values_non_neg_ij, last_row));
+		const Index best_row_in_last_col = argmax(xt::col(values_non_neg_ij, last_col));
 
 		Index u;
 		Index v;
@@ -445,8 +460,8 @@ protected:
 public:
 	inline Aligner(
 		const Locality &p_locality,
-		const Index p_max_len_s,
-		const Index p_max_len_t) :
+		const size_t p_max_len_s,
+		const size_t p_max_len_t) :
 
 		m_locality(p_locality),
 		m_factory(p_max_len_s, p_max_len_t) {
@@ -542,8 +557,8 @@ public:
 	Value compute(
 		Flow &flow,
 		const Similarity &similarity,
-		const Index len_s,
-		const Index len_t) const {
+		const size_t len_s,
+		const size_t len_t) const {
 
 		// For global alignment, we pose the problem as a Needleman-Wunsch problem, but follow the
 		// implementation of Sankoff and Kruskal.
@@ -572,18 +587,14 @@ public:
 
 		// Hendrix, D. A. Applied Bioinformatics. https://open.oregonstate.education/appliedbioinformatics/.
 
-		if (len_t < 1 || len_s < 1) {
-			throw std::invalid_argument("len must be >= 1");
-		}
-
 		auto matrix = this->m_factory.make(len_s, len_t);
 
 		auto values = matrix.values();
 		auto traceback = matrix.traceback();
 
-		for (Index u = 0; u < len_s; u++) {
+		for (Index u = 0; static_cast<size_t>(u) < len_s; u++) {
 
-			for (Index v = 0; v < len_t; v++) {
+			for (Index v = 0; static_cast<size_t>(v) < len_t; v++) {
 
 				MaxFold<Index, Value> best;
 
@@ -663,8 +674,8 @@ public:
 	Value compute(
 		Flow &flow,
 		const Similarity &similarity,
-		const Index len_s,
-		const Index len_t) const {
+		const size_t len_s,
+		const size_t len_t) const {
 
 		// Our implementation follows what is commonly referred to as Waterman-Smith-Beyer, i.e.
 		// an O(n^3) algorithm for generic gap costs. Waterman-Smith-Beyer generates a local alignment.
@@ -680,18 +691,14 @@ public:
 
 		// Hendrix, D. A. Applied Bioinformatics. https://open.oregonstate.education/appliedbioinformatics/.
 
-		if (len_t < 1 || len_s < 1) {
-			throw std::invalid_argument("length in general_gap must be >= 1");
-		}
-
 		auto matrix = this->m_factory.make(len_s, len_t);
 
 		auto values = matrix.values();
 		auto traceback = matrix.traceback();
 
-		for (Index u = 0; u < len_s; u++) {
+		for (Index u = 0; static_cast<size_t>(u) < len_s; u++) {
 
-			for (Index v = 0; v < len_t; v++) {
+			for (Index v = 0; static_cast<size_t>(v) < len_t; v++) {
 
 				MaxFold<Index, Value> best;
 
