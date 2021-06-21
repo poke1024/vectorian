@@ -113,7 +113,7 @@ token_similarity = vectorian.similarity.TokenSimilarity(
 span_similarity = vectorian.similarity.SpanFlowSimilarity(
     token_sim=token_similarity,
     flow_strategy=vectorian.alignment.WatermanSmithBeyer(
-        gap=vectorian.alignment.ExponentialGapCost(5),
+        gap=vectorian.alignment.smooth_gap_cost(5),
         zero=0.25))
 ```
 

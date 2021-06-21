@@ -46,12 +46,12 @@ class GapCost:
 
 class ConstantGapCost(GapCost):
 	"""
-	Models a constant gap cost \( C(t) = c_0 \) (i.e. independent of
-	gap length).
+	Models a constant gap cost \( w_k = u \). \( w_k \) is the gap
+	cost at length \( k \). \( u \) is a configurable parameter.
 	"""
 
-	def __init__(self, cost):
-		self._cost = cost
+	def __init__(self, u):
+		self._cost = u
 
 	@property
 	def is_affine(self):
@@ -71,16 +71,10 @@ class ConstantGapCost(GapCost):
 		return c
 
 
-class GotohGapCost(GapCost):
-	"""
-	\( w_k = u k + v \)
-	"""
-	pass
-
-
 class AffineGapCost(GapCost):
 	"""
-	\( w_k = u k \)
+	Models an affine gap cost \( w_k = u k \). \( w_k \) is the gap
+	cost at length \( k \). \( u \) is a configurable parameter.
 	"""
 
 	def __init__(self, u):
@@ -97,31 +91,66 @@ class AffineGapCost(GapCost):
 		return f'AffineGapCost({self.u})'
 
 	def costs(self, n):
-		c = np.empty((n,), dtype=np.float32)
-		c[0] = 0
-		x = 0
-		for i in range(1, n):
-			c[i] = x
-			x += self._u
-		return c
+		return np.linspace(0., (n - 1) * self._u, n, dtype=np.float32)
+
+
+class GotohGapCost(GapCost):
+	"""
+	Models a gap cost that is \( w_k = u k + v \) if \( k \le K_1 \),
+	and constant, i.e. \( w_k = w_{K_1} \), if \( k > K_1 \).
+
+	Gotoh, O. (1982). An improved algorithm for matching biological
+	sequences. Journal of Molecular Biology, 162(3), 705–708.
+	https://doi.org/10.1016/0022-2836(82)90398-9
+	"""
+
+	def __init__(self, u, v, k1, wk1):
+		self._u = u
+		self._v = v
+		self._k1 = k1
+		self._wk1 = wk1
+
+	def to_description(self):
+		return f'GotohGapCost({self.u}, {self.v}, {self.k1}, {self.wk1})'
+
+	def costs(self, n):
+		w = np.linspace(0., (n - 1) * self._u, n, dtype=np.float32) + self._v
+		w[np.arange(self._k1 + 1, n)] = self._wk1
+		return w
 
 
 class ExponentialGapCost(GapCost):
-	def __init__(self, cutoff):
-		self._cutoff = cutoff
+	"""
+	Models a gap cost \( w_k = 1 - u^{-k v} \). \( w_k \) is the gap
+	cost at length \( k \). \( u \) and \( v \) are configurable
+	parameters.
+	"""
+
+	def __init__(self, u, v):
+		self._u = u  # base
+		self._v = v  # exp
 
 	def to_description(self):
-		return f'ExponentialGapCost({self._cutoff})'
+		return f'ExponentialGapCost({self._u}, {self._v})'
 
 	def costs(self, n):
 		c = np.empty((n,), dtype=np.float32)
-		if self._cutoff > 0:
-			for i in range(n):
-				c[i] = 1 - (2 ** -(i / self._cutoff))
-		else:
-			c.fill(1)
-			c[0] = 0
+		for i in range(n):
+			c[i] = 1 - (self._u ** -(i * self._v))
 		return c
+
+
+def smooth_gap_cost(k):
+	"""
+	Models gap cost as the complement of an exponentially decaying
+	function that starts at \( w_0 = 1 \) and decreases
+	slowly such that \( w_k = 0.5 \) for a given \( k \).
+	"""
+
+	if k > 0:
+		return ExponentialGapCost(2, 1 / k)
+	else:
+		return ConstantGapCost(0)
 
 
 class CustomGapCost(GapCost):
@@ -222,7 +251,10 @@ class GlobalAlignment(AlignmentStrategy):
 
 class SemiGlobalAlignment(AlignmentStrategy):
 	"""
-	Models semiglobal (end gaps free) alignments.
+	Models semiglobal (also called "end gaps free" or "free-shift") alignments.
+
+	In this variant, insertions and deletions at the start and at the end of
+	the sequences are not weighted as penalties.
 
 	Aluru, S. (Ed.). (2005). Handbook of Computational Molecular Biology.
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
@@ -314,8 +346,8 @@ class WordMoversDistance(TransportStrategy):
 	@staticmethod
 	def wmd(variant='bow', **kwargs):
 		"""
-		Create a variant of WMD. To compute the WMD for two documents/sentences, the runtime
-		is super cubic in the number of different tokens involved.
+		Create a variant of WMD. To compute the WMD for two documents/sentences, the
+		runtime is super cubic in the number of different tokens involved.
 		"""
 
 		kwargs['builtin'] = f"wmd/{variant}"
@@ -352,6 +384,11 @@ class WordMoversDistance(TransportStrategy):
 		extra_mass_penalty=-1, builtin=None):
 		"""
 		Args:
+			relaxed: indicates whether to solve a RWMD or a full WMD.
+
+			normalize_bow: indicates whether to use nbow or (unnormalized) bow as
+				representation of the bag of words.
+
 			symmetric: indicates whether to also solve the symmetric RWMD problem,
 				which gives a tighter lower bound of WMD, but doubles the computation
 				cost

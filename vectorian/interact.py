@@ -489,12 +489,12 @@ class LinearGapCostWidget(SlidingGapCostWidget):
 		return "**linear gap cost** of **%.2f**" % self._cost.value
 
 
-class ExponentialGapCostWidget(SlidingGapCostWidget):
+class SmoothGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
-		super().__init__(iquery, 'Cutoff:', vectorian.alignment.ExponentialGapCost, default=3, max=20, step=1)
+		super().__init__(iquery, 'Cutoff:', vectorian.alignment.smooth_gap_cost, default=3, max=20, step=1)
 
 	def describe(self):
-		return "**exponential gap cost** with a 50%% cutoff at **%.2f**" % self._cost.value
+		return "**smooth gap cost** with a 50%% penalty at **%.2f**" % self._cost.value
 
 
 class GapCostWidget(FineTuneableWidget):
@@ -505,7 +505,7 @@ class GapCostWidget(FineTuneableWidget):
 	_types = [
 		('Constant', ConstantGapCostWidget),
 		('Linear', LinearGapCostWidget),
-		('Exponential', ExponentialGapCostWidget)
+		('Exponential', SmoothGapCostWidget)
 	]
 
 	_default = 'Linear'
