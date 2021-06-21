@@ -3,9 +3,6 @@
 
 #include "common.h"
 
-// Aligner always computes one best alignment, but there
-// might be multiple such alignments.
-
 #include <xtensor/xsort.hpp>
 
 namespace alignments {
@@ -196,9 +193,9 @@ public:
 		fold.update(m_zero, -1, -1);
 	}
 
-	template<typename Flow, typename Index>
+	template<typename Alignment, typename Index>
 	inline Value traceback(
-		Flow &flow,
+		Alignment &alignment,
 		Matrix<Index, Value> &matrix) const {
 
 		const auto len_s = matrix.len_s();
@@ -229,29 +226,22 @@ public:
 			return 0;
 		}
 
-		flow.initialize(len_t);
-		//_best_match.resize(len_t);
-		//std::fill(_best_match.begin(), _best_match.end(), -1);
+		alignment.resize(len_s, len_t);
 
 		Index u = best_u;
 		Index v = best_v;
 
-		Index last_u = -1;
-		Index last_v = -1;
-
 		while (u >= 0 && v >= 0 && values(u, v) > zero_similarity) {
-			if (u == last_u) {
-				flow.reset(last_v);
-			}
-
-			flow.set(v, u);
-			//_best_match[v] = u;
-			last_u = u;
-			last_v = v;
+			const Index last_u = u;
+			const Index last_v = v;
 
 			const auto t = xt::view(traceback, u, v, xt::all());
 			u = t(0);
 			v = t(1);
+
+			if (u != last_u && v != last_v) {
+				alignment.add_edge(last_u, last_v);
+			}
 		}
 
 		if (u >= 0 && v >= 0) {
@@ -281,9 +271,9 @@ public:
 	inline void update_best(Fold &fold) const {
 	}
 
-	template<typename Flow, typename Index>
+	template<typename Alignment, typename Index>
 	inline float traceback(
-		Flow &flow,
+		Alignment &alignment,
 		Matrix<Index, Value> &matrix) const {
 
 		const auto len_s = matrix.len_s();
@@ -292,32 +282,23 @@ public:
 		const auto values = matrix.values();
 		const auto traceback = matrix.traceback();
 
-		flow.initialize(len_t);
+		alignment.resize(len_s, len_t);
 
 		Index u = len_s - 1;
 		Index v = len_t - 1;
 		const Value best_score = values(u, v);
 
-		Index last_u = -1;
-		Index last_v = -1;
-
-		// note: we omit initial pairs of the form (x, -1) and
-		// (-1, x) here, even though they are part of the global
-		// alignment. They are considered in the score though.
-
 		while (u >= 0 && v >= 0) {
-			if (u == last_u) {
-				flow.reset(last_v);
-			}
-
-			flow.set(v, u);
-			//_best_match[v] = u;
-			last_u = u;
-			last_v = v;
+			const Index last_u = u;
+			const Index last_v = v;
 
 			const auto t = xt::view(traceback, u, v, xt::all());
 			u = t(0);
 			v = t(1);
+
+			if (u != last_u && v != last_v) {
+				alignment.add_edge(last_u, last_v);
+			}
 		}
 
 		return best_score;
@@ -341,9 +322,9 @@ public:
 	inline void update_best(Fold &fold) const {
 	}
 
-	template<typename Flow, typename Index>
+	template<typename Alignment, typename Index>
 	inline float traceback(
-		Flow &flow,
+		Alignment &alignment,
 		Matrix<Index, Value> &matrix) const {
 
 		const auto len_s = matrix.len_s();
@@ -352,7 +333,7 @@ public:
 		const auto values = matrix.values();
 		const auto traceback = matrix.traceback();
 
-		flow.initialize(len_t);
+		alignment.resize(len_s, len_t);
 
 		const Index last_row = len_s - 1;
 		const Index last_col = len_t - 1;
@@ -374,21 +355,17 @@ public:
 
 		const Value best_score = values(u, v);
 
-		Index last_u = -1;
-		Index last_v = -1;
-
 		while (u >= 0 && v >= 0) {
-			if (u == last_u) {
-				flow.reset(last_v);
-			}
-
-			flow.set(v, u);
-			last_u = u;
-			last_v = v;
+			const Index last_u = u;
+			const Index last_v = v;
 
 			const auto t = xt::view(traceback, u, v, xt::all());
 			u = t(0);
 			v = t(1);
+
+			if (u != last_u && v != last_v) {
+				alignment.add_edge(last_u, last_v);
+			}
 		}
 
 		return best_score;
@@ -452,13 +429,13 @@ public:
 
 
 template<typename Locality, typename Index=int16_t, typename Value=float>
-class Aligner {
+class Solver {
 protected:
 	const Locality m_locality;
 	MatrixFactory<Index, Value> m_factory;
 
 public:
-	inline Aligner(
+	inline Solver(
 		const Locality &p_locality,
 		const size_t p_max_len_s,
 		const size_t p_max_len_t) :
@@ -474,52 +451,10 @@ public:
 	auto matrix(const Index len_s, const Index len_t) {
 		return m_factory.make(len_s, len_t);
 	}
-
-#if 0 && !defined(ALIGNER_SLIM)
-	std::string pretty_printed(
-		const std::string &s,
-		const std::string &t) {
-
-		std::ostringstream out[3];
-
-		int i = 0;
-		for (int j = 0; j < t.length(); j++) {
-			auto m = _best_match[j];
-			if (m < 0) {
-				out[0] << "-";
-				out[1] << " ";
-				out[2] << t[j];
-			} else {
-				while (i < m) {
-					out[0] << s[i];
-					out[1] << " ";
-					out[2] << "-";
-					i += 1;
-				}
-
-				out[0] << s[m];
-				out[1] << "|";
-				out[2] << t[j];
-				i = m + 1;
-			}
-		}
-
-		while (i < s.length()) {
-			out[0] << s[i];
-			out[1] << " ";
-			out[2] << "-";
-			i += 1;
-		}
-
-		std::ostringstream r;
-		r << out[0].str() << "\n" << out[1].str() << "\n" << out[2].str();
-		return r.str();
-	}
-#endif
 };
 
 template<typename Locality, typename Index=int16_t, typename Value=float>
-class AffineGapCostAligner : public Aligner<Locality, Index, Value> {
+class AffineGapCostSolver : public Solver<Locality, Index, Value> {
 	const Value m_gap_cost_s;
 	const Value m_gap_cost_t;
 
@@ -528,14 +463,14 @@ public:
 	typedef Index IndexType;
 	typedef Value GapCostSpec;
 
-	inline AffineGapCostAligner(
+	inline AffineGapCostSolver(
 		const Locality &p_locality,
 		const Value p_gap_cost_s,
 		const Value p_gap_cost_t,
 		const Index p_max_len_s,
 		const Index p_max_len_t) :
 
-		Aligner<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
+		Solver<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
 		m_gap_cost_s(p_gap_cost_s),
 		m_gap_cost_t(p_gap_cost_t) {
 
@@ -553,9 +488,9 @@ public:
 		return m_gap_cost_t * len;
 	}
 
-	template<typename Flow, typename Similarity>
-	Value compute(
-		Flow &flow,
+	template<typename Alignment, typename Similarity>
+	Value solve(
+		Alignment &alignment,
 		const Similarity &similarity,
 		const size_t len_s,
 		const size_t len_t) const {
@@ -617,7 +552,7 @@ public:
 			}
 		}
 
-		return this->m_locality.traceback(flow, matrix);
+		return this->m_locality.traceback(alignment, matrix);
 	}
 };
 
@@ -631,7 +566,7 @@ inline void check_gap_tensor_shape(const xt::xtensor<Value, 1> &tensor, const si
 }
 
 template<typename Locality, typename Index=int16_t, typename Value=float>
-class GeneralGapCostAligner : public Aligner<Locality, Index, Value> {
+class GeneralGapCostSolver : public Solver<Locality, Index, Value> {
 	const xt::xtensor<Value, 1> m_gap_cost_s;
 	const xt::xtensor<Value, 1> m_gap_cost_t;
 
@@ -640,14 +575,14 @@ public:
 	typedef Index IndexType;
 	typedef GapTensorFactory GapCostSpec;
 
-	inline GeneralGapCostAligner(
+	inline GeneralGapCostSolver(
 		const Locality &p_locality,
 		const GapTensorFactory &p_gap_cost_s,
 		const GapTensorFactory &p_gap_cost_t,
 		const Index p_max_len_s,
 		const Index p_max_len_t) :
 
-		Aligner<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
+		Solver<Locality, Index, Value>(p_locality, p_max_len_s, p_max_len_t),
 		m_gap_cost_s(p_gap_cost_s(p_max_len_s + 1)),
 		m_gap_cost_t(p_gap_cost_t(p_max_len_t + 1)) {
 
@@ -670,9 +605,9 @@ public:
 		return m_gap_cost_t(len);
 	}
 
-	template<typename Flow, typename Similarity>
-	Value compute(
-		Flow &flow,
+	template<typename Alignment, typename Similarity>
+	Value solve(
+		Alignment &alignment,
 		const Similarity &similarity,
 		const size_t len_s,
 		const size_t len_t) const {
@@ -725,7 +660,7 @@ public:
 			}
 		}
 
-		return this->m_locality.traceback(flow, matrix);
+		return this->m_locality.traceback(alignment, matrix);
 	}
 };
 

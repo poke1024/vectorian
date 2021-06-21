@@ -168,6 +168,22 @@ protected:
 		callback(m_callback_name, data);
 	}
 
+	class FlowAlignment {
+		InjectiveFlow<Index> &m_flow;
+
+	public:
+		inline FlowAlignment(InjectiveFlow<Index> &p_flow) : m_flow(p_flow) {
+		}
+
+		inline void resize(const size_t len_s, const size_t len_t) {
+			m_flow.initialize(len_t);
+		}
+
+		inline void add_edge(const size_t u, const size_t v) {
+			m_flow.set(v, u);
+		}
+	};
+
 public:
 	InjectiveAlignment(
 		const char *p_callback_name,
@@ -194,8 +210,10 @@ public:
 			m_cached_flow->reserve(m_max_len_t);
 		}
 
-		const float aligner_score = m_aligner->compute(
-			*m_cached_flow.get(),
+		FlowAlignment alignment(*m_cached_flow.get());
+
+		const float aligner_score = m_aligner->solve(
+			alignment,
 			[&p_slice] (auto i, auto j) -> float {
 				return p_slice.similarity(i, j);
 			},
@@ -275,9 +293,9 @@ public:
 
 template<typename Index, typename Locality>
 class AlignmentWithAffineGapCost : public InjectiveAlignment<
-	Index, alignments::AffineGapCostAligner<Locality, Index, float>> {
+	Index, alignments::AffineGapCostSolver<Locality, Index, float>> {
 public:
-	typedef alignments::AffineGapCostAligner<Locality, Index, float> Aligner;
+	typedef alignments::AffineGapCostSolver<Locality, Index, float> Aligner;
 
 	AlignmentWithAffineGapCost(
 		const float p_gap_cost_s,
@@ -300,16 +318,16 @@ public:
 
 template<typename Index, typename Locality>
 class AlignmentWithGeneralGapCost : public InjectiveAlignment<
-	Index, alignments::GeneralGapCostAligner<Locality, Index, float>> {
+	Index, alignments::GeneralGapCostSolver<Locality, Index, float>> {
 public:
-	typedef alignments::GeneralGapCostAligner<Locality, Index, float> Aligner;
+	typedef alignments::GeneralGapCostSolver<Locality, Index, float> Aligner;
 
 	AlignmentWithGeneralGapCost(
 		const alignments::GapTensorFactory &p_gap_cost_s,
 		const alignments::GapTensorFactory &p_gap_cost_t,
 		const Locality &p_locality) :
 
-		InjectiveAlignment<Index, alignments::GeneralGapCostAligner<Locality, Index, float>>(
+		InjectiveAlignment<Index, alignments::GeneralGapCostSolver<Locality, Index, float>>(
 			"alignment/general-gap-cost",
 			AlignerFactory<Aligner>{p_locality, p_gap_cost_s, p_gap_cost_t}) {
 	}
