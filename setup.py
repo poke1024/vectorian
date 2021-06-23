@@ -29,6 +29,7 @@ ext_modules = [
 		"vectorian_core",
 		[str(x) for x in sorted(sources)],
 		cxx_std=17,
+		extra_compile_args=["-O3"],
 		define_macros=macros,
 		include_dirs=[str(x) for x in include_dirs],
 	),
