@@ -4,3 +4,6 @@
 [submodule "vectorian/core/lib/pyemd"]
 	path = vectorian/core/lib/pyemd
 	url = https://github.com/wmayner/pyemd
+[submodule "vectorian/core/lib/pyalign"]
+	path = vectorian/core/lib/pyalign
+	url = https://github.com/poke1024/pyalign

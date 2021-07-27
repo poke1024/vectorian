@@ -4,11 +4,11 @@
 #include "common.h"
 #include "match/matcher.h"
 #include "match/match.h"
-#include "alignment/aligner.h"
 #include "query.h"
 #include "document.h"
 #include "result_set.h"
 #include "metric/alignment.h"
+#include "pyalign/algorithm/factory.h"
 #include <fstream>
 
 template<typename Aligner>

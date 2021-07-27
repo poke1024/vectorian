@@ -2,7 +2,7 @@
 #define __VECTORIAN_METRIC_ALIGNMENT__
 
 #include "common.h"
-#include "alignment/aligner.h"
+#include "pyalign/algorithm/factory.h"
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 
@@ -106,9 +106,8 @@ inline float reference_score(
 
 template<typename Aligner>
 struct AlignerFactory {
-	typedef typename Aligner::IndexType Index;
+	typedef typename Aligner::Index Index;
 
-	const typename Aligner::LocalityType m_locality;
 	const typename Aligner::GapCostSpec m_gap_cost_s;
 	const typename Aligner::GapCostSpec m_gap_cost_t;
 
@@ -117,7 +116,6 @@ struct AlignerFactory {
 		const size_t max_len_t) const {
 
 		return std::make_shared<Aligner>(
-			m_locality,
 			m_gap_cost_s,
 			m_gap_cost_t,
 			max_len_s,
@@ -125,23 +123,28 @@ struct AlignerFactory {
 	}
 };
 
-template<typename Index, typename Aligner>
+template<typename Algorithm>
 class InjectiveAlignment {
 public:
-	typedef AlignerFactory<Aligner> AlignerFactory;
+	typedef std::shared_ptr<pyalign::SolverImpl<Algorithm>> SolverInstanceRef;
+	typedef std::function<SolverInstanceRef(size_t, size_t)> SolverFactory;
+
+	typedef typename Algorithm::index_type index_type;
+	typedef typename Algorithm::index_vec_type index_vec_type;
+	typedef typename Algorithm::cell_type cell_type;
 
 protected:
 	const char *m_callback_name;
-	const AlignerFactory m_factory;
-	std::shared_ptr<Aligner> m_aligner;
+	const SolverFactory m_factory;
+	SolverInstanceRef m_solver;
 	size_t m_max_len_t;
-	mutable InjectiveFlowRef<Index> m_cached_flow;
+	mutable InjectiveFlowRef<index_type> m_cached_flow;
 
 	template<typename Slice>
 	void call_debug_hook(
 		const QueryRef &p_query,
 		const Slice &p_slice,
-		const InjectiveFlowRef<Index> &p_flow,
+		const InjectiveFlowRef<index_type> &p_flow,
 		const float p_score) const {
 
 		py::gil_scoped_acquire acquire;
@@ -157,10 +160,10 @@ protected:
 		py::dict data;
 		data["slice"] = p_slice.id();
 		data["similarity"] = sim;
-		data["values"] = xt::pyarray<float>(m_aligner->matrix(
+		/*data["values"] = xt::pyarray<float>(m_aligner->matrix(
 			p_slice.len_s(), p_slice.len_t()).values_non_neg_ij());
 		data["traceback"] = xt::pyarray<float>(m_aligner->matrix(
-			p_slice.len_s(), p_slice.len_t()).traceback());
+			p_slice.len_s(), p_slice.len_t()).traceback());*/
 		data["flow"] = p_flow->to_py();
 		data["score"] = p_score;
 
@@ -169,25 +172,63 @@ protected:
 	}
 
 	class FlowAlignment {
-		InjectiveFlow<Index> &m_flow;
+		float m_score;
 
 	public:
-		inline FlowAlignment(InjectiveFlow<Index> &p_flow) : m_flow(p_flow) {
+		InjectiveFlowRef<index_type> m_flow;
+
+		inline FlowAlignment() {
+		}
+
+		inline FlowAlignment(const InjectiveFlowRef<index_type> &p_flow) : m_flow(p_flow) {
 		}
 
 		inline void resize(const size_t len_s, const size_t len_t) {
-			m_flow.initialize(len_t);
+			m_flow->initialize(len_t);
 		}
 
 		inline void add_edge(const size_t u, const size_t v) {
-			m_flow.set(v, u);
+			m_flow->set(v, u);
+		}
+
+		inline void set_score(const float p_score) {
+			m_score = p_score;
+		}
+
+		inline float score() const {
+			return m_score;
 		}
 	};
+
+	struct FlowAlignmentFactory {
+		const ResultSetRef &m_result_set;
+		InjectiveFlowRef<index_type> &m_cached_flow;
+		const size_t m_max_len_t;
+
+		typedef FlowAlignment ref_type;
+		typedef FlowAlignment deref_type;
+
+		inline FlowAlignment &deref(FlowAlignment &p) const {
+			return p;
+		}
+
+		inline FlowAlignment make() const {
+			if (!m_cached_flow) {
+				m_cached_flow = m_result_set->flow_factory()->create_injective();
+				m_cached_flow->reserve(m_max_len_t);
+			}
+
+			FlowAlignment r = FlowAlignment(m_cached_flow);
+			m_cached_flow.reset();
+			return r;
+		}
+	};
+
 
 public:
 	InjectiveAlignment(
 		const char *p_callback_name,
-		const AlignerFactory &p_factory) :
+		const SolverFactory &p_factory) :
 
 		m_callback_name(p_callback_name),
 		m_factory(p_factory),
@@ -195,7 +236,7 @@ public:
 	}
 
 	void init(const size_t max_len_s, const size_t max_len_t) {
-		m_aligner = m_factory.make(max_len_s, max_len_t);
+		m_solver = m_factory(max_len_s, max_len_t);
 		m_max_len_t = max_len_t;
 	}
 
@@ -205,20 +246,24 @@ public:
 		const Slice &p_slice,
 		const ResultSetRef &p_result_set) const {
 
-		if (!m_cached_flow) {
-			m_cached_flow = p_result_set->flow_factory()->create_injective();
-			m_cached_flow->reserve(m_max_len_t);
-		}
+		const auto &algorithm = m_solver->algorithm();
 
-		FlowAlignment alignment(*m_cached_flow.get());
-
-		const float aligner_score = m_aligner->solve(
-			alignment,
+		algorithm.solve(
 			[&p_slice] (auto i, auto j) -> float {
 				return p_slice.similarity(i, j);
 			},
 			p_slice.len_s(),
 			p_slice.len_t());
+
+		std::array<FlowAlignment, cell_type::batch_size> alignments;
+
+		algorithm.template alignment<FlowAlignmentFactory>(
+			index_vec_type({static_cast<index_type>(p_slice.len_s())}),
+			index_vec_type({static_cast<index_type>(p_slice.len_t())}),
+			alignments,
+			FlowAlignmentFactory{p_result_set, m_cached_flow, m_max_len_t});
+
+		const float aligner_score = alignments[0].score();
 
 		const float score_max = reference_score(
 			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
@@ -230,18 +275,27 @@ public:
 		}
 
 		if (score > p_result_set->worst_score()) {
-			const auto flow = m_cached_flow;
-			m_cached_flow.reset();
-
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				flow,
+				alignments[0].m_flow,
 				score);
 		} else {
+			m_cached_flow = alignments[0].m_flow;
 			return MatchRef();
 		}
 	}
+
+	inline float gap_cost_s(size_t len) const {
+		const auto &algorithm = m_solver->algorithm();
+		return algorithm.gap_cost_s(len);
+	}
+
+	inline float gap_cost_t(size_t len) const {
+		const auto &algorithm = m_solver->algorithm();
+		return algorithm.gap_cost_t(len);
+	}
+
 
 	template<typename SliceFactory>
 	class ScoreComputer {
@@ -252,13 +306,13 @@ public:
 		}
 
 		void operator()(const MatchRef &p_match) const {
-			auto *flow = static_cast<InjectiveFlow<Index>*>(p_match->flow().get());
+			auto *flow = static_cast<InjectiveFlow<index_type>*>(p_match->flow().get());
 			auto &mapping = flow->mapping();
 
 		    const auto match_slice = p_match->slice();
 	        const auto token_at = match_slice.idx;
 
-	        Index end = 0;
+	        index_type end = 0;
 	        for (auto m : mapping) {
 	            end = std::max(end, m.target);
 	        }
@@ -271,7 +325,7 @@ public:
 	            TokenSpan{s_tokens, token_at, match_slice.len},
 	            TokenSpan{t_tokens->data(), 0, static_cast<int32_t>(t_tokens->size())});
 
-	        Index i = 0;
+	        index_type i = 0;
 	        for (auto &m : mapping) {
 	            if (m.target >= 0) {
 	                m.weight.flow = 1.0f;
@@ -291,20 +345,69 @@ public:
 	}
 };
 
-template<typename Index, typename Locality>
-class AlignmentWithAffineGapCost : public InjectiveAlignment<
-	Index, alignments::AffineGapCostSolver<Locality, Index, float>> {
+template<typename SliceFactory>
+class MakePyalignMatcher {
+private:
+	const QueryRef m_query;
+	const DocumentRef m_document;
+	const MetricRef m_metric;
+	const SliceFactory m_slice_factory;
+
 public:
-	typedef alignments::AffineGapCostSolver<Locality, Index, float> Aligner;
+	MakePyalignMatcher(
+		const QueryRef &p_query,
+		const DocumentRef &p_document,
+		const MetricRef &p_metric,
+		const SliceFactory &p_slice_factory) :
+
+		m_query(p_query),
+		m_document(p_document),
+		m_metric(p_metric),
+		m_slice_factory(p_slice_factory) {
+
+	}
+
+	template<
+		typename Algorithm,
+		typename Options,
+		typename... Args>
+	auto make(
+		const Options &p_options,
+		const Args&... p_args) const {
+
+		const auto gen = [=](
+			const size_t p_max_len_s,
+			const size_t p_max_len_t) {
+
+			return std::make_shared<pyalign::SolverImpl<Algorithm>>(
+				p_options,
+				p_max_len_s,
+				p_max_len_t,
+				p_args...);
+		};
+
+		return make_matcher(m_query, m_document, m_metric, m_slice_factory,
+			std::move(InjectiveAlignment<Algorithm>("alignment", gen)),
+			InjectiveAlignment<Algorithm>::create_score_computer(m_slice_factory));
+	}
+};
+
+/*typedef pyalign::cell_type<float, int16_t, pyalign::no_batch> CellType;
+typedef pyalign::problem_type<pyalign::goal::one_optimal_alignment, pyalign::direction::maximize> ProblemType;
+
+template<typename Index, template<typename, typename> class Locality>
+class AlignmentWithAffineGapCost : public InjectiveAlignment<
+	Index, pyalign::AffineGapCostSolver<CellType, ProblemType, Locality>> {
+public:
+	typedef pyalign::AffineGapCostSolver<CellType, ProblemType, Locality> Aligner;
 
 	AlignmentWithAffineGapCost(
 		const float p_gap_cost_s,
-		const float p_gap_cost_t,
-		const Locality &p_locality) :
+		const float p_gap_cost_t) :
 
 		InjectiveAlignment<Index, Aligner>(
 			"alignment/affine-gap-cost",
-			AlignerFactory<Aligner>{p_locality, p_gap_cost_s, p_gap_cost_t}) {
+			AlignerFactory<Aligner>{p_gap_cost_s, p_gap_cost_t}) {
 	}
 
 	inline float gap_cost_s(size_t len) const {
@@ -316,20 +419,19 @@ public:
 	}
 };
 
-template<typename Index, typename Locality>
+template<typename Index, template<typename, typename> class Locality>
 class AlignmentWithGeneralGapCost : public InjectiveAlignment<
-	Index, alignments::GeneralGapCostSolver<Locality, Index, float>> {
+	Index, pyalign::GeneralGapCostSolver<CellType, ProblemType, Locality>> {
 public:
-	typedef alignments::GeneralGapCostSolver<Locality, Index, float> Aligner;
+	typedef pyalign::GeneralGapCostSolver<CellType, ProblemType, Locality> Aligner;
 
 	AlignmentWithGeneralGapCost(
-		const alignments::GapTensorFactory &p_gap_cost_s,
-		const alignments::GapTensorFactory &p_gap_cost_t,
-		const Locality &p_locality) :
+		const pyalign::GapTensorFactory<float> &p_gap_cost_s,
+		const pyalign::GapTensorFactory<float> &p_gap_cost_t) :
 
-		InjectiveAlignment<Index, alignments::GeneralGapCostSolver<Locality, Index, float>>(
+		InjectiveAlignment<Index, pyalign::GeneralGapCostSolver<CellType, ProblemType, Locality>>(
 			"alignment/general-gap-cost",
-			AlignerFactory<Aligner>{p_locality, p_gap_cost_s, p_gap_cost_t}) {
+			AlignerFactory<Aligner>{p_gap_cost_s, p_gap_cost_t}) {
 	}
 
 	inline float gap_cost_s(size_t len) const {
@@ -339,7 +441,7 @@ public:
 	inline float gap_cost_t(size_t len) const {
 		return this->m_aligner->gap_cost_t(len);
 	}
-};
+};*/
 
 class NoScoreComputer {
 public:
@@ -562,19 +664,19 @@ inline GapMask parse_gap_mask(const py::dict &alignment_def) {
 }
 
 template<
-	template<typename, typename> typename Alignment,
-	typename Index, typename SliceFactory, typename Locality, typename GapCost>
+	template<typename, template<typename, typename> class> typename Alignment,
+	template<typename, typename> class Locality,
+	typename Index, typename SliceFactory, typename GapCost>
 MatcherRef make_alignment_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
 	const MetricRef &p_metric,
 	const SliceFactory &p_factory,
-	const Locality &p_locality,
 	const GapCost &p_gap_cost_s,
 	const GapCost &p_gap_cost_t) {
 
 	return make_matcher(p_query, p_document, p_metric, p_factory,
-		std::move(Alignment<Index, Locality>(p_gap_cost_s, p_gap_cost_t, p_locality)),
+		std::move(Alignment<Index, Locality>(p_gap_cost_s, p_gap_cost_t)),
 		Alignment<Index, Locality>::create_score_computer(p_factory));
 }
 
@@ -612,31 +714,38 @@ MatcherRef create_alignment_matcher(
 
 	if (algo_parts.size() == 3 && algo_parts[0] == "alignment") {
 
+		// FIXME
+
+		const auto options = pyalign::create_options(
+			alignment_def["pyalign"].cast<py::dict>());
+
+		const auto make_matcher = MakePyalignMatcher<SliceFactory>(
+			p_query, p_document, p_metric, p_factory);
+
+		const auto matcher = pyalign::create_solver_factory<MakePyalignMatcher<SliceFactory>, float, Index>(
+			options, make_matcher);
+
+		return matcher;
+
+		/*
+
 		if (algo_parts[2] == "general") { // general gap costs
 
 			PPK_ASSERT(alignment_def.contains("gap"));
 			const auto costs_dict = alignment_def["gap"].cast<py::dict>();
 
-			const auto gap_cost_s = costs_dict["s"].cast<alignments::GapTensorFactory>();
-			const auto gap_cost_t = costs_dict["t"].cast<alignments::GapTensorFactory>();
+			const auto gap_cost_s = costs_dict["s"].cast<pyalign::GapTensorFactory<float>>();
+			const auto gap_cost_t = costs_dict["t"].cast<pyalign::GapTensorFactory<float>>();
 
 			if (algo_parts[1] == "local") {
-				float zero = 0.5;
-				if (alignment_def.contains("zero")) {
-					zero = alignment_def["zero"].cast<float>();
-				}
-
-				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::Local<float>(zero), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, pyalign::Local, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else if (algo_parts[1] == "global") {
-				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, pyalign::Global, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else if (algo_parts[1] == "semiglobal") {
-				return make_alignment_matcher<AlignmentWithGeneralGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::SemiGlobal<float>(), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithGeneralGapCost, pyalign::Semiglobal, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else {
 				throw std::invalid_argument(algo_parts[2]);
 			}
@@ -650,22 +759,14 @@ MatcherRef create_alignment_matcher(
 			const float gap_cost_t = costs_dict["t"].cast<float>();
 
 			if (algo_parts[1] == "local") {
-				float zero = 0.5f;
-				if (alignment_def.contains("zero")) {
-					zero = alignment_def["zero"].cast<float>();
-				}
-
-				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::Local<float>(zero), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithAffineGapCost, pyalign::Local, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else if (algo_parts[1] == "global") {
-				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::Global<float>(), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithAffineGapCost, pyalign::Global, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else if (algo_parts[1] == "semiglobal") {
-				return make_alignment_matcher<AlignmentWithAffineGapCost, Index, SliceFactory>(
-					p_query, p_document, p_metric, p_factory,
-					alignments::SemiGlobal<float>(), gap_cost_s, gap_cost_t);
+				return make_alignment_matcher<AlignmentWithAffineGapCost, pyalign::Semiglobal, Index, SliceFactory>(
+					p_query, p_document, p_metric, p_factory, gap_cost_s, gap_cost_t);
 			} else {
 				throw std::invalid_argument(algo_parts[2]);
 			}
@@ -673,7 +774,7 @@ MatcherRef create_alignment_matcher(
 
 		else {
 			throw std::invalid_argument(algo_parts[1]);
-		}
+		}*/
 
 	} else if (algorithm == "word-movers-distance") {
 
