@@ -28,7 +28,8 @@ class AlignmentStrategy(SpanFlowStrategy):
 			'algorithm': 'pyalign',
 			'options': {
 				'locality': locality_enum,
-				'gaps': gaps
+				'gap_cost': gaps,
+				'zero_sim': kwargs.get('zero', 0)
 			}
 		}, **kwargs)
 

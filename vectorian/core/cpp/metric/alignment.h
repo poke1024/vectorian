@@ -230,7 +230,7 @@ protected:
 
 
 public:
-	InjectiveAlignment(
+	inline InjectiveAlignment(
 		const char *p_callback_name,
 		const SolverFactory &p_factory) :
 

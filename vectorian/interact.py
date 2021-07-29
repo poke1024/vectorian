@@ -597,16 +597,9 @@ class LocalAlignmentWidget(AlignmentAlgorithmWidget):
 	def __init__(self, iquery, alignment=None, **kwargs):
 		self._gap_cost = GapCostWidget(iquery, default="Exponential")
 		self._gap_mask = GapMaskWidget(iquery)
-		self._zero = widgets.BoundedFloatText(
-			value=0.25,
-			min=0,
-			max=1,
-			step=0.1,
-			description='Zero:',
-			disabled=False)
 		super().__init__(
 			iquery,
-			[self._gap_cost.widget, self._gap_mask.widget, self._zero],
+			[self._gap_cost.widget, self._gap_mask.widget],
 			**kwargs)
 
 	def make(self):
@@ -616,11 +609,10 @@ class LocalAlignmentWidget(AlignmentAlgorithmWidget):
 			gap={
 				's': gap if 's' in mask else vectorian.alignment.ConstantGapCost(0),
 				't': gap if 't' in mask else vectorian.alignment.ConstantGapCost(0)
-			},
-			zero=self._zero.value)
+			})
 
 	def describe_alignment(self):
-		return "with " + self._gap_cost.describe() + self._gap_mask.describe() + (". Zero similarity is set to **%.2f**" % self._zero.value)
+		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
 
 
 class WordMoversDistanceWidget(AlignmentAlgorithmWidget):
