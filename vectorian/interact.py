@@ -475,24 +475,24 @@ class SlidingGapCostWidget:
 
 
 class ConstantGapCostWidget(SlidingGapCostWidget):
-	def __init__(self, iquery):
-		super().__init__(iquery, 'Cost:', vectorian.alignment.ConstantGapCost)
+	def __init__(self, iquery, k=0.1):
+		super().__init__(iquery, 'Cost:', vectorian.alignment.ConstantGapCost, default=k)
 
 	def describe(self):
 		return "**constant gap cost** of **%.2f**" % self._cost.value
 
 
 class LinearGapCostWidget(SlidingGapCostWidget):
-	def __init__(self, iquery):
-		super().__init__(iquery, 'Cost:', vectorian.alignment.LinearGapCost)
+	def __init__(self, iquery, k=0.1):
+		super().__init__(iquery, 'Cost:', vectorian.alignment.LinearGapCost, default=k)
 
 	def describe(self):
 		return "**linear gap cost** of **%.2f**" % self._cost.value
 
 
 class SmoothGapCostWidget(SlidingGapCostWidget):
-	def __init__(self, iquery):
-		super().__init__(iquery, 'Cutoff:', vectorian.alignment.smooth_gap_cost, default=3, max=20, step=1)
+	def __init__(self, iquery, k=3):
+		super().__init__(iquery, 'Cutoff:', vectorian.alignment.smooth_gap_cost, default=k, max=k * 7, step=1)
 
 	def describe(self):
 		return "**smooth gap cost** with a 50%% penalty at **%.2f**" % self._cost.value
@@ -538,10 +538,53 @@ class GapMaskWidget:
 		return f" (applied to {text})"
 
 
+def derive_gap_cost_args(gap_cost):
+	args_s = gap_cost['s'].to_tuple()
+	args_t = gap_cost['t'].to_tuple()
+	if args_s != args_t:
+		raise RuntimeError(
+			f'cannot derive non-unified gap costs for s and t: {args_s} != {args_t}')
+	if args_s[0] == 'exponential' and args_s[1] == 2:
+		return {
+			'default': 'Exponential',
+			'default_options': {
+				'k': int(1 / args_s[2])
+			}
+		}
+	elif args_s[0] == 'linear':
+		return {
+			'default': 'Linear',
+			'default_options': {
+				'k': args_s[1]
+			}
+		}
+	elif args_s[0] == 'constant':
+		return {
+			'default': 'Constant',
+			'default_options': {
+				'k': args_s[1]
+			}
+		}
+	else:
+		raise RuntimeError(f'cannot decompose gap cost specification {args_s}')
+
+
 class AlignmentAlgorithmWidget:
-	def __init__(self, iquery, parameters, indent='5em', similarity=None):
+	def __init__(self, iquery, klass, alignment=None, indent='5em', similarity=None):
+		if alignment is not None:
+			gap_cost_widget_args = derive_gap_cost_args(alignment.gap)
+		else:
+			gap_cost_widget_args = {
+				'default': 'Exponential'
+			}
+
+		self._gap_cost = GapCostWidget(iquery, **gap_cost_widget_args)
+		self._gap_mask = GapMaskWidget(iquery)
+
+		self._klass = klass
 		self._token_sim = TokenSimilarityMetricWidget(iquery, similarity)
 
+		parameters = [self._gap_cost.widget, self._gap_mask.widget]
 		if parameters is None:
 			self._vbox = widgets.VBox([
 				self._token_sim.widget])
@@ -563,18 +606,6 @@ class AlignmentAlgorithmWidget:
 	def describe_token_sim(self):
 		return self._token_sim.describe()
 
-	def describe_alignment(self):
-		raise NotImplementedError()
-
-
-class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None, klass=vectorian.alignment.GlobalAlignment, **kwargs):
-		self._gap_cost = GapCostWidget(iquery, default="Exponential")
-		self._gap_mask = GapMaskWidget(iquery)
-		self._klass = klass
-		super().__init__(
-			iquery, [self._gap_cost.widget, self._gap_mask.widget], **kwargs)
-
 	def make(self):
 		gap = self._gap_cost.make()
 		mask = self._gap_mask.get()
@@ -588,31 +619,19 @@ class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
 		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
 
 
-class SemiGlobalAlignmentWidget(GlobalAlignmentWidget):
+class GlobalAlignmentWidget(AlignmentAlgorithmWidget):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, klass=vectorian.alignment.GlobalAlignment, **kwargs)
+
+
+class SemiGlobalAlignmentWidget(AlignmentAlgorithmWidget):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs, klass=vectorian.alignment.SemiGlobalAlignment)
 
 
 class LocalAlignmentWidget(AlignmentAlgorithmWidget):
-	def __init__(self, iquery, alignment=None, **kwargs):
-		self._gap_cost = GapCostWidget(iquery, default="Exponential")
-		self._gap_mask = GapMaskWidget(iquery)
-		super().__init__(
-			iquery,
-			[self._gap_cost.widget, self._gap_mask.widget],
-			**kwargs)
-
-	def make(self):
-		gap = self._gap_cost.make()
-		mask = self._gap_mask.get()
-		return vectorian.alignment.LocalAlignment(
-			gap={
-				's': gap if 's' in mask else vectorian.alignment.ConstantGapCost(0),
-				't': gap if 't' in mask else vectorian.alignment.ConstantGapCost(0)
-			})
-
-	def describe_alignment(self):
-		return "with " + self._gap_cost.describe() + self._gap_mask.describe()
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs, klass=vectorian.alignment.LocalAlignment)
 
 
 class WordMoversDistanceWidget(AlignmentAlgorithmWidget):

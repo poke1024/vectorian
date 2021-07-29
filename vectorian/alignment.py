@@ -21,17 +21,14 @@ class AlignmentStrategy(SpanFlowStrategy):
 	the order of both sequences.
 	"""
 
-	def _make_args(self, locality, gaps, **kwargs):
-		locality_enum = core.pyalign.Locality.__members__[locality.upper()]
-
-		return dict({
+	def _make_args(self, locality, gaps):
+		return {
 			'algorithm': 'pyalign',
 			'options': {
-				'locality': locality_enum,
-				'gap_cost': gaps,
-				'zero_sim': kwargs.get('zero', 0)
+				'locality': locality,
+				'gap_cost': gaps
 			}
-		}, **kwargs)
+		}
 
 
 class TransportStrategy(SpanFlowStrategy):
@@ -76,6 +73,10 @@ class GlobalAlignment(AlignmentStrategy):
 		if not all(k in ("s", "t") for k in gap.keys()):
 			raise ValueError(gap)
 
+	@property
+	def gap(self):
+		return self._gap
+
 	def to_description(self, partition):
 		return {
 			'GlobalAlignment': {
@@ -84,7 +85,7 @@ class GlobalAlignment(AlignmentStrategy):
 		}
 
 	def to_args(self, partition):
-		return self._make_args("global", self._gap)
+		return self._make_args(core.pyalign.Locality.GLOBAL, self._gap)
 
 
 class SemiGlobalAlignment(AlignmentStrategy):
@@ -103,6 +104,10 @@ class SemiGlobalAlignment(AlignmentStrategy):
 		if not all(k in ("s", "t") for k in gap.keys()):
 			raise ValueError(gap)
 
+	@property
+	def gap(self):
+		return self._gap
+
 	def to_description(self, partition):
 		return {
 			'SemiGlobalAlignment': {
@@ -111,7 +116,7 @@ class SemiGlobalAlignment(AlignmentStrategy):
 		}
 
 	def to_args(self, partition):
-		return self._make_args("semiglobal", self._gap)
+		return self._make_args(core.pyalign.Locality.SEMIGLOBAL, self._gap)
 
 
 class LocalAlignment(AlignmentStrategy):
@@ -148,11 +153,14 @@ class LocalAlignment(AlignmentStrategy):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Dict[str, GapCost], zero: float = 0):
+	def __init__(self, gap: Dict[str, GapCost]):
 		self._gap = gap
-		self._zero = zero
 		if not all(k in ("s", "t") for k in gap.keys()):
 			raise ValueError(gap)
+
+	@property
+	def gap(self):
+		return self._gap
 
 	def to_description(self, partition):
 		return {
@@ -163,7 +171,7 @@ class LocalAlignment(AlignmentStrategy):
 		}
 
 	def to_args(self, partition):
-		return self._make_args("local", self._gap, zero=self._zero)
+		return self._make_args(core.pyalign.Locality.LOCAL, self._gap)
 
 
 class WordMoversDistance(TransportStrategy):

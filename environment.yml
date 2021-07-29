@@ -13,7 +13,7 @@ dependencies:
   - pip
   - pip:
       - pybind11~=2.6.2
-      - pyalign~=0.3
+      - pyalign==0.3.3
       - smart-open>=3.0.0, <4.0.0
       - tqdm>=4.56.2
       - spacy>=3.0.0
