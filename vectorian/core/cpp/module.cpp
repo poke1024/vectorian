@@ -12,6 +12,8 @@
 #include "query.h"
 #include "document.h"
 #include "result_set.h"
+#include "pyalign/algorithm/pyalign.h"
+#include "metric/alignment.h"
 
 namespace py = pybind11;
 
@@ -137,6 +139,9 @@ PYBIND11_MODULE(core, m) {
 	result_set.def("best_n", &ResultSet::best_n);
 	result_set.def("extend", &ResultSet::extend);
 
-	//py::class_<ExternalMetric, ExternalMetricRef> ext_metric(m, "ExternalMetric");
-	//ext_metric.def(py::init<const std::string&>());
+	// additional pyalign definitions here.
+
+	py::module pyalign_m = m.def_submodule("pyalign");
+	pyalign::register_solver<PyAlignOptions>(pyalign_m);
+	pyalign::register_enum(pyalign_m);
 }

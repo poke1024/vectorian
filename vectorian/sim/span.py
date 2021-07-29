@@ -2,7 +2,7 @@ from vectorian.alignment import SpanFlowStrategy, LocalAlignment
 from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
 from vectorian.sim.token import AbstractTokenSimilarity
 from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
-
+from vectorian.alignment import ConstantGapCost
 
 class SpanSimilarity:
 	def create_index(self, partition):
@@ -24,7 +24,10 @@ class SpanFlowSimilarity(SpanSimilarity):
 			raise TypeError(token_sim)
 
 		if flow_strategy is None:
-			flow_strategy = LocalAlignment()
+			flow_strategy = LocalAlignment(gap={
+				's': ConstantGapCost(0),
+				't': ConstantGapCost(0)
+			})
 
 		if not isinstance(flow_strategy, SpanFlowStrategy):
 			raise TypeError(flow_strategy)

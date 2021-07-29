@@ -155,4 +155,10 @@ struct GapMask {
 	bool v; // apply gap penalty to query
 };
 
+#define PYALIGN_FEATURES_DTW 0
+#define PYALIGN_FEATURES_SCORE_ONLY 0
+#define PYALIGN_FEATURES_MINIMIZE 0
+#define PYALIGN_FEATURES_ALL_SOLUTIONS 0
+
 #endif // __VECTORIAN_COMMON_H__
+

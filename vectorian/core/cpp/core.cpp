@@ -98,8 +98,7 @@ cfg['sources'] = [
 	'common.cpp',
 	'result_set.cpp',
 	'document.cpp',
-	'../lib/ppk_assert/src/ppk_assert.cpp',
-	'../lib/pyalign/pyalign/algorithm/factory.cpp']
+	'../lib/ppk_assert/src/ppk_assert.cpp']
 
 if platform.system() == 'Darwin':  # >= macOS 10.14.6
 	cfg['compiler_args'].append("-stdlib=libc++")

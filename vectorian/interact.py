@@ -6,6 +6,7 @@ import vectorian.alignment
 import vectorian.embeddings
 import vectorian.metrics
 import vectorian.session
+import vectorian.core as core
 
 
 ROOT_LEVEL_STYLE = {'description_width': '10em'}
@@ -483,7 +484,7 @@ class ConstantGapCostWidget(SlidingGapCostWidget):
 
 class LinearGapCostWidget(SlidingGapCostWidget):
 	def __init__(self, iquery):
-		super().__init__(iquery, 'Cost:', vectorian.alignment.AffineGapCost)
+		super().__init__(iquery, 'Cost:', vectorian.alignment.LinearGapCost)
 
 	def describe(self):
 		return "**linear gap cost** of **%.2f**" % self._cost.value
@@ -718,16 +719,19 @@ class AlignmentWidget(FineTuneableWidget):
 			kwargs['default_options'] = {}
 
 		if alignment is not None:
+			def map_alignment(args):
+				locality = args['options']['locality']
+				to_str = dict((v, k) for k, v in core.pyalign.Locality.__members__.items())
+				return f'{to_str[locality].capitalize()} Alignment'
+
 			mapping = {
-				#'needleman-wunsch': 'Needleman-Wunsch',
-				#'smith-waterman': 'Smith-Waterman',
-				'alignment/local/general': 'Local Alignment',
-				'word-movers-distance': 'Word Movers Distance (WMD)',
-				'word-rotators-distance': 'Word Rotators Distance (WRD)'
+				'pyalign': map_alignment,
+				'word-movers-distance': lambda args: 'Word Movers Distance (WMD)',
+				'word-rotators-distance': lambda args: 'Word Rotators Distance (WRD)'
 			}
 
 			args = alignment.to_args(iquery.partition)
-			kwargs['default'] = mapping[args['algorithm']]
+			kwargs['default'] = mapping[args['algorithm']](args)
 			kwargs['default_options']['alignment'] = alignment
 
 		if similarity is not None:

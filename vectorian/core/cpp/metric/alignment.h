@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "pyalign/algorithm/factory.h"
+#include "pyalign/algorithm/pyalign.h"
 #include "alignment/wmd.h"
 #include "alignment/wrd.h"
 
@@ -123,10 +124,10 @@ struct AlignerFactory {
 	}
 };
 
-template<typename Algorithm>
+template<typename Options, typename Algorithm>
 class InjectiveAlignment {
 public:
-	typedef std::shared_ptr<pyalign::SolverImpl<Algorithm>> SolverInstanceRef;
+	typedef std::shared_ptr<pyalign::SolverImpl<Options, Algorithm>> SolverInstanceRef;
 	typedef std::function<SolverInstanceRef(size_t, size_t)> SolverFactory;
 
 	typedef typename Algorithm::index_type index_type;
@@ -173,14 +174,17 @@ protected:
 
 	class FlowAlignment {
 		float m_score;
-
-	public:
 		InjectiveFlowRef<index_type> m_flow;
 
+	public:
 		inline FlowAlignment() {
 		}
 
 		inline FlowAlignment(const InjectiveFlowRef<index_type> &p_flow) : m_flow(p_flow) {
+		}
+
+		inline const InjectiveFlowRef<index_type> &flow() const {
+			return m_flow;
 		}
 
 		inline void resize(const size_t len_s, const size_t len_t) {
@@ -264,24 +268,26 @@ public:
 			FlowAlignmentFactory{p_result_set, m_cached_flow, m_max_len_t});
 
 		const float aligner_score = alignments[0].score();
+		const auto &flow = alignments[0].flow();
+		PPK_ASSERT(flow.get() != nullptr);
 
 		const float score_max = reference_score(
-			p_matcher->query(), p_slice, m_cached_flow->max_score(p_slice));
+			p_matcher->query(), p_slice, flow->max_score(p_slice));
 		const auto score = Score(aligner_score, score_max);
 
 		if (Hook) {
 			call_debug_hook(
-				p_matcher->query(), p_slice, m_cached_flow, aligner_score);
+				p_matcher->query(), p_slice, flow, aligner_score);
 		}
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
 				p_matcher,
 				p_slice.id(),
-				alignments[0].m_flow,
+				flow,
 				score);
 		} else {
-			m_cached_flow = alignments[0].m_flow;
+			m_cached_flow = flow;
 			return MatchRef();
 		}
 	}
@@ -345,8 +351,74 @@ public:
 	}
 };
 
-template<typename SliceFactory>
-class MakePyalignMatcher {
+class PyAlignOptions {
+public:
+	typedef float value_type;
+	typedef int16_t index_type;
+
+private:
+	struct alignment {
+		inline alignment(const py::dict &p_options) :
+			locality(p_options.contains("locality") ?
+				p_options["locality"].cast<pyalign::enums::Locality>() : pyalign::enums::Locality::LOCAL),
+			gap_costs(p_options.contains("gap_cost") ?
+				p_options["gap_cost"] : py::none().cast<py::object>()) {
+		}
+
+		const pyalign::enums::Locality locality;
+		const pyalign::GapCosts<value_type> gap_costs;
+	};
+
+	const py::dict m_options;
+	const alignment m_alignment;
+
+public:
+	inline PyAlignOptions(
+		const py::dict &p_options) :
+
+		m_options(p_options),
+		m_alignment(p_options) {
+	}
+
+	inline py::dict to_dict() {
+		return m_options;
+	}
+
+	inline constexpr pyalign::enums::Type type() const {
+		return pyalign::enums::Type::ALIGNMENT;
+	}
+
+	inline constexpr bool batch() const {
+		return false;
+	}
+
+	inline constexpr pyalign::enums::Direction direction() const {
+		return pyalign::enums::Direction::MAXIMIZE;
+	}
+
+	inline constexpr pyalign::enums::Detail detail() const {
+		return pyalign::enums::Detail::ALIGNMENT;
+	}
+
+	inline constexpr pyalign::enums::Count count() const {
+		return pyalign::enums::Count::ONE;
+	}
+
+	inline pyalign::enums::Locality locality() const {
+		return m_alignment.locality;
+	}
+
+	inline const pyalign::GapCosts<value_type> &gap_costs() const {
+		return m_alignment.gap_costs;
+	}
+
+	inline std::shared_ptr<PyAlignOptions> clone() const {
+		return std::make_shared<PyAlignOptions>(m_options);
+	}
+};
+
+template<typename Options, typename SliceFactory>
+class MakePyAlignMatcher {
 private:
 	const QueryRef m_query;
 	const DocumentRef m_document;
@@ -354,7 +426,10 @@ private:
 	const SliceFactory m_slice_factory;
 
 public:
-	MakePyalignMatcher(
+	typedef typename Options::value_type Value;
+	typedef typename Options::index_type Index;
+
+	MakePyAlignMatcher(
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
 		const MetricRef &p_metric,
@@ -369,7 +444,6 @@ public:
 
 	template<
 		typename Algorithm,
-		typename Options,
 		typename... Args>
 	auto make(
 		const Options &p_options,
@@ -379,7 +453,7 @@ public:
 			const size_t p_max_len_s,
 			const size_t p_max_len_t) {
 
-			return std::make_shared<pyalign::SolverImpl<Algorithm>>(
+			return std::make_shared<pyalign::SolverImpl<Options, Algorithm>>(
 				p_options,
 				p_max_len_s,
 				p_max_len_t,
@@ -387,8 +461,8 @@ public:
 		};
 
 		return make_matcher(m_query, m_document, m_metric, m_slice_factory,
-			std::move(InjectiveAlignment<Algorithm>("alignment", gen)),
-			InjectiveAlignment<Algorithm>::create_score_computer(m_slice_factory));
+			std::move(InjectiveAlignment<Options, Algorithm>("alignment", gen)),
+			InjectiveAlignment<Options, Algorithm>::create_score_computer(m_slice_factory));
 	}
 };
 
@@ -712,18 +786,16 @@ MatcherRef create_alignment_matcher(
 
 	} else*/
 
-	if (algo_parts.size() == 3 && algo_parts[0] == "alignment") {
+	if (algo_parts.size() == 1 && algo_parts[0] == "pyalign") {
 
-		// FIXME
+		const auto options = pyalign::create_options<PyAlignOptions>(
+			alignment_def["options"].cast<py::dict>());
 
-		const auto options = pyalign::create_options(
-			alignment_def["pyalign"].cast<py::dict>());
-
-		const auto make_matcher = MakePyalignMatcher<SliceFactory>(
+		const auto make_matcher = MakePyAlignMatcher<PyAlignOptions, SliceFactory>(
 			p_query, p_document, p_metric, p_factory);
 
-		const auto matcher = pyalign::create_solver_factory<MakePyalignMatcher<SliceFactory>, float, Index>(
-			options, make_matcher);
+		const auto matcher = pyalign::create_solver_factory(
+			*options.get(), make_matcher);
 
 		return matcher;
 
