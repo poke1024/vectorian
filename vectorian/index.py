@@ -9,7 +9,6 @@ import yaml
 import collections
 import contextlib
 import logging
-import faiss
 import functools
 
 from cached_property import cached_property
@@ -557,6 +556,8 @@ def augment_xq(xq):
 
 class PartitionEmbeddingIndex(Index):
 	def __init__(self, partition, metric, encoder, nlp, vectors=None, faiss_description='Flat'):
+		import faiss
+
 		super().__init__(partition, metric)
 
 		self._partition = partition
