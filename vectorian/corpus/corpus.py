@@ -1,4 +1,6 @@
 import vectorian.core as core
+import json
+import concurrent.futures
 
 from vectorian.corpus.document import Document
 from vectorian.importers import Importer
@@ -20,14 +22,35 @@ class Corpus:
 		self._ids.add(doc.unique_id)
 
 	@staticmethod
+	def _create_corpus_json(path):
+		path = Path(path)
+		names = []
+		for p in path.iterdir():
+			if p.suffix == ".txt":
+				names.append(p.name)
+		with open(path / "corpus.json", "w") as f:
+			f.write(json.dumps({
+				'docs': sorted(names)
+			}))
+
+	@staticmethod
 	def load(path):
 		path = Path(path)
-		docs = []
-		for p in sorted(path.iterdir()):
-			if p.suffix == ".txt":
-				doc = Document.load(p)
-				doc.metadata["origin"] = p
-				docs.append(doc)
+
+		if not (path / "corpus.json").exists():
+			Corpus._create_corpus_json(path)
+		with open(path / "corpus.json", "r") as f:
+			names = json.loads(f.read())["docs"]
+
+		def load_doc(name):
+			p = path / name
+			doc = Document.load(p)
+			doc.metadata["origin"] = p
+			return doc
+
+		with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+			docs = executor.map(load_doc, names)
+
 		return Corpus(docs)
 
 	def save(self, path):
@@ -35,6 +58,7 @@ class Corpus:
 		path.mkdir(exist_ok=True)
 		for doc in self._docs:
 			doc.save(path / (doc.caching_name + ".json"))
+		Corpus._create_corpus_json(path)
 
 	def __iter__(self):
 		for doc in self._docs:
