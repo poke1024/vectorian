@@ -23,6 +23,10 @@ include_dirs = [
 	base_path / 'core/cpp'
 ]
 
+conda_prefix = os.environ.get("CONDA_PREFIX")
+if conda_prefix is not None:
+	include_dirs.append(f"{conda_prefix}/include")
+
 macros = [('VECTORIAN_SETUP_PY', '1')]
 if os.environ.get("VECTORIAN_BLAS", False):
 	macros += [('VECTORIAN_BLAS', '1')]
