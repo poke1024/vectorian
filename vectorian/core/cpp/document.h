@@ -6,9 +6,6 @@
 #include "embedding/vectors.h"
 
 inline void add_dummy_token(std::vector<Token> &tokens) {
-	if (tokens.empty()) {
-		return;
-	}
 	// adding a last dummy token with the correct idx is handy.
 	Token t;
 	t.id = -1;
