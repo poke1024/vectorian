@@ -6,6 +6,7 @@ import contextlib
 import zipfile
 import h5py
 import uuid
+import logging
 
 from functools import lru_cache
 from slugify import slugify
@@ -420,11 +421,15 @@ class Document:
 		return self.metadata['title']
 
 	def prepare(self, session, doc_index):
-		names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
-		contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
+		try:
+			names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
+			contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
-		return PreparedDocument(
-			self, session, doc_index, contextual_embeddings)
+			return PreparedDocument(
+				self, session, doc_index, contextual_embeddings)
+		except:
+			logging.error(f"failed to prepare doc '{self.title}' [{self.unique_id}]")
+			raise
 
 
 class Token:

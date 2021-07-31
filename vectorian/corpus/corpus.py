@@ -13,8 +13,8 @@ class Corpus:
 	def __init__(self, docs=None):
 		if docs is None:
 			docs = []
-		self._docs = docs
-		self._ids = set([doc.unique_id for doc in docs])
+		self._docs = list(docs)
+		self._ids = set([doc.unique_id for doc in self._docs])
 
 	def add(self, doc):
 		assert doc.unique_id not in self._ids
@@ -60,9 +60,15 @@ class Corpus:
 			doc.save(path / (doc.caching_name + ".json"))
 		Corpus._create_corpus_json(path)
 
+	def __len__(self):
+		return len(self._docs)
+
 	def __iter__(self):
 		for doc in self._docs:
 			yield doc
+
+	def __getitem__(self, k):
+		return self._docs[k]
 
 
 class LazyCorpus:
