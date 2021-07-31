@@ -1,6 +1,7 @@
 import numpy as np
 import yaml
 import os
+import platform
 
 from pathlib import Path
 from setuptools import setup, find_packages
@@ -46,6 +47,9 @@ if os.environ.get("VECTORIAN_DEBUG", False) or \
 			'-fno-optimize-sibling-calls'
 		])
 		extra_link_args.append('-fsanitize=address')
+
+		if platform.system() == 'Linux':
+			extra_link_args.append('-static-libasan')
 else:
 	extra_compile_args.extend(['-O3'])
 
@@ -73,3 +77,11 @@ setup(
 	cmdclass={"build_ext": build_ext},
 	install_requires=required,
 )
+
+# some notes on debugging:
+
+# for linux asan, use:
+# LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)
+
+# debug with:
+# lldb python -- your_script.py
