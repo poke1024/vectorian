@@ -6,13 +6,19 @@
 #include "embedding/vectors.h"
 
 inline void add_dummy_token(std::vector<Token> &tokens) {
-	// adding a last dummy token with the correct idx is handy.
 	Token t;
 	t.id = -1;
-	t.idx = tokens.rbegin()->idx + tokens.rbegin()->len;
 	t.len = 0;
 	t.pos = -1;
 	t.tag = -1;
+
+	if (tokens.empty()) {
+		t.idx = 0;
+	} else {
+		t.idx = tokens.rbegin()->idx + tokens.rbegin()->len;
+	}
+
+	// adding a last dummy token with the correct idx is handy.
 	tokens.push_back(t);
 }
 
