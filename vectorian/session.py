@@ -4,6 +4,7 @@ import logging
 import collections
 import time
 import numpy as np
+import concurrent.futures
 
 from cached_property import cached_property
 from functools import lru_cache
@@ -54,8 +55,14 @@ class Collection:
 	def __init__(self, session, vocab, corpus):
 		self._vocab = vocab
 		self._docs = []
-		for i, doc in enumerate(corpus):
-			self._docs.append(doc.prepare(session, i))
+
+		with tqdm(desc="Preparing Documents", total=len(corpus)) as pbar:
+			def prepare_doc(i):
+				pbar.update(1)
+				return corpus[i].prepare(session, i)
+
+			with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
+				self._docs = executor.map(prepare_doc, range(len(corpus)))
 
 	@property
 	def documents(self):
