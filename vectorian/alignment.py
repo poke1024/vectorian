@@ -2,7 +2,7 @@ import vectorian.core as core
 import numpy as np
 import io
 
-from typing import Dict
+from typing import Dict, Union
 from pyalign.gaps import *
 
 
@@ -68,10 +68,11 @@ class GlobalAlignment(AlignmentStrategy):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Dict[str, GapCost]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
 		self._gap = gap
-		if not all(k in ("s", "t") for k in gap.keys()):
-			raise ValueError(gap)
+		if isinstance(gap, Dict):
+			if not all(k in ("s", "t") for k in gap.keys()):
+				raise ValueError(gap)
 
 	@property
 	def gap(self):
@@ -99,10 +100,11 @@ class SemiGlobalAlignment(AlignmentStrategy):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Dict[str, GapCost]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
 		self._gap = gap
-		if not all(k in ("s", "t") for k in gap.keys()):
-			raise ValueError(gap)
+		if isinstance(gap, Dict):
+			if not all(k in ("s", "t") for k in gap.keys()):
+				raise ValueError(gap)
 
 	@property
 	def gap(self):
@@ -153,10 +155,11 @@ class LocalAlignment(AlignmentStrategy):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Dict[str, GapCost]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
 		self._gap = gap
-		if not all(k in ("s", "t") for k in gap.keys()):
-			raise ValueError(gap)
+		if isinstance(gap, Dict):
+			if not all(k in ("s", "t") for k in gap.keys()):
+				raise ValueError(gap)
 
 	@property
 	def gap(self):
