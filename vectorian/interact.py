@@ -757,7 +757,7 @@ class AlignmentWidget(FineTuneableWidget):
 		return self._fine_tune.make_token_sim()
 
 	def make(self):
-		return vectorian.metrics.SpanFlowSimilarity(
+		return vectorian.metrics.NetworkFlowSimilarity(
 			token_sim=self.make_token_sim(),
 			flow_strategy=self.make_alignment())
 
@@ -819,7 +819,7 @@ class TagWeightedAlignmentWidget:
 		])
 
 	def make(self):
-		return vectorian.metrics.SpanFlowSimilarity(
+		return vectorian.metrics.NetworkFlowSimilarity(
 			token_sim=self._alignment.make_token_sim(),
 			flow_strategy=self._alignment.make_alignment(),
 			tag_weights=self._tag_weights)

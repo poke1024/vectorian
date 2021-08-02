@@ -13,7 +13,7 @@ from tqdm.autonotebook import tqdm
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSimilarity, TokenSimilarity, SpanFlowSimilarity, SpanSimilarity
+from vectorian.metrics import CosineSimilarity, TokenSimilarity, NetworkFlowSimilarity, SpanSimilarity
 from vectorian.embeddings import OpenedVectorsCache, Vectors
 
 
@@ -192,7 +192,7 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._embeddings[0]
-		return SpanFlowSimilarity(
+		return NetworkFlowSimilarity(
 			TokenSimilarity(
 				embedding, CosineSimilarity()))
 

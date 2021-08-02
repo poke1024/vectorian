@@ -98,7 +98,7 @@ session = vectorian.session.LabSession(
     normalizers="default")
 ```
 
-Now we create a `SpanFlowSimilarity`, which
+Now we create a `NetworkFlowSimilarity`, which
 is a special form of `SpanSimilarity` that allows us to
 specify the Waterman-Smith-Beyer alignment algorithm.
 Note that we base this alignment on a concept of token similarity
@@ -110,11 +110,10 @@ token_similarity = vectorian.similarity.TokenSimilarity(
     glove,
     vectorian.similarity.CosineSimilarity())
 
-span_similarity = vectorian.similarity.SpanFlowSimilarity(
+span_similarity = vectorian.similarity.NetworkFlowSimilarity(
     token_sim=token_similarity,
-    flow_strategy=vectorian.alignment.WatermanSmithBeyer(
-        gap=vectorian.alignment.smooth_gap_cost(5),
-        zero=0.25))
+    flow_strategy=vectorian.alignment.LocalAlignment(
+        gap=vectorian.alignment.smooth_gap_cost(5)))
 ```
 
 By creating `Partition` on a "sentence" level we instruct the

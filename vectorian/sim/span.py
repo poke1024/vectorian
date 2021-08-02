@@ -4,6 +4,7 @@ from vectorian.sim.token import AbstractTokenSimilarity
 from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
 from vectorian.alignment import ConstantGapCost
 
+
 class SpanSimilarity:
 	def create_index(self, partition):
 		raise NotImplementedError()
@@ -12,7 +13,7 @@ class SpanSimilarity:
 		raise NotImplementedError()
 
 
-class SpanFlowSimilarity(SpanSimilarity):
+class NetworkFlowSimilarity(SpanSimilarity):
 	def __init__(
 		self,
 		token_sim: AbstractTokenSimilarity,
