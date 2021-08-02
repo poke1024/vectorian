@@ -68,8 +68,9 @@ class TokenTable:
 		return len(self._token_idx)
 
 	def add_many(self, table, base_mask):
-		texts = list(self._normalizers['token'].token_to_text_many(self._text, table))
-		texts = list(map(self._norm_text, texts))
+		texts = list(map(
+			self._norm_text,
+			self._normalizers['token'].token_to_text_many(self._text, table)))
 		token_mask = np.logical_and(
 			base_mask,
 			np.array([x and len(x.strip()) > 0 for x in texts], dtype=np.bool))
@@ -77,22 +78,20 @@ class TokenTable:
 		n = len(table)
 		assert n == len(texts)
 
-		start = table["start"]
-		end = table["end"]
-		pos = table["pos"]
-		tag = table["tag"]
+		start = table["start"][token_mask]
+		end = table["end"][token_mask]
 
-		for i, norm_text in enumerate(texts):
-			if not token_mask[i]:
-				continue
+		assert len(self._token_idx) == 0
+		assert len(self._token_len) == 0
+		assert len(self._token_pos) == 0
+		assert len(self._token_tag) == 0
+		assert len(self._token_str) == 0
 
-			self._token_idx.append(start[i])
-			self._token_len.append(end[i] - start[i])
-
-			self._token_pos.append(pos[i] or "")
-			self._token_tag.append(tag[i] or "")
-
-			self._token_str.append(norm_text)
+		self._token_idx = start
+		self._token_len = end - start
+		self._token_pos = [(x or "") for i, x in enumerate(table["pos"]) if token_mask[i]]
+		self._token_tag = [(x or "") for i, x in enumerate(table["tag"]) if token_mask[i]]
+		self._token_str = [x for i, x in enumerate(texts) if token_mask[i]]
 
 		return token_mask
 
