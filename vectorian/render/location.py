@@ -14,11 +14,25 @@ class PlayLocationFormatter:
 			scene = location.get("scene", 0)
 			line = location.get("line", 0)
 
-			speaker = metadata["speakers"].get(speaker, "")
+			data = document.metadata["locations"]["data"]
+			speaker = data["speakers"].get(speaker, "")
 			if act > 0:
 				return Location(speaker, "%s.%d, line %d" % (roman.toRoman(act), scene, line))
 			else:
 				return Location(speaker, "line %d" % line)
+		else:
+			return None
+
+
+class MarkdownLocationFormatter:
+	def __call__(self, document, location):
+		heading_i = location.get("heading", None)
+		if heading_i is not None:
+			data = document.metadata["locations"]["data"]
+			heading = data["headings"][heading_i]
+
+			paragraph = location["paragraph"]
+			return Location("", heading + (", par. %d" % paragraph))
 		else:
 			return None
 
@@ -52,18 +66,23 @@ class TextLocationFormatter:
 
 class LocationFormatter:
 	def __init__(self):
-		self._formatters = [
-			PlayLocationFormatter(),
-			BookLocationFormatter(),
-			TextLocationFormatter()]
+		self._formatters = {
+			'play': PlayLocationFormatter(),
+			'markdown': MarkdownLocationFormatter(),
+			'book': BookLocationFormatter(),
+			'text': TextLocationFormatter()
+		}
 
-	def add(self, formatter):
-		self._formatters.append(formatter)
+	def add(self, type_, formatter):
+		self._formatters[type_] = formatter
 
 	def __call__(self, document, location):
-		for f in self._formatters:
-			x = f(document, location)
-			# print(f, "returned", x, "on", location)
-			if x:
-				return x
-		return None
+		locations = document.metadata.get("locations")
+		if not locations:
+			return None
+
+		formatter = self._formatters.get(locations["type"])
+		if not formatter:
+			return None
+
+		return formatter(document, location)

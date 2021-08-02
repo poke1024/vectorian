@@ -102,7 +102,7 @@ def make_tokens_dict(tokens):
 
 
 Metadata = namedtuple(
-	"Metadata", ["version", "unique_id", "origin", "author", "title", "speakers"])
+	"Metadata", ["version", "unique_id", "origin", "author", "title", "locations"])
 
 
 class Importer:
@@ -321,7 +321,7 @@ class NovelImporter(Importer):
 			origin=str(path),
 			author=author,
 			title=title,
-			speakers={})
+			locations={'type': 'book'})
 
 		return self._make_doc(
 			md, paragraphs, ['book', 'chapter', 'paragraph'], locations)
@@ -397,10 +397,86 @@ class PlayShakespeareImporter(Importer):
 			origin=str(path),
 			author="William Shakespeare",
 			title=root.find(".//title").text,
-			speakers={v: full_speaker_names.get(k, k) for k, v in speakers.items()})
+			locations={
+				'type': 'play',
+				'data': {
+					'speakers': {v: full_speaker_names.get(k, k) for k, v in speakers.items()}
+				}
+			})
 
 		return self._make_doc(
 			md, texts, ['act', 'scene', 'speaker', 'line'], locations)
+
+
+class MarkdownImporter(Importer):
+	# a generic importer for markdown texts.
+
+	_sections = re.compile(
+		r"\n#([^\n]+)\n", re.IGNORECASE)
+
+	def __call__(self, path, unique_id=None, author="", title=None):
+		path = Path(path)
+
+		if title is None:
+			title = path.stem
+
+		if unique_id is None:
+			unique_id = f"{author}/{title}"
+
+		with open(path, "r") as f:
+			text = "\n" + self._preprocess_text(f.read())
+
+		heading_breaks = []
+		for m in MarkdownImporter._sections.finditer(text):
+			heading = m.group(1).strip()
+			heading_breaks.append((heading, m.start(0)))
+
+		sections = []
+		headings = []
+		locations = []
+
+		def add_section(heading, s):
+			s = s.strip()
+			if not s:
+				return
+
+			s = "\n".join(s.split("\n")[2:])
+			paragraphs = s.split("\n\n")
+
+			h_key = len(headings)
+			headings.append(heading)
+			for i, paragraph in enumerate(paragraphs):
+				sections.append(paragraph)
+				locations.append((h_key, i + 1))
+
+		if heading_breaks:
+			first_break = heading_breaks[0][1]
+			if first_break > 0:
+				s = text[:first_break]
+				if s:
+					add_section("", s)
+
+			heading_breaks.append(("", len(text)))
+			for ((heading, s), (_, e)) in zip(heading_breaks, heading_breaks[1:]):
+				add_section(heading, text[s:e])
+		else:
+			add_section("", text)
+
+		md = Metadata(
+			version="1.0",
+			unique_id=unique_id,
+			origin=str(path),
+			author=author,
+			title=title,
+			locations={
+				'type': 'markdown',
+				'data': {
+					'headings': headings
+				}
+			})
+
+		return self._make_doc(
+			md, sections, ['heading', 'paragraph'], locations)
 
 
 class StringImporter(Importer):
@@ -420,7 +496,7 @@ class StringImporter(Importer):
 			origin="<string>",
 			author=author,
 			title=title,
-			speakers={})
+			locations={'type': 'text'})
 
 		return self._make_doc(
 			md, [self._preprocess_text(s)], [], locations, show_progress=show_progress)
