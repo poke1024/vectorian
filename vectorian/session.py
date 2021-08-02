@@ -61,8 +61,8 @@ class Collection:
 				pbar.update(1)
 				return corpus[i].prepare(session, i)
 
-			with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
-				self._docs = executor.map(prepare_doc, range(len(corpus)))
+			with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+				self._docs = list(executor.map(prepare_doc, range(len(corpus))))
 
 	@property
 	def documents(self):
