@@ -85,3 +85,6 @@ setup(
 
 # debug with:
 # lldb python -- your_script.py
+
+# forcing clang on Linux:
+# export CC=clang
