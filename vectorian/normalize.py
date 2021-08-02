@@ -1,4 +1,5 @@
 import re
+import numpy as np
 
 
 def chain(callables):
@@ -54,32 +55,43 @@ class RewrittenDict:
 			return self._base[k]
 
 
-def make_rewrite(rules):
-	if rules is None:
-		return lambda t: t
+class Rewrite:
+	def __init__(self, rules):
+		self._rules = rules
 
-	def f(t):
+	def transform_table(self, dset):
+		for attr, rewrites in self._rules.items():
+			values = dset[attr]
+			for src, dst in rewrites.items():
+				values[values == src] = dst
+			dset[attr] = values
+
+	def transform_token(self, t):
 		t_new = dict()
-		for k, v in rules.items():
-			x = v.get(t[k])
+		for attr, rewrites in self._rules.items():
+			x = rewrites.get(t[attr])
 			if x is not None:
-				t_new[k] = x
+				t_new[attr] = x
 		return RewrittenDict(t, t_new) if t_new else t
 
-	return f
 
+class Ignore:
+	def __init__(self, rules):
+		self._rules = rules
 
-def make_ignore(rules):
-	if rules is None:
-		return lambda t: False
+	def ignore_table(self, dset):
+		mask = np.zeros((len(dset),), dtype=np.bool)
+		for k, vs in self._rules.items():
+			values = dset[k]
+			for v in vs:
+				mask = np.logical_or(mask, values == v)
+		return np.logical_not(mask)
 
-	def f(t):
-		for k, v in rules.items():
+	def ignore_token(self, t):
+		for k, v in self._rules.items():
 			if t[k] in v:
 				return True
 		return False
-
-	return f
 
 
 class TextNormalizer:
@@ -115,20 +127,34 @@ class TokenNormalizer:
 	def token_to_text(self, text, token):
 		raise NotImplementedError()
 
+	def token_to_token_many(self, table):
+		raise NotImplementedError()
+
+	def token_to_text_many(self, text, table):
+		raise NotImplementedError()
+
 
 class SimpleTokenNormalizer(TokenNormalizer):
 	def __init__(self, rewrite=None, ignore=None):
-		self._rewrite = make_rewrite(rewrite)
-		self._ignore = make_ignore(ignore)
+		self._rewrite = Rewrite(rewrite)
+		self._ignore = Ignore(ignore)
 
 	def token_to_token(self, token):
-		token = self._rewrite(token)
-		if self._ignore(token):
+		token = self._rewrite.transform_token(token)
+		if self._ignore.ignore_token(token):
 			return None
 		return token
 
 	def token_to_text(self, text, token):
 		return text[token["start"]:token["end"]]
+
+	def token_to_token_many(self, table):
+		self._rewrite.transform_table(table)
+		return self._ignore.ignore_table(table)
+
+	def token_to_text_many(self, text, table):
+		for start, end in zip(table["start"], table["end"]):
+			yield text[start:end]
 
 
 def normalizer_dict(normalizers):

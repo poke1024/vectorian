@@ -60,11 +60,41 @@ class TokenTable:
 		self._token_tag = []  # tag_ from spacy's Token
 		self._token_str = []
 
+		self._normalizers = normalizers
 		self._make_text = normalizers['token'].token_to_text
 		self._norm_text = normalizers['text'].to_callable()
 
 	def __len__(self):
 		return len(self._token_idx)
+
+	def add_many(self, table, base_mask):
+		texts = list(self._normalizers['token'].token_to_text_many(self._text, table))
+		texts = list(map(self._norm_text, texts))
+		token_mask = np.logical_and(
+			base_mask,
+			np.array([x and len(x.strip()) > 0 for x in texts], dtype=np.bool))
+
+		n = len(table)
+		assert n == len(texts)
+
+		start = table["start"]
+		end = table["end"]
+		pos = table["pos"]
+		tag = table["tag"]
+
+		for i, norm_text in enumerate(texts):
+			if not token_mask[i]:
+				continue
+
+			self._token_idx.append(start[i])
+			self._token_len.append(end[i] - start[i])
+
+			self._token_pos.append(pos[i] or "")
+			self._token_tag.append(tag[i] or "")
+
+			self._token_str.append(norm_text)
+
+		return token_mask
 
 	def add(self, token):
 		norm_text = self._norm_text(self._make_text(self._text, token)) or ""
@@ -123,6 +153,26 @@ class DocumentStorage:
 		raise NotImplementedError()
 
 
+class Table:
+	def __init__(self, get, count):
+		self._col = {}
+		self._get = get
+		self._count = count
+
+	def __len__(self):
+		return self._count
+
+	def __getitem__(self, k):
+		data = self._col.get(k)
+		if data is None:
+			data = self._get(k)
+			self._col[k] = data
+		return data
+
+	def __setitem__(self, k, v):
+		self._col[k] = v
+
+
 class Tokens:
 	pass
 
@@ -154,6 +204,9 @@ class InternalMemoryTokens(Tokens):
 	def __iter__(self):
 		for i in range(len(self)):
 			yield InternalMemoryTokens.TokenData(self._data, i)
+
+	def to_table(self):
+		return Table(self._data.get, len(self))
 
 	def save_to_h5(self, hf):
 		for k, v in self._tokens.items():
@@ -228,6 +281,9 @@ class ExternalMemoryTokens(Tokens):
 		get = self._column
 		for i in range(len(self)):
 			yield ExternalMemoryTokens.TokenData(self._hf, get, i)
+
+	def to_table(self):
+		return Table(self._column, len(self))
 
 	def close(self):
 		self._hf.close()
@@ -520,18 +576,17 @@ class PreparedDocument:
 
 		self._session = session
 
-		token_mapper = session.normalizer('token').token_to_token
-
 		with storage.tokens() as tokens:
+			token_to_token = session.normalizer('token').token_to_token_many
+			table = tokens.to_table()
+			token_base_mask = token_to_token(table)
+
 			with storage.text(self._session) as text:
-				token_table = TokenTable(text.get(), self._session.normalizers)
+				token_table = TokenTable(
+					text.get(), self._session.normalizers)
 
-				token_mask = np.zeros((len(tokens),), dtype=np.bool)
-
-				for i, token in enumerate(tokens):
-					t = token_mapper(token)
-					if t:
-						token_mask[i] = token_table.add(t)
+				token_mask = token_table.add_many(
+					table, token_base_mask)
 
 		with storage.spans() as spans:
 			reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
