@@ -144,21 +144,11 @@ SessionEmbedding = collections.namedtuple(
 
 
 class Session:
-	def __init__(self, docs, embeddings=None, normalizers=None):
+	def __init__(self, docs, embeddings=None):
 		if embeddings is None:
 			embeddings = []
 
-		if normalizers == "default":
-			normalizers = normalize.default_normalizers()
-
 		self._embedding_manager = core.EmbeddingManager()
-
-		if any(e.is_static for e in embeddings) and not normalizers:
-			logging.warning("got static embeddings but no normalizers.")
-
-		if normalizers is None:
-			normalizers = {}
-		self._normalizers = normalize.normalizer_dict(normalizers)
 
 		self._embeddings = tuple(embeddings)
 
@@ -233,13 +223,6 @@ class Session:
 		if window_step is None:
 			window_step = window_size
 		return Partition(self, level, window_size, window_step)
-
-	@property
-	def normalizers(self):
-		return self._normalizers
-
-	def normalizer(self, stage):
-		return self._normalizers[stage]
 
 	def word_vec(self, embedding, token_or_tokens):
 		from vectorian.corpus.document import Token

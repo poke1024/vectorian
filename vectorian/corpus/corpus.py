@@ -3,6 +3,8 @@ import json
 import concurrent.futures
 import numpy as np
 import h5py
+import collections
+import enum
 
 from vectorian.corpus.document import Document
 from vectorian.importers import Importer
@@ -10,6 +12,113 @@ from pathlib import Path
 from tqdm.autonotebook import tqdm
 from collections import namedtuple
 from typing import Dict
+
+
+class CorpusDB:
+	class Stage(enum.Enum):
+		PREFLIGHT = 0
+		ADD = 1
+
+	def __init__(self, path, normalizers):
+		self._file = h5py.File(path, "w")
+
+		self._normalizers = normalizers
+		self._make_text = normalizers['token'].token_to_text
+		self._token_to_token = normalizers['token'].token_to_token_many
+		self._norm_text = normalizers['text'].to_callable()
+
+		self._mappings = collections.defaultdict(dict)
+		self._enums = {}
+
+		self._stage = None
+
+	def close(self):
+		self._file.close()
+
+	@staticmethod
+	def make(path, normalizers, docs):
+		db = CorpusDB(path, normalizers)
+		try:
+			for stage in (CorpusDB.Stage.PREFLIGHT, CorpusDB.Stage.ADD):
+				db.set_stage(stage)
+				for doc in docs:
+					db.add(doc)
+		finally:
+			db.close()
+
+	def _add_mappings(self, attr, value):
+		m = self._mappings[attr]
+		if value not in m:
+			m[value] = len(m)
+
+	def _make_enum(self, attr):
+		mapping = self._mappings[attr]
+		return h5py.enum_dtype(mapping, basetype=np.min_scalar_type(len(mapping)))
+
+	def set_stage(self, stage: Stage):
+		if stage == CorpusDB.Stage.ADD:
+			for attr in self._mappings.keys():
+				self._enums[attr] = self._make_enum(attr)
+		self._stage = stage
+
+	def _add(self, doc, text, table, base_mask):
+		texts = list(map(
+			self._norm_text,
+			self._normalizers['token'].token_to_text_many(text, table)))
+		token_mask = np.logical_and(
+			base_mask,
+			np.array([x and len(x.strip()) > 0 for x in texts], dtype=np.bool))
+
+		data = {
+			'pos': [(x or "") for i, x in enumerate(table["pos"]) if token_mask[i]],
+			'tag': [(x or "") for i, x in enumerate(table["tag"]) if token_mask[i]],
+			'str': [x for i, x in enumerate(texts) if token_mask[i]]
+		}
+
+		assert len(table) == len(texts)
+
+		if self._stage == CorpusDB.Stage.PREFLIGHT:
+			for k, xs in data.items():
+				for x in xs:
+					self._add_mappings(k, x)
+
+		elif self._stage == CorpusDB.Stage.ADD:
+			start = table["start"][token_mask]
+			end = table["end"][token_mask]
+
+			doc_group = self._file.create_group(doc.unique_id)
+
+			doc_group.attrs['origin'] = str(doc.metadata['origin'])
+			doc_group.attrs['token_mask'] = token_mask
+
+			dset_tokens = doc_group.create_dataset(
+				'span',
+				(len(start), 2),
+				dtype=np.uint32)
+
+			dset_tokens[:, 0] = start
+			dset_tokens[:, 1] = end - start
+
+			n = start.shape[0]
+
+			for k, v in data.items():
+				mapping = self._mappings[k]
+				dset = doc_group.create_dataset(
+					k,
+					(n,),
+					dtype=self._enums[k])
+				dset[:] = [mapping[x] for x in v]
+
+		else:
+			raise ValueError(f"unknown stage {self._stage}")
+
+	def add(self, doc):
+		with doc.storage.tokens() as tokens:
+			table = tokens.to_table()
+			base_mask = self._token_to_token(table)
+
+			with doc.storage.text() as text:
+				self._add(doc, text.get(), table, base_mask)
 
 
 class Corpus:
@@ -59,7 +168,7 @@ class Corpus:
 	def save(self, path):
 		names = set()
 		for doc in self._docs:
-			name = doc.caching_name
+			name = doc.unique_id
 			if name not in names:
 				names.add(name)
 			else:
@@ -83,19 +192,8 @@ class Corpus:
 	def __getitem__(self, k):
 		return self._docs[k]
 
-	def prepare(self, normalizers: Dict):
-		database = CorpusDB(normalizers)
-		token_to_token = normalizers['token'].token_to_token_many
-
-		for doc_index, doc in enumerate(self._docs):
-			with doc.storage.tokens() as tokens:
-				table = tokens.to_table()
-				token_base_mask = token_to_token(table)
-
-				with doc.storage.text() as text:
-					database.add_doc(
-						text, table, token_base_mask)
-
+	def save_compact(self, path, normalizers: Dict):
+		CorpusDB.make(path, normalizers, self._docs)
 
 
 class LazyCorpus:

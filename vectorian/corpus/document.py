@@ -50,77 +50,20 @@ def convert_idx_len_to_utf8(text, idx, len):
 	pass  # FIXME
 
 
-class TokenTable:
-	def __init__(self, text, normalizers):
-		self._text = text
+def corpus_db_data_to_dict(doc_group):
+	span = doc_group["span"]
 
-		self._token_idx = []
-		self._token_len = []
-		self._token_pos = []  # pos_ from spacy's Token
-		self._token_tag = []  # tag_ from spacy's Token
-		self._token_str = []
+	max_len = np.iinfo(np.uint8).max
+	if np.any(span[:, 1] > max_len):
+		raise RuntimeError(f"token len > {max_len} is not supported")
 
-		self._normalizers = normalizers
-		self._make_text = normalizers['token'].token_to_text
-		self._norm_text = normalizers['text'].to_callable()
-
-	def __len__(self):
-		return len(self._token_idx)
-
-	def add_many(self, table, base_mask):
-		texts = list(map(
-			self._norm_text,
-			self._normalizers['token'].token_to_text_many(self._text, table)))
-		token_mask = np.logical_and(
-			base_mask,
-			np.array([x and len(x.strip()) > 0 for x in texts], dtype=np.bool))
-
-		n = len(table)
-		assert n == len(texts)
-
-		start = table["start"][token_mask]
-		end = table["end"][token_mask]
-
-		assert len(self._token_idx) == 0
-		assert len(self._token_len) == 0
-		assert len(self._token_pos) == 0
-		assert len(self._token_tag) == 0
-		assert len(self._token_str) == 0
-
-		self._token_idx = start
-		self._token_len = end - start
-		self._token_pos = [(x or "") for i, x in enumerate(table["pos"]) if token_mask[i]]
-		self._token_tag = [(x or "") for i, x in enumerate(table["tag"]) if token_mask[i]]
-		self._token_str = [x for i, x in enumerate(texts) if token_mask[i]]
-
-		return token_mask
-
-	def add(self, token):
-		norm_text = self._norm_text(self._make_text(self._text, token)) or ""
-		if len(norm_text.strip()) > 0:
-			self._token_idx.append(token["start"])
-			self._token_len.append(token["end"] - token["start"])
-
-			self._token_pos.append(token.get("pos", "") or "")
-			self._token_tag.append(token.get("tag", "") or "")
-
-			self._token_str.append(norm_text)
-			return True
-		else:
-			return False
-
-	def to_dict(self):
-		max_len = np.iinfo(np.uint8).max
-		if any(x > max_len for x in self._token_len):
-			raise RuntimeError(f"token len > {max_len} is not supported")
-
-		return {
-			'str': self._token_str,
-			'idx': np.array(self._token_idx, dtype=np.uint32),
-			'len': np.array(self._token_len, dtype=np.uint8),
-			'pos': self._token_pos,
-			'tag': self._token_tag
-		}
+	return {
+		'str': [str(x) for x in doc_group["str"]],
+		'idx': np.array(span[:, 0], dtype=np.uint32),
+		'len': np.array(span[:, 1], dtype=np.uint8),
+		'pos': [str(x) for x in doc_group["pos"]],
+		'tag': [str(x) for x in doc_group["tag"]]
+	}
 
 
 class Lengths:
@@ -480,13 +423,13 @@ class Document:
 	def title(self):
 		return self.metadata['title']
 
-	def prepare(self, session, doc_index):
+	def prepare(self, session, doc_index, corpus_db):
 		try:
 			names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
 			contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 			return PreparedDocument(
-				self, session, doc_index, contextual_embeddings)
+				self, session, doc_index, corpus_db, contextual_embeddings)
 		except:
 			logging.error(f"failed to prepare doc '{self.title}' [{self.unique_id}]")
 			raise
@@ -574,23 +517,16 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, doc, session, doc_index, contextual_embeddings):
+	def __init__(self, doc, session, doc_index, corpus_db, contextual_embeddings):
 		self._doc = doc
-		storage = doc.storage
-
 		self._session = session
 
-		with storage.tokens() as tokens:
-			token_to_token = session.normalizer('token').token_to_token_many
-			table = tokens.to_table()
-			token_base_mask = token_to_token(table)
+		storage = doc.storage
+		self._metadata = storage.metadata
 
-			with storage.text() as text:
-				token_table = TokenTable(
-					text.get(), self._session.normalizers)
-
-				token_mask = token_table.add_many(
-					table, token_base_mask)
+		uid = self.unique_id
+		doc_group = corpus_db[uid]
+		token_mask = doc_group.attrs["token_mask"]
 
 		with storage.spans() as spans:
 			reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
@@ -605,13 +541,11 @@ class PreparedDocument:
 		self._contextual_embeddings = dict(
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())
 
-		self._metadata = storage.metadata
-
 		self._compiled = core.Document(
 			doc_index,
 			session.vocab,
 			self._spans,
-			token_table.to_dict(),
+			corpus_db_data_to_dict(doc_group),
 			self._metadata,
 			self._contextual_embeddings)
 
