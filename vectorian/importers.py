@@ -135,6 +135,10 @@ class Importer:
 		return text
 
 	def _make_doc(self, md, partitions, loc_ax, locations, show_progress=True):
+
+		if not md.unique_id:
+			raise ValueError("unique id for document must not be empty")
+
 		pipe = self._nlp.pipe(
 			partitions,
 			batch_size=self._batch_size,

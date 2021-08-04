@@ -304,7 +304,7 @@ class InternalMemoryDocumentStorage(DocumentStorage):
 		yield self._json
 
 	@contextlib.contextmanager
-	def text(self, session):
+	def text(self, cache=None):
 		yield InternalMemoryText(self._text)
 
 	@contextlib.contextmanager
@@ -329,20 +329,20 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 	@property
 	def metadata(self):
 		if self._metadata is None:
-			with zipfile.ZipFile(self._path.with_suffix('.zip'), 'r') as zf:
+			with zipfile.ZipFile(self._path / "info.zip", 'r') as zf:
 				self._load_metadata(zf)
 		return self._metadata
 
 	@contextlib.contextmanager
 	def json(self):
-		with zipfile.ZipFile(self._path.with_suffix('.zip'), 'r') as zf:
+		with zipfile.ZipFile(self._path / "info.zip", 'r') as zf:
 			if self._metadata is None:
 				self._load_metadata(zf)
 			yield json.loads(zf.read('data.json'))
 
 	@contextlib.contextmanager
-	def text(self, session):
-		text = ExternalMemoryText(self._path.with_suffix('.txt'))
+	def text(self, cache=None):
+		text = ExternalMemoryText(self._path / "document.txt")
 		try:
 			yield text
 		finally:
@@ -350,7 +350,7 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def tokens(self):
-		tokens = ExternalMemoryTokens(self._path.with_suffix(".tok.h5"))
+		tokens = ExternalMemoryTokens(self._path / "tokens.h5")
 
 		try:
 			yield tokens
@@ -359,7 +359,7 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def spans(self):
-		with h5py.File(self._path.with_suffix(".spn.h5"), "r") as hf:
+		with h5py.File(self._path / "spans.h5", "r") as hf:
 			spans = dict()
 			for name in hf.keys():
 				data = dict()
@@ -388,9 +388,11 @@ class Document:
 	@staticmethod
 	def load(path):
 		path = Path(path)
+		if path.suffix != ".document":
+			raise ValueError(f"document path '{path}' must end in '.document'")
 
 		contextual_embeddings = dict()
-		emb_path = path.with_suffix(".embeddings")
+		emb_path = path / "embeddings"
 		emb_json_path = emb_path / "info.json"
 		if emb_json_path.exists():
 			with open(emb_json_path, "r") as f:
@@ -404,29 +406,32 @@ class Document:
 	def save(self, path):
 		path = Path(path)
 
+		if path.suffix != ".document":
+			raise ValueError(f"document path '{path}' must end in '.document'")
+
 		with self._storage.json() as data:
-			with zipfile.ZipFile(path.with_suffix(".zip"), "w") as zf:
+			with zipfile.ZipFile(path / "info.zip", "w") as zf:
 				zf.writestr("data.json", json.dumps(data))
 
 		with self._storage.tokens() as tokens:
-			with h5py.File(path.with_suffix(".tok.h5"), "w") as hf:
+			with h5py.File(path / "tokens.h5", "w") as hf:
 				tokens.save_to_h5(hf)
 
 		with self._storage.spans() as spans:
-			with h5py.File(path.with_suffix(".spn.h5"), "w") as hf:
+			with h5py.File(path / "spans.h5", "w") as hf:
 				for name, data in spans.items():
 					g = hf.create_group(name)
 					for k, v in data.items():
 						g.create_dataset(k, data=v)
 
-		with self._storage.text(None) as text:
-			with open(path.with_suffix(".txt"), "w") as f:
+		with self._storage.text() as text:
+			with open(path / "document.txt", "w") as f:
 				f.write(text.get())
 
 		if self._contextual_embeddings:
 			emb_data = dict()
 
-			emb_path = path.with_suffix(".embeddings")
+			emb_path = path / "embeddings"
 			emb_path.mkdir(exist_ok=True)
 
 			for k, vectors in self._contextual_embeddings.items():
@@ -580,7 +585,7 @@ class PreparedDocument:
 			table = tokens.to_table()
 			token_base_mask = token_to_token(table)
 
-			with storage.text(self._session) as text:
+			with storage.text() as text:
 				token_table = TokenTable(
 					text.get(), self._session.normalizers)
 
@@ -653,7 +658,7 @@ class PreparedDocument:
 
 	@contextlib.contextmanager
 	def text(self):
-		with self.storage.text(self._session) as text:
+		with self.storage.text() as text:
 			yield text
 
 	def token(self, i):

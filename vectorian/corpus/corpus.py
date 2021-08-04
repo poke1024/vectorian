@@ -1,12 +1,15 @@
 import vectorian.core as core
 import json
 import concurrent.futures
+import numpy as np
+import h5py
 
 from vectorian.corpus.document import Document
 from vectorian.importers import Importer
 from pathlib import Path
 from tqdm.autonotebook import tqdm
 from collections import namedtuple
+from typing import Dict
 
 
 class Corpus:
@@ -26,11 +29,11 @@ class Corpus:
 		path = Path(path)
 		names = []
 		for p in path.iterdir():
-			if p.suffix == ".txt":
+			if p.suffix == ".document":
 				names.append(p.name)
 		with open(path / "corpus.json", "w") as f:
 			f.write(json.dumps({
-				'docs': sorted(names)
+				'documents': sorted(names)
 			}))
 
 	@staticmethod
@@ -40,7 +43,7 @@ class Corpus:
 		if not (path / "corpus.json").exists():
 			Corpus._create_corpus_json(path)
 		with open(path / "corpus.json", "r") as f:
-			names = json.loads(f.read())["docs"]
+			names = json.loads(f.read())["documents"]
 
 		def load_doc(name):
 			p = path / name
@@ -54,10 +57,20 @@ class Corpus:
 		return Corpus(docs)
 
 	def save(self, path):
+		names = set()
+		for doc in self._docs:
+			name = doc.caching_name
+			if name not in names:
+				names.add(name)
+			else:
+				raise ValueError(f"non-unique document name '{name}'")
+
 		path = Path(path)
 		path.mkdir(exist_ok=True)
 		for doc in self._docs:
-			doc.save(path / (doc.caching_name + ".json"))
+			doc_path = path / (doc.caching_name + ".document")
+			doc_path.mkdir(exist_ok=False)
+			doc.save(doc_path)
 		Corpus._create_corpus_json(path)
 
 	def __len__(self):
@@ -69,6 +82,20 @@ class Corpus:
 
 	def __getitem__(self, k):
 		return self._docs[k]
+
+	def prepare(self, normalizers: Dict):
+		database = CorpusDB(normalizers)
+		token_to_token = normalizers['token'].token_to_token_many
+
+		for doc_index, doc in enumerate(self._docs):
+			with doc.storage.tokens() as tokens:
+				table = tokens.to_table()
+				token_base_mask = token_to_token(table)
+
+				with doc.storage.text() as text:
+					database.add_doc(
+						text, table, token_base_mask)
+
 
 
 class LazyCorpus:
