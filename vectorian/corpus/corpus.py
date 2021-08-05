@@ -18,7 +18,7 @@ class FlavorRecord:
 
 	@property
 	def token_mask(self):
-		return self._doc_group.attrs["token_mask"]
+		return self._doc_group["token_mask"]
 
 	def _unmap(self, attr):
 		xs = self._doc_group[attr]
@@ -140,8 +140,10 @@ class FlavorBuilder:
 			except ValueError as err:
 				raise RuntimeError(f"could not create group {unique_id} in {self._root}: {err}")
 
-			#doc_group.attrs['origin'] = str(doc.metadata['origin'])
-			doc_group.attrs['token_mask'] = token_mask
+			doc_group.create_dataset(
+				'token_mask',
+				data=token_mask,
+				dtype=np.bool)
 
 			dset_tokens = doc_group.create_dataset(
 				'span',
