@@ -5,6 +5,7 @@ import collections
 import enum
 import uuid
 import sqlite3
+import contextlib
 
 from vectorian.corpus.document import Document
 from pathlib import Path
@@ -44,13 +45,14 @@ class FlavorRecord:
 class FlavorCache:
 	def __init__(self, root):
 		self._root = root
-		self._documents_group = root.require_group('documents')
-		self._mappings_group = root.require_group('mappings')
+		self._documents_group = root['documents']
+		self._mappings_group = root['mappings']
 
 		self._mappings = {}
 		for k in self._mappings_group.keys():
 			dset = self._mappings_group[k]
-			self._mappings[k] = dset
+			n = dset.shape[0]
+			self._mappings[k] = [str(dset[i]) for i in range(n)]
 
 	def get(self, unique_id):
 		return FlavorRecord(
@@ -65,8 +67,8 @@ class FlavorBuilder:
 
 	def __init__(self, root, normalizers):
 		self._root = root
-		self._documents_group = root.require_group('documents')
-		self._mappings_group = root.require_group('mappings')
+		self._documents_group = root.create_group('documents')
+		self._mappings_group = root.create_group('mappings')
 
 		self._normalizers = normalizers
 		self._make_text = normalizers['token'].token_to_text
@@ -79,13 +81,14 @@ class FlavorBuilder:
 		self._stage = None
 
 	@staticmethod
-	def make(file, flavor, docs):
-		db = FlavorBuilder(file, flavor.normalizers)
+	def make(root, flavor, docs):
+		builder = FlavorBuilder(root, flavor.normalizers)
+
 		with tqdm(total=2 * len(docs), desc=f"Adding Flavor '{flavor.name}'") as pbar:
 			for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
-				db.set_stage(stage)
+				builder.set_stage(stage)
 				for unique_id, doc in docs.items():
-					db.add(unique_id, doc)
+					builder.add(unique_id, doc)
 					pbar.update(1)
 
 	def _add_mappings(self, attr, value):
@@ -185,11 +188,12 @@ class Corpus:
 		self._path = path
 
 		self._documents_path = path / "documents"
-		#self._documents_path.mkdir(exist_ok=True)
+		self._flavors_path = path / "flavors"
+		self._flavors_path.mkdir(exist_ok=True)
 
 		self._corpus_h5 = h5py.File(path / "corpus.h5", "a")
 		self._documents_group = self._corpus_h5.require_group("documents")
-		self._flavors_group = self._corpus_h5.require_group("flavors")
+		#self._flavors_group = self._corpus_h5.require_group("flavors")
 
 		self._corpus_sql = sqlite3.connect(path / "corpus.db")
 
@@ -229,20 +233,32 @@ class Corpus:
 		self._conn.close()
 
 	def add_flavor(self, flavor):
-		FlavorBuilder.make(
-			self._flavors_group.create_group(flavor.name),
-			flavor,
-			self._docs)
+		path = self._flavors_path / f"{flavor.name}.h5"
+		if path.exists():
+			raise RuntimeError(f"flavor {flavor.name} already exists")
+		with h5py.File(path, 'w') as hf:
+			FlavorBuilder.make(
+				hf,
+				flavor,
+				self._docs)
 
 	def del_flavor(self, flavor_name):
-		del self._flavors_group[flavor_name]
+		p = self._flavors_path / f"{flavor_name}.h5"
+		if p.exists() and p.is_file():
+			p.unlink()
 
 	@property
 	def flavors(self):
-		return list(self._flavors_group.keys())
+		names = []
+		for p in self._flavors_path.iterdir():
+			if p.suffix == ".h5":
+				names.append(p.stem)
+		return names
 
-	def get_flavor_cache(self, flavor_name):
-		return FlavorCache(self._flavors_group[flavor_name])
+	@contextlib.contextmanager
+	def flavor_cache(self, flavor_name):
+		with h5py.File(self._flavors_path / f"{flavor_name}.h5", 'r') as hf:
+			yield FlavorCache(hf)
 
 	def get_unique_id(self, doc):
 		return self._doc_to_unique_id[id(doc)]
@@ -261,11 +277,14 @@ class Corpus:
 		if unique_id in self._documents_group or unique_id in self._docs:
 			raise ValueError("failed to create uuid for doc")
 
-		doc.save_to_corpus(
-			unique_id,
-			self._documents_path / unique_id,
-			self._corpus_sql,
-			self._documents_group.create_group(unique_id))
+		try:
+			doc.save_to_corpus(
+				unique_id,
+				self._documents_path / unique_id,
+				self._corpus_sql,
+				self._documents_group.create_group(unique_id))
+		finally:
+			self._corpus_h5.flush()
 
 		self._add_doc(unique_id, doc)
 
