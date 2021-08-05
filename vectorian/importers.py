@@ -243,7 +243,11 @@ class TextImporter(Importer):
 			origin=origin,
 			author=author,
 			title=title,
-			speakers={})
+			locations={
+				'type': 'text',
+				'data': {
+				}
+			})
 
 		return self._make_doc(
 			md, paragraphs, ['paragraph'], locations)
