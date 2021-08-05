@@ -108,22 +108,6 @@ class ExternalSqliteText(Text):
 		pass
 
 
-def corpus_db_data_to_dict(doc_group):
-	span = doc_group["span"]
-
-	max_len = np.iinfo(np.uint8).max
-	if np.any(span[:, 1] > max_len):
-		raise RuntimeError(f"token len > {max_len} is not supported")
-
-	return {
-		'str': [str(x) for x in doc_group["str"]],
-		'idx': np.array(span[:, 0], dtype=np.uint32),
-		'len': np.array(span[:, 1], dtype=np.uint8),
-		'pos': [str(x) for x in doc_group["pos"]],
-		'tag': [str(x) for x in doc_group["tag"]]
-	}
-
-
 class Lengths:
 	def __init__(self, start, end):
 		self._start = start
@@ -524,13 +508,13 @@ class Document:
 	def title(self):
 		return self.metadata['title']
 
-	def prepare(self, corpus, session):
+	def prepare(self, corpus, flavor_cache, session):
 		try:
 			names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
 			contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 			return PreparedDocument(
-				corpus, session, self, contextual_embeddings)
+				corpus, flavor_cache, session, self, contextual_embeddings)
 		except:
 			logging.error(f"failed to prepare doc '{corpus.get_unique_id(self)}'")
 			raise
@@ -618,7 +602,7 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, corpus, session, doc, contextual_embeddings):
+	def __init__(self, corpus, flavor_cache, session, doc, contextual_embeddings):
 		self._doc = doc
 		self._session = session
 
@@ -626,9 +610,9 @@ class PreparedDocument:
 		self._metadata = storage.metadata
 
 		uid = corpus.get_unique_id(doc)
-		flavor_group = corpus.get_flavor(session.flavor.name)
-		doc_group = flavor_group[uid]
-		token_mask = doc_group.attrs["token_mask"]
+		flavor_record = flavor_cache.get(uid)
+
+		token_mask = flavor_record.token_mask
 
 		with storage.spans() as spans:
 			reindex = np.cumsum(np.concatenate(([False], token_mask)), dtype=np.int32)
@@ -647,7 +631,7 @@ class PreparedDocument:
 			corpus.get_doc_index(doc),
 			session.vocab,
 			self._spans,
-			corpus_db_data_to_dict(doc_group),
+			flavor_record.to_dict(),
 			self._metadata,
 			self._contextual_embeddings)
 

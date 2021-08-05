@@ -11,6 +11,53 @@ from pathlib import Path
 from tqdm.autonotebook import tqdm
 
 
+class FlavorRecord:
+	def __init__(self, doc_group, mappings):
+		self._doc_group = doc_group
+		self._mappings = mappings
+
+	@property
+	def token_mask(self):
+		return self._doc_group.attrs["token_mask"]
+
+	def _unmap(self, attr):
+		xs = self._doc_group[attr]
+		m = self._mappings[attr]
+		return [m[i] for i in xs]
+
+	def to_dict(self):
+		span = self._doc_group["span"]
+
+		max_len = np.iinfo(np.uint8).max
+		if np.any(span[:, 1] > max_len):
+			raise RuntimeError(f"token len > {max_len} is not supported")
+
+		return {
+			'str': self._unmap('str'),
+			'idx': np.array(span[:, 0], dtype=np.uint32),
+			'len': np.array(span[:, 1], dtype=np.uint8),
+			'pos': self._unmap('pos'),
+			'tag': self._unmap('tag')
+		}
+
+
+class FlavorCache:
+	def __init__(self, root):
+		self._root = root
+		self._documents_group = root.require_group('documents')
+		self._mappings_group = root.require_group('mappings')
+
+		self._mappings = {}
+		for k in self._mappings_group.keys():
+			dset = self._mappings_group[k]
+			self._mappings[k] = dset
+
+	def get(self, unique_id):
+		return FlavorRecord(
+			self._documents_group[unique_id],
+			self._mappings)
+
+
 class FlavorBuilder:
 	class Stage(enum.Enum):
 		PREFLIGHT = 0
@@ -18,6 +65,8 @@ class FlavorBuilder:
 
 	def __init__(self, root, normalizers):
 		self._root = root
+		self._documents_group = root.require_group('documents')
+		self._mappings_group = root.require_group('mappings')
 
 		self._normalizers = normalizers
 		self._make_text = normalizers['token'].token_to_text
@@ -40,18 +89,25 @@ class FlavorBuilder:
 					pbar.update(1)
 
 	def _add_mappings(self, attr, value):
+		if not isinstance(value, str):
+			raise ValueError(f"expected str, got '{value}'")
 		m = self._mappings[attr]
 		if value not in m:
 			m[value] = len(m)
 
-	def _make_enum(self, attr):
+	def _add_mapping(self, attr):
+		dt = h5py.string_dtype(encoding='utf8')
 		mapping = self._mappings[attr]
-		return h5py.enum_dtype(mapping, basetype=np.min_scalar_type(len(mapping)))
+
+		self._mappings_group.create_dataset(
+			attr,
+			data=[x.encode("utf8") for x, _ in sorted(mapping.items(), key=lambda x: x[1])],
+			dtype=dt)
 
 	def set_stage(self, stage: Stage):
 		if stage == FlavorBuilder.Stage.ADD:
 			for attr in self._mappings.keys():
-				self._enums[attr] = self._make_enum(attr)
+				self._add_mapping(attr)
 		self._stage = stage
 
 	def _add(self, unique_id, doc, text, table, base_mask):
@@ -80,11 +136,11 @@ class FlavorBuilder:
 			end = table["end"][token_mask]
 
 			try:
-				doc_group = self._root.create_group(unique_id)
+				doc_group = self._documents_group.create_group(unique_id)
 			except ValueError as err:
 				raise RuntimeError(f"could not create group {unique_id} in {self._root}: {err}")
 
-			doc_group.attrs['origin'] = str(doc.metadata['origin'])
+			#doc_group.attrs['origin'] = str(doc.metadata['origin'])
 			doc_group.attrs['token_mask'] = token_mask
 
 			dset_tokens = doc_group.create_dataset(
@@ -102,7 +158,7 @@ class FlavorBuilder:
 				dset = doc_group.create_dataset(
 					k,
 					(n,),
-					dtype=self._enums[k])
+					dtype=np.min_scalar_type(len(mapping)))
 				dset[:] = [mapping[x] for x in v]
 
 		else:
@@ -176,12 +232,15 @@ class Corpus:
 			flavor,
 			self._docs)
 
+	def del_flavor(self, flavor_name):
+		del self._flavors_group[flavor_name]
+
 	@property
 	def flavors(self):
 		return list(self._flavors_group.keys())
 
-	def get_flavor(self, flavor):
-		return self._flavors_group[flavor]
+	def get_flavor_cache(self, flavor_name):
+		return FlavorCache(self._flavors_group[flavor_name])
 
 	def get_unique_id(self, doc):
 		return self._doc_to_unique_id[id(doc)]

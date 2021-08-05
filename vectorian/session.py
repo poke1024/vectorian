@@ -56,10 +56,12 @@ class Collection:
 		self._vocab = vocab
 		self._docs = []
 
+		flavor_cache = corpus.get_flavor_cache(session.flavor.name)
+
 		with tqdm(desc="Preparing Documents", total=len(corpus)) as pbar:
 			def prepare_doc(doc):
 				pbar.update(1)
-				return doc.prepare(corpus, session)
+				return doc.prepare(corpus, flavor_cache, session)
 
 			with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
 				self._docs = list(executor.map(prepare_doc, corpus.docs))
