@@ -1,19 +1,14 @@
-import vectorian.core as core
-import json
 import concurrent.futures
 import numpy as np
 import h5py
 import collections
 import enum
 import uuid
+import sqlite3
 
 from vectorian.corpus.document import Document
-from vectorian.importers import Importer
 from pathlib import Path
 from tqdm.autonotebook import tqdm
-from collections import namedtuple
-from slugify import slugify
-from typing import Dict
 
 
 class FlavorBuilder:
@@ -128,15 +123,26 @@ class Corpus:
 		self._path = path
 
 		self._documents_path = path / "documents"
-		self._documents_path.mkdir(exist_ok=True)
+		#self._documents_path.mkdir(exist_ok=True)
 
 		self._corpus_h5 = h5py.File(path / "corpus.h5", "a")
 		self._documents_group = self._corpus_h5.require_group("documents")
 		self._flavors_group = self._corpus_h5.require_group("flavors")
 
+		self._corpus_sql = sqlite3.connect(path / "corpus.db")
+
+		with self._corpus_sql:
+			self._corpus_sql.execute('''
+				CREATE TABLE IF NOT EXISTS text(
+					unique_id TEXT PRIMARY KEY, content TEXT)''')
+
 		def load_doc(unique_id):
 			p = self._documents_path / unique_id
-			doc = Document.load_from_corpus(p, self._documents_group[unique_id])
+			doc = Document.load_from_corpus(
+				unique_id,
+				p,
+				self._corpus_sql,
+				self._documents_group[unique_id])
 			#doc.metadata["origin"] = p
 			return unique_id, doc
 
@@ -148,11 +154,17 @@ class Corpus:
 		self._ordered_docs = []
 
 		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-			for unique_id, doc in executor.map(load_doc, unique_ids):
+			for unique_id, doc in tqdm(
+				executor.map(load_doc, unique_ids),
+				total=len(unique_ids),
+				desc="Opening Corpus",
+				disable=len(unique_ids) < 1):
+
 				self._add_doc(unique_id, doc)
 
 	def close(self):
 		self._corpus_h5.close()
+		self._conn.close()
 
 	def add_flavor(self, flavor):
 		FlavorBuilder.make(
@@ -185,7 +197,9 @@ class Corpus:
 			raise ValueError("failed to create uuid for doc")
 
 		doc.save_to_corpus(
+			unique_id,
 			self._documents_path / unique_id,
+			self._corpus_sql,
 			self._documents_group.create_group(unique_id))
 
 		self._add_doc(unique_id, doc)
@@ -203,48 +217,3 @@ class Corpus:
 
 	def __getitem__(self, k):
 		return self._ordered_docs[k]
-
-
-class LazyCorpus:
-	def __init__(self, name):
-		self._src = []
-		self._path = Path.home() / ".vectorian" / "corpus" / name
-		self._path.mkdir(exist_ok=True, parents=True)
-
-	def add(self, path, importer: Importer, unique_id=None):
-		assert isinstance(importer, Importer)
-
-		Source = namedtuple("Source", [
-			"path",
-			"importer",
-			"unique_id"
-		])
-
-		path = Path(path)
-		if path.is_dir():
-			for p in path.iterdir():
-				self.add(p, importer=importer)
-		else:
-			if unique_id is None:
-				unique_id = path.stem
-			self._src.append(Source(
-				path=path,
-				importer=importer,
-				unique_id=unique_id
-			))
-
-	def _compile(self):
-		for src in tqdm(self._src):
-			p = self._path / (src.caching_name + ".json")
-			if p.exists():
-				continue
-			doc = src.importer(src.path)
-			doc.save(p)
-
-	def __iter__(self):
-		self._compile()
-
-		for p in sorted(self._path.iterdir()):
-			doc = Document.load(p)
-			doc["origin"] = p
-			yield doc

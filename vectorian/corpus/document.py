@@ -82,17 +82,30 @@ class ExternalMemoryText(Text):
 	def __init__(self, path):
 		self._f = open(path, "r")
 		self._text = self._f.read()
-		# FIXME
 
 	def get(self):
 		return self._text
 
 	def close(self):
 		self._f.close()
+		
+		
+class ExternalSqliteText(Text):
+	def __init__(self, doc_sql, unique_id):
+		self._doc_sql = doc_sql
+		self._unique_id = unique_id
 
+	def get(self):
+		cursor = self._doc_sql.cursor()
+		try:
+			cursor.execute("SELECT content FROM text WHERE unique_id=?", (self._unique_id,))
+			text = cursor.fetchone()[0]
+		finally:
+			cursor.close()
+		return text
 
-def convert_idx_len_to_utf8(text, idx, len):
-	pass  # FIXME
+	def close(self):
+		pass
 
 
 def corpus_db_data_to_dict(doc_group):
@@ -309,9 +322,11 @@ def _spans_from_h5(hf):
 
 
 class CorpusDocumentStorage(DocumentStorage):
-	def __init__(self, doc_path, doc_group):
+	def __init__(self, doc_path, doc_sql, doc_group, unique_id):
 		self._doc_path = doc_path
+		self._doc_sql = doc_sql
 		self._doc_group = doc_group
+		self._unique_id = unique_id
 
 	@cached_property
 	def metadata(self):
@@ -319,11 +334,14 @@ class CorpusDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def text(self, cache=None):
-		text = ExternalMemoryText(self._doc_path / "document.txt")
-		try:
-			yield text
-		finally:
-			text.close()
+		if self._doc_sql is None:
+			text = ExternalMemoryText(self._doc_path / "document.txt")
+			try:
+				yield text
+			finally:
+				text.close()
+		else:
+			yield ExternalSqliteText(self._doc_sql, self._unique_id)
 
 	@contextlib.contextmanager
 	def tokens(self):
@@ -379,9 +397,10 @@ class Document:
 		return name in self._contextual_embeddings
 
 	@staticmethod
-	def load_from_corpus(doc_path, doc_group):
+	def load_from_corpus(unique_id, doc_path, doc_sql, doc_group):
 		contextual_embeddings = Document._load_embeddings(doc_path)
-		return Document(CorpusDocumentStorage(doc_path, doc_group), contextual_embeddings)
+		return Document(CorpusDocumentStorage(
+			doc_path, doc_sql, doc_group, unique_id), contextual_embeddings)
 
 	@staticmethod
 	def load_from_fs(path):
@@ -392,7 +411,7 @@ class Document:
 		contextual_embeddings = Document._load_embeddings(path)
 		return Document(ExternalMemoryDocumentStorage(path), contextual_embeddings)
 
-	def save_to_corpus(self, doc_path, doc_group):
+	def save_to_corpus(self, unique_id, doc_path, doc_sql, doc_group):
 		doc_group.attrs["metadata"] = json.dumps(self._storage.metadata)
 
 		with self._storage.tokens() as tokens:
@@ -405,11 +424,17 @@ class Document:
 				for k, v in data.items():
 					g.create_dataset(k, data=v)
 
-		doc_path.mkdir(exist_ok=True)
-
 		with self._storage.text() as text:
-			with open(doc_path / "document.txt", "w") as f:
-				f.write(text.get())
+			if doc_sql is None:
+				doc_path.mkdir(exist_ok=True)
+
+				with open(doc_path / "document.txt", "w") as f:
+					f.write(text.get())
+			else:
+				with doc_sql:
+					doc_sql.execute('''
+						INSERT INTO text(unique_id, content) VALUES (?, ?)
+						''', (unique_id, text.get()))
 
 		self._save_embeddings(doc_path)
 
@@ -459,7 +484,7 @@ class Document:
 			emb_data = dict()
 
 			emb_path = path / "embeddings"
-			emb_path.mkdir(exist_ok=True)
+			emb_path.mkdir(exist_ok=True, parents=True)
 
 			for k, vectors in self._contextual_embeddings.items():
 				unique_name = uuid.uuid1().hex
