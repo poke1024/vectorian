@@ -221,7 +221,7 @@ class Importer:
 class TextImporter(Importer):
 	# an importer for plain text files that does not assume any structure.
 
-	def __call__(self, spec, author="", title=None):
+	def __call__(self, spec, author="", title=None, **kwargs):
 		text_base, title_base, origin = get_text_from_spec(spec)
 
 		if title is None:
@@ -234,6 +234,9 @@ class TextImporter(Importer):
 		paragraph_sep = "\n\n"
 		paragraphs = text.split(paragraph_sep)
 		paragraphs = [x + paragraph_sep for x in paragraphs[:-1]] + paragraphs[-1:]
+
+		if not paragraphs:
+			return None
 
 		for j, p in enumerate(paragraphs):
 			locations.append((j,))
@@ -250,7 +253,7 @@ class TextImporter(Importer):
 			})
 
 		return self._make_doc(
-			md, paragraphs, ['paragraph'], locations)
+			md, paragraphs, ['paragraph'], locations, **kwargs)
 
 
 class NovelImporter(Importer):
@@ -259,7 +262,7 @@ class NovelImporter(Importer):
 	_chapters = re.compile(
 		r"\n\n\n\W*chapter\s+(\d+)[^\n]*\n\n", re.IGNORECASE)
 
-	def __call__(self, path, author="Anonymous", title=None):
+	def __call__(self, path, author="Anonymous", title=None, **kwargs):
 		path = Path(path)
 
 		if title is None:
@@ -329,7 +332,7 @@ class NovelImporter(Importer):
 			locations={'type': 'book'})
 
 		return self._make_doc(
-			md, paragraphs, ['book', 'chapter', 'paragraph'], locations)
+			md, paragraphs, ['book', 'chapter', 'paragraph'], locations, **kwargs)
 
 
 class BodleianImporter(Importer):
@@ -352,7 +355,7 @@ class PlayShakespeareImporter(Importer):
 
 		return self(xml_path)
 
-	def __call__(self, path):
+	def __call__(self, path, **kwargs):
 		import xml.etree.ElementTree as ET
 		from collections import defaultdict
 
@@ -407,7 +410,7 @@ class PlayShakespeareImporter(Importer):
 			})
 
 		return self._make_doc(
-			md, texts, ['act', 'scene', 'speaker', 'line'], locations)
+			md, texts, ['act', 'scene', 'speaker', 'line'], locations, **kwargs)
 
 
 class MarkdownImporter(Importer):
@@ -416,7 +419,7 @@ class MarkdownImporter(Importer):
 	_sections = re.compile(
 		r"\n#([^\n]+)\n", re.IGNORECASE)
 
-	def __call__(self, text, author="", title=None):
+	def __call__(self, text, author="", title=None, **kwargs):
 
 		text_base, title_base, origin = get_text_from_spec(text)
 
@@ -474,4 +477,4 @@ class MarkdownImporter(Importer):
 			})
 
 		return self._make_doc(
-			md, sections, ['heading', 'paragraph'], locations)
+			md, sections, ['heading', 'paragraph'], locations, **kwargs)
