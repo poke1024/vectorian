@@ -30,12 +30,14 @@ class FlavorBuilder:
 		self._stage = None
 
 	@staticmethod
-	def make(file, normalizers, docs):
-		db = FlavorBuilder(file, normalizers)
-		for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
-			db.set_stage(stage)
-			for unique_id, doc in docs.items():
-				db.add(unique_id, doc)
+	def make(file, flavor, docs):
+		db = FlavorBuilder(file, flavor.normalizers)
+		with tqdm(total=2 * len(docs), desc=f"Adding Flavor '{flavor.name}'") as pbar:
+			for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
+				db.set_stage(stage)
+				for unique_id, doc in docs.items():
+					db.add(unique_id, doc)
+					pbar.update(1)
 
 	def _add_mappings(self, attr, value):
 		m = self._mappings[attr]
@@ -169,7 +171,7 @@ class Corpus:
 	def add_flavor(self, flavor):
 		FlavorBuilder.make(
 			self._flavors_group.create_group(flavor.name),
-			flavor.normalizers,
+			flavor,
 			self._docs)
 
 	@property
