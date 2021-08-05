@@ -19,10 +19,10 @@ class FlavorRecord:
 
 	@property
 	def token_mask(self):
-		return self._doc_group["token_mask"]
+		return np.array(self._doc_group["token_mask"])
 
 	def _unmap(self, attr):
-		xs = self._doc_group[attr]
+		xs = np.array(self._doc_group[attr])
 		m = self._mappings[attr]
 		return [m[i] for i in xs]
 
