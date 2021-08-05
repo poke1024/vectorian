@@ -1,6 +1,5 @@
 import re
 import logging
-import datetime
 import numpy as np
 import download
 
@@ -102,7 +101,7 @@ def make_tokens_dict(tokens):
 
 
 Metadata = namedtuple(
-	"Metadata", ["version", "unique_id", "origin", "author", "title", "locations"])
+	"Metadata", ["version", "origin", "author", "title", "locations"])
 
 
 class Importer:
@@ -135,9 +134,6 @@ class Importer:
 		return text
 
 	def _make_doc(self, md, partitions, loc_ax, locations, show_progress=True):
-
-		if not md.unique_id:
-			raise ValueError("unique id for document must not be empty")
 
 		pipe = self._nlp.pipe(
 			partitions,
@@ -215,14 +211,11 @@ class Importer:
 class TextImporter(Importer):
 	# an importer for plain text files that does not assume any structure.
 
-	def __call__(self, path, unique_id=None, author="Anonymous", title=None):
+	def __call__(self, path, author="Anonymous", title=None):
 		path = Path(path)
 
 		if title is None:
 			title = path.stem
-
-		if unique_id is None:
-			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
 			text = self._preprocess_text(f.read())
@@ -238,7 +231,6 @@ class TextImporter(Importer):
 
 		md = Metadata(
 			version="1.0",
-			unique_id=unique_id,
 			origin=str(path),
 			author=author,
 			title=title,
@@ -254,14 +246,11 @@ class NovelImporter(Importer):
 	_chapters = re.compile(
 		r"\n\n\n\W*chapter\s+(\d+)[^\n]*\n\n", re.IGNORECASE)
 
-	def __call__(self, path, unique_id=None, author="Anonymous", title=None):
+	def __call__(self, path, author="Anonymous", title=None):
 		path = Path(path)
 
 		if title is None:
 			title = path.stem
-
-		if unique_id is None:
-			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
 			text = self._preprocess_text(f.read())
@@ -321,7 +310,6 @@ class NovelImporter(Importer):
 
 		md = Metadata(
 			version="1.0",
-			unique_id=unique_id,
 			origin=str(path),
 			author=author,
 			title=title,
@@ -393,11 +381,8 @@ class PlayShakespeareImporter(Importer):
 					locations.append((actnum, scenenum, speaker_no, line_no))
 					texts.append(normalize_dashes(" ".join(lines)))
 
-		unique_name = f"{root.attrib['variant']}-{root.attrib['unique']}"
-
 		md = Metadata(
 			version="1.0",
-			unique_id="PlayShakespeare.com/William Shakespeare/play/" + unique_name,
 			origin=str(path),
 			author="William Shakespeare",
 			title=root.find(".//title").text,
@@ -418,14 +403,11 @@ class MarkdownImporter(Importer):
 	_sections = re.compile(
 		r"\n#([^\n]+)\n", re.IGNORECASE)
 
-	def __call__(self, path, unique_id=None, author="", title=None):
+	def __call__(self, path, author="", title=None):
 		path = Path(path)
 
 		if title is None:
 			title = path.stem
-
-		if unique_id is None:
-			unique_id = f"{author}/{title}"
 
 		with open(path, "r") as f:
 			text = "\n" + self._preprocess_text(f.read())
@@ -468,7 +450,6 @@ class MarkdownImporter(Importer):
 
 		md = Metadata(
 			version="1.0",
-			unique_id=unique_id,
 			origin=str(path),
 			author=author,
 			title=title,
@@ -486,17 +467,13 @@ class MarkdownImporter(Importer):
 class StringImporter(Importer):
 	# a generic importer for short text strings for ad-hoc experiments.
 
-	def __call__(self, s, unique_id=None, author="", title="", show_progress=False):
-		if unique_id is None:
-			unique_id = str(datetime.datetime.now())
-
+	def __call__(self, s, author="", title="", show_progress=False):
 		locations = [
 			[]
 		]
 
 		md = Metadata(
 			version="1.0",
-			unique_id=unique_id,
 			origin="<string>",
 			author=author,
 			title=title,
