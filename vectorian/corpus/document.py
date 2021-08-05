@@ -9,8 +9,8 @@ import uuid
 import logging
 
 from functools import lru_cache
-from slugify import slugify
 from pathlib import Path
+from cached_property import cached_property
 from vectorian.embeddings import MaskedVectorsRef, ExternalMemoryVectorsRef
 
 
@@ -235,8 +235,8 @@ class ExternalMemoryTokens(Tokens):
 		def __getitem__(self, key):
 			return self.get(key)
 
-	def __init__(self, path):
-		self._hf = h5py.File(path, 'r')
+	def __init__(self, hf):
+		self._hf = hf
 		self._cache = dict()
 
 	def _column(self, k):
@@ -272,24 +272,17 @@ class ExternalMemoryTokens(Tokens):
 	def to_table(self):
 		return Table(self._column, len(self))
 
-	def close(self):
-		self._hf.close()
-
 
 class InternalMemoryDocumentStorage(DocumentStorage):
-	def __init__(self, json, text, tokens, spans):
-		self._json = json
+	def __init__(self, metadata, text, tokens, spans):
+		self._metadata = metadata
 		self._text = text
 		self._tokens = InternalMemoryTokens(tokens)
 		self._spans = spans
 
 	@property
 	def metadata(self):
-		return self._json['metadata']
-
-	@contextlib.contextmanager
-	def json(self):
-		yield self._json
+		return self._metadata
 
 	@contextlib.contextmanager
 	def text(self, cache=None):
@@ -304,29 +297,51 @@ class InternalMemoryDocumentStorage(DocumentStorage):
 		yield self._spans
 
 
+def _spans_from_h5(hf):
+	spans = dict()
+	for name in hf.keys():
+		data = dict()
+		for k, v in hf[name].items():
+			data[k] = v
+		spans[name] = data
+
+	return spans
+
+
+class CorpusDocumentStorage(DocumentStorage):
+	def __init__(self, doc_path, doc_group):
+		self._doc_path = doc_path
+		self._doc_group = doc_group
+
+	@cached_property
+	def metadata(self):
+		return json.loads(self._doc_group.attrs["metadata"])
+
+	@contextlib.contextmanager
+	def text(self, cache=None):
+		text = ExternalMemoryText(self._doc_path / "document.txt")
+		try:
+			yield text
+		finally:
+			text.close()
+
+	@contextlib.contextmanager
+	def tokens(self):
+		yield ExternalMemoryTokens(self._doc_group["tokens"])
+
+	@contextlib.contextmanager
+	def spans(self):
+		yield _spans_from_h5(self._doc_group["spans"])
+
+
 class ExternalMemoryDocumentStorage(DocumentStorage):
 	def __init__(self, path):
 		self._path = Path(path)
-		self._metadata = None
 
-	def _load_metadata(self, zf):
-		data = json.loads(zf.read('data.json'))
-		self._metadata = data['metadata']
-		self._metadata['origin'] = str(self._path)
-
-	@property
+	@cached_property
 	def metadata(self):
-		if self._metadata is None:
-			with zipfile.ZipFile(self._path / "info.zip", 'r') as zf:
-				self._load_metadata(zf)
-		return self._metadata
-
-	@contextlib.contextmanager
-	def json(self):
-		with zipfile.ZipFile(self._path / "info.zip", 'r') as zf:
-			if self._metadata is None:
-				self._load_metadata(zf)
-			yield json.loads(zf.read('data.json'))
+		with open("metadata.json", "r") as f:
+			return json.loads(f.read())
 
 	@contextlib.contextmanager
 	def text(self, cache=None):
@@ -338,23 +353,13 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 
 	@contextlib.contextmanager
 	def tokens(self):
-		tokens = ExternalMemoryTokens(self._path / "tokens.h5")
-
-		try:
-			yield tokens
-		finally:
-			tokens.close()
+		with h5py.File(self._path / "tokens.h5", 'r') as hf:
+			yield ExternalMemoryTokens(hf)
 
 	@contextlib.contextmanager
 	def spans(self):
 		with h5py.File(self._path / "spans.h5", "r") as hf:
-			spans = dict()
-			for name in hf.keys():
-				data = dict()
-				for k, v in hf[name].items():
-					data[k] = v
-				spans[name] = data
-			yield spans
+			yield _spans_from_h5(hf)
 
 
 class Document:
@@ -374,32 +379,50 @@ class Document:
 		return name in self._contextual_embeddings
 
 	@staticmethod
-	def load(path):
+	def load_from_corpus(doc_path, doc_group):
+		contextual_embeddings = Document._load_embeddings(doc_path)
+		return Document(CorpusDocumentStorage(doc_path, doc_group), contextual_embeddings)
+
+	@staticmethod
+	def load_from_fs(path):
 		path = Path(path)
 		if path.suffix != ".document":
 			raise ValueError(f"document path '{path}' must end in '.document'")
 
-		contextual_embeddings = dict()
-		emb_path = path / "embeddings"
-		emb_json_path = emb_path / "info.json"
-		if emb_json_path.exists():
-			with open(emb_json_path, "r") as f:
-				emb_data = json.loads(f.read())
-
-			for k, slug_name in emb_data.items():
-				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / slug_name)
-
+		contextual_embeddings = Document._load_embeddings(path)
 		return Document(ExternalMemoryDocumentStorage(path), contextual_embeddings)
 
-	def save(self, path):
+	def save_to_corpus(self, doc_path, doc_group):
+		doc_group.attrs["metadata"] = json.dumps(self._storage.metadata)
+
+		with self._storage.tokens() as tokens:
+			tokens.save_to_h5(doc_group.create_group("tokens"))
+
+		with self._storage.spans() as spans:
+			spans_group = doc_group.create_group("spans")
+			for name, data in spans.items():
+				g = spans_group.create_group(name)
+				for k, v in data.items():
+					g.create_dataset(k, data=v)
+
+		doc_path.mkdir(exist_ok=True)
+
+		with self._storage.text() as text:
+			with open(doc_path / "document.txt", "w") as f:
+				f.write(text.get())
+
+		self._save_embeddings(doc_path)
+
+	def save_to_fs(self, path):
 		path = Path(path)
 
+		if not path.is_dir():
+			raise ValueError(f"document path '{path}' needs to be a dir")
 		if path.suffix != ".document":
 			raise ValueError(f"document path '{path}' must end in '.document'")
 
-		with self._storage.json() as data:
-			with zipfile.ZipFile(path / "info.zip", "w") as zf:
-				zf.writestr("data.json", json.dumps(data))
+		with open(path / "metadata.json", "w") as f:
+			f.write(json.dumps(self._storage.metadata))
 
 		with self._storage.tokens() as tokens:
 			with h5py.File(path / "tokens.h5", "w") as hf:
@@ -416,6 +439,22 @@ class Document:
 			with open(path / "document.txt", "w") as f:
 				f.write(text.get())
 
+		self._save_embeddings(path)
+
+	@staticmethod
+	def _load_embeddings(path):
+		contextual_embeddings = dict()
+		emb_path = path / "embeddings"
+		emb_json_path = emb_path / "info.json"
+		if emb_json_path.exists():
+			with open(emb_json_path, "r") as f:
+				emb_data = json.loads(f.read())
+
+			for k, slug_name in emb_data.items():
+				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / slug_name)
+		return contextual_embeddings
+
+	def _save_embeddings(self, path):
 		if self._contextual_embeddings:
 			emb_data = dict()
 
@@ -432,33 +471,25 @@ class Document:
 				f.write(json.dumps(emb_data))
 
 	def to_json(self):
-		with self._storage.json() as data:
-			r = data
-		return r
+		return self._storage.metadata
 
 	@property
 	def structure(self):
-		with self._storage.json() as data:
-			lines = []
-			for i, p in enumerate(data["partitions"]):
-				text = p["text"]
-				lines.append(f"partition {i + 1}:")
-				for j, sent in enumerate(p["sents"]):
-					lines.append(f"  sentence {j + 1}:")
-					lines.append("    " + text[sent["start"]:sent["end"]])
-			return "\n".join(lines)
+		data = self._storage.metadata
+
+		lines = []
+		for i, p in enumerate(data["partitions"]):
+			text = p["text"]
+			lines.append(f"partition {i + 1}:")
+			for j, sent in enumerate(p["sents"]):
+				lines.append(f"  sentence {j + 1}:")
+				lines.append("    " + text[sent["start"]:sent["end"]])
+
+		return "\n".join(lines)
 
 	@property
 	def metadata(self):
 		return self._storage.metadata
-
-	@property
-	def unique_id(self):
-		return self.metadata['unique_id']
-
-	@property
-	def caching_name(self):
-		return slugify(self.unique_id)
 
 	@property
 	def origin(self):
@@ -468,15 +499,15 @@ class Document:
 	def title(self):
 		return self.metadata['title']
 
-	def prepare(self, corpus, session, doc_index):
+	def prepare(self, corpus, session):
 		try:
 			names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
 			contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 			return PreparedDocument(
-				corpus, session, self, doc_index, contextual_embeddings)
+				corpus, session, self, contextual_embeddings)
 		except:
-			logging.error(f"failed to prepare doc '{self.title}' [{self.unique_id}]")
+			logging.error(f"failed to prepare doc '{corpus.get_unique_id(self)}'")
 			raise
 
 
@@ -562,15 +593,16 @@ class Span:
 
 
 class PreparedDocument:
-	def __init__(self, corpus, session, doc, doc_index, contextual_embeddings):
+	def __init__(self, corpus, session, doc, contextual_embeddings):
 		self._doc = doc
 		self._session = session
 
 		storage = doc.storage
 		self._metadata = storage.metadata
 
-		uid = self.unique_id
-		doc_group = corpus.get_flavor(session.flavor.name)[uid]
+		uid = corpus.get_unique_id(doc)
+		flavor_group = corpus.get_flavor(session.flavor.name)
+		doc_group = flavor_group[uid]
 		token_mask = doc_group.attrs["token_mask"]
 
 		with storage.spans() as spans:
@@ -587,7 +619,7 @@ class PreparedDocument:
 			(k, MaskedVectorsRef(v, token_mask)) for k, v in contextual_embeddings.items())
 
 		self._compiled = core.Document(
-			doc_index,
+			corpus.get_doc_index(doc),
 			session.vocab,
 			self._spans,
 			corpus_db_data_to_dict(doc_group),
@@ -629,11 +661,7 @@ class PreparedDocument:
 
 	@property
 	def unique_id(self):
-		return self.metadata['unique_id']
-
-	@property
-	def caching_name(self):
-		return slugify(self.unique_id)
+		return self._doc.unique_id
 
 	@contextlib.contextmanager
 	def text(self):

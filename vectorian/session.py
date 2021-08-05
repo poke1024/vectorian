@@ -57,12 +57,12 @@ class Collection:
 		self._docs = []
 
 		with tqdm(desc="Preparing Documents", total=len(corpus)) as pbar:
-			def prepare_doc(i):
+			def prepare_doc(doc):
 				pbar.update(1)
-				return corpus[i].prepare(corpus, session, i)
+				return doc.prepare(corpus, session)
 
 			with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-				self._docs = list(executor.map(prepare_doc, range(len(corpus))))
+				self._docs = list(executor.map(prepare_doc, corpus.docs))
 
 	@property
 	def documents(self):
@@ -146,9 +146,11 @@ SessionEmbedding = collections.namedtuple(
 class Session:
 	def __init__(self, corpus, embeddings=None, flavor=None):
 		if flavor is None:
-			if not corpus.flavors:
+			c_flavors = corpus.flavors
+			if not c_flavors or (len(c_flavors) == 1 and c_flavors[0] == "vanilla"):
 				flavor = VanillaFlavor()
-				corpus.add_flavor(flavor)
+				if not c_flavors:
+					corpus.add_flavor(flavor)
 			else:
 				raise ValueError("please specify a flavor")
 

@@ -5,12 +5,14 @@ import numpy as np
 import h5py
 import collections
 import enum
+import uuid
 
 from vectorian.corpus.document import Document
 from vectorian.importers import Importer
 from pathlib import Path
 from tqdm.autonotebook import tqdm
 from collections import namedtuple
+from slugify import slugify
 from typing import Dict
 
 
@@ -19,8 +21,8 @@ class FlavorBuilder:
 		PREFLIGHT = 0
 		ADD = 1
 
-	def __init__(self, file, normalizers):
-		self._file = file
+	def __init__(self, root, normalizers):
+		self._root = root
 
 		self._normalizers = normalizers
 		self._make_text = normalizers['token'].token_to_text
@@ -37,8 +39,8 @@ class FlavorBuilder:
 		db = FlavorBuilder(file, normalizers)
 		for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
 			db.set_stage(stage)
-			for doc in docs:
-				db.add(doc)
+			for unique_id, doc in docs.items():
+				db.add(unique_id, doc)
 
 	def _add_mappings(self, attr, value):
 		m = self._mappings[attr]
@@ -55,7 +57,7 @@ class FlavorBuilder:
 				self._enums[attr] = self._make_enum(attr)
 		self._stage = stage
 
-	def _add(self, doc, text, table, base_mask):
+	def _add(self, unique_id, doc, text, table, base_mask):
 		texts = list(map(
 			self._norm_text,
 			self._normalizers['token'].token_to_text_many(text, table)))
@@ -80,7 +82,10 @@ class FlavorBuilder:
 			start = table["start"][token_mask]
 			end = table["end"][token_mask]
 
-			doc_group = self._file.create_group(doc.unique_id)
+			try:
+				doc_group = self._root.create_group(unique_id)
+			except ValueError as err:
+				raise RuntimeError(f"could not create group {unique_id} in {self._root}: {err}")
 
 			doc_group.attrs['origin'] = str(doc.metadata['origin'])
 			doc_group.attrs['token_mask'] = token_mask
@@ -106,13 +111,13 @@ class FlavorBuilder:
 		else:
 			raise ValueError(f"unknown stage {self._stage}")
 
-	def add(self, doc):
+	def add(self, unique_id, doc):
 		with doc.storage.tokens() as tokens:
 			table = tokens.to_table()
 			base_mask = self._token_to_token(table)
 
 			with doc.storage.text() as text:
-				self._add(doc, text.get(), table, base_mask)
+				self._add(unique_id, doc, text.get(), table, base_mask)
 
 
 class Corpus:
@@ -122,25 +127,29 @@ class Corpus:
 			raise ValueError(f"expected directory path, got '{path}'")
 		self._path = path
 
-		if not (path / "corpus.json").exists():
-			Corpus._create_corpus_json(path)
-		with open(path / "corpus.json", "r") as f:
-			names = json.loads(f.read())["documents"]
-
-		def load_doc(name):
-			p = path / name
-			doc = Document.load(p)
-			doc.metadata["origin"] = p
-			return doc
-
-		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-			self._docs = list(executor.map(load_doc, names))
-
-		self._ids = set([doc.unique_id for doc in self._docs])
+		self._documents_path = path / "documents"
+		self._documents_path.mkdir(exist_ok=True)
 
 		self._corpus_h5 = h5py.File(path / "corpus.h5", "a")
 		self._documents_group = self._corpus_h5.require_group("documents")
 		self._flavors_group = self._corpus_h5.require_group("flavors")
+
+		def load_doc(unique_id):
+			p = self._documents_path / unique_id
+			doc = Document.load_from_corpus(p, self._documents_group[unique_id])
+			#doc.metadata["origin"] = p
+			return unique_id, doc
+
+		unique_ids = list(self._documents_group.keys())
+		self._docs = {}
+
+		self._doc_to_unique_id = {}
+		self._unique_id_to_index = {}
+		self._ordered_docs = []
+
+		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+			for unique_id, doc in executor.map(load_doc, unique_ids):
+				self._add_doc(unique_id, doc)
 
 	def close(self):
 		self._corpus_h5.close()
@@ -158,43 +167,42 @@ class Corpus:
 	def get_flavor(self, flavor):
 		return self._flavors_group[flavor]
 
-	def add_doc(self, doc, ignore_dup=False):
-		if doc.unique_id in self._ids:
-			if ignore_dup:
-				return
-			else:
-				raise ValueError(f"unique document id '{doc.unique_id}' is already in corpus")
+	def get_unique_id(self, doc):
+		return self._doc_to_unique_id[id(doc)]
 
-		self._docs.append(doc)
-		self._ids.add(doc.unique_id)
+	def get_doc_index(self, doc):
+		return self._unique_id_to_index[self._doc_to_unique_id[id(doc)]]
 
-		doc_path = self._path / (doc.caching_name + ".document")
-		doc_path.mkdir(exist_ok=False)
-		doc.save(doc_path)
+	def _add_doc(self, unique_id, doc):
+		self._docs[unique_id] = doc
+		self._doc_to_unique_id[id(doc)] = unique_id
+		self._unique_id_to_index[unique_id] = len(self._ordered_docs)
+		self._ordered_docs.append(doc)
 
-		Corpus._create_corpus_json(self._path)
+	def add_doc(self, doc):
+		unique_id = str(uuid.uuid4())
+		if unique_id in self._documents_group or unique_id in self._docs:
+			raise ValueError("failed to create uuid for doc")
 
-	@staticmethod
-	def _create_corpus_json(path):
-		path = Path(path)
-		names = []
-		for p in path.iterdir():
-			if p.suffix == ".document":
-				names.append(p.name)
-		with open(path / "corpus.json", "w") as f:
-			f.write(json.dumps({
-				'documents': sorted(names)
-			}))
+		doc.save_to_corpus(
+			self._documents_path / unique_id,
+			self._documents_group.create_group(unique_id))
+
+		self._add_doc(unique_id, doc)
+
+	@property
+	def docs(self):
+		return self._docs.values()
 
 	def __len__(self):
 		return len(self._docs)
 
 	def __iter__(self):
-		for doc in self._docs:
+		for doc in self._docs.values():
 			yield doc
 
 	def __getitem__(self, k):
-		return self._docs[k]
+		return self._ordered_docs[k]
 
 
 class LazyCorpus:

@@ -186,10 +186,9 @@ class Importer:
 			'document': compile_doc_spans(tokens)
 		}
 
-		json = {
-			'metadata': md._asdict(),
-			'loc_ax': loc_ax
-		}
+		extended_metadata = dict(
+			**md._asdict(),
+			loc_ax=loc_ax)
 
 		from vectorian.corpus.document import Document, InternalMemoryDocumentStorage
 
@@ -208,7 +207,8 @@ class Importer:
 			(k, transformed(k, v)) for k, v in contextual_vectors.items())
 
 		return Document(
-			InternalMemoryDocumentStorage(json, ''.join(texts), make_tokens_dict(tokens), spans),
+			InternalMemoryDocumentStorage(
+				extended_metadata, ''.join(texts), make_tokens_dict(tokens), spans),
 			contextual_embeddings)
 
 
