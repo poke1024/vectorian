@@ -42,10 +42,14 @@ def compile_spans(spans, tokens, loc_ax):
 		'end': np.empty(n, dtype=np.int32)
 	}
 
-	loc = np.array(spans['loc'])
-	for i, k in enumerate(loc_ax):
-		assert k not in new_spans
-		new_spans[k] = to_min_dtype(loc[:, i])
+	if len(spans['loc']) > 0:
+		loc = np.array(spans['loc'])
+		for i, k in enumerate(loc_ax):
+			assert k not in new_spans
+			new_spans[k] = to_min_dtype(loc[:, i])
+	else:
+		for i, k in enumerate(loc_ax):
+			new_spans[k] = np.array([], dtype=np.uint8)
 
 	token_i = 0
 
@@ -187,6 +191,9 @@ class Importer:
 			for e in self._embeddings:
 				contextual_vectors[e.name].append(e.encode(doc))
 
+		if not tokens:
+			return None
+
 		spans = {
 			'sentence': compile_spans(sents, tokens, loc_ax),
 			'document': compile_doc_spans(tokens)
@@ -216,6 +223,12 @@ class Importer:
 			InternalMemoryDocumentStorage(
 				extended_metadata, ''.join(texts), make_tokens_dict(tokens), spans),
 			contextual_embeddings)
+
+	def from_path(self, path: Path, *args, **kwargs):
+		raise NotImplementedError()
+
+	def from_str(self, text: str, *args, **kwargs):
+		raise NotImplementedError()
 
 
 class TextImporter(Importer):
