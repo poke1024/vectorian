@@ -120,7 +120,9 @@ class FlavorBuilder:
 class Corpus:
 	def __init__(self, path):
 		path = Path(path)
-		if not path.is_dir():
+		if not path.exists():
+			path.mkdir()
+		elif not path.is_dir():
 			raise ValueError(f"expected directory path, got '{path}'")
 		self._path = path
 
