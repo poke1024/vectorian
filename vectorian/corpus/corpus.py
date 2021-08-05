@@ -179,7 +179,7 @@ class FlavorBuilder:
 
 
 class Corpus:
-	def __init__(self, path):
+	def __init__(self, path, mutable=False):
 		path = Path(path)
 		if not path.exists():
 			path.mkdir()
@@ -191,7 +191,10 @@ class Corpus:
 		self._flavors_path = path / "flavors"
 		self._flavors_path.mkdir(exist_ok=True)
 
-		self._corpus_h5 = h5py.File(path / "corpus.h5", "a")
+		if not (path / "corpus.h5").exists():
+			mutable = True
+
+		self._corpus_h5 = h5py.File(path / "corpus.h5", "a" if mutable else "r")
 		self._documents_group = self._corpus_h5.require_group("documents")
 		#self._flavors_group = self._corpus_h5.require_group("flavors")
 
