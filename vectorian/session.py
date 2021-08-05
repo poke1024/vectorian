@@ -1,5 +1,4 @@
 import vectorian.core as core
-import vectorian.normalize as normalize
 import logging
 import collections
 import time
@@ -15,6 +14,7 @@ from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, NetworkFlowSimilarity, SpanSimilarity
 from vectorian.embeddings import OpenedVectorsCache, Vectors
+from vectorian.flavor import VanillaFlavor
 
 
 class Result:
@@ -59,7 +59,7 @@ class Collection:
 		with tqdm(desc="Preparing Documents", total=len(corpus)) as pbar:
 			def prepare_doc(i):
 				pbar.update(1)
-				return corpus[i].prepare(session, i)
+				return corpus[i].prepare(corpus, session, i)
 
 			with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
 				self._docs = list(executor.map(prepare_doc, range(len(corpus))))
@@ -144,7 +144,14 @@ SessionEmbedding = collections.namedtuple(
 
 
 class Session:
-	def __init__(self, docs, embeddings=None):
+	def __init__(self, corpus, embeddings=None, flavor=None):
+		if flavor is None:
+			if not corpus.flavors:
+				flavor = VanillaFlavor()
+				corpus.add_flavor(flavor)
+			else:
+				raise ValueError("please specify a flavor")
+
 		if embeddings is None:
 			embeddings = []
 
@@ -154,7 +161,7 @@ class Session:
 
 		for embedding in self._embeddings:
 			if embedding.is_contextual:
-				for doc in docs:
+				for doc in corpus:
 					if not doc.has_contextual_embedding(embedding.name):
 						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
 
@@ -168,8 +175,9 @@ class Session:
 
 		self._vocab = core.Vocabulary(self._embedding_manager)
 
+		self._flavor = flavor
 		self._collection = Collection(
-			self, self._vocab, docs)
+			self, self._vocab, corpus)
 
 		self._vocab.compile_embeddings()  # i.e. static embeddings
 		self._embedding_manager.compile_contextual()
@@ -179,6 +187,14 @@ class Session:
 	@property
 	def vocab(self):
 		return self._vocab
+
+	@property
+	def flavor(self):
+		return self._flavor
+
+	@property
+	def normalizers(self):
+		return self._flavor.normalizers
 
 	def default_metric(self):
 		embedding = self._embeddings[0]

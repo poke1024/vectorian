@@ -14,13 +14,13 @@ from collections import namedtuple
 from typing import Dict
 
 
-class CorpusDB:
+class FlavorBuilder:
 	class Stage(enum.Enum):
 		PREFLIGHT = 0
 		ADD = 1
 
-	def __init__(self, path, normalizers):
-		self._file = h5py.File(path, "w")
+	def __init__(self, file, normalizers):
+		self._file = file
 
 		self._normalizers = normalizers
 		self._make_text = normalizers['token'].token_to_text
@@ -32,19 +32,13 @@ class CorpusDB:
 
 		self._stage = None
 
-	def close(self):
-		self._file.close()
-
 	@staticmethod
-	def make(path, normalizers, docs):
-		db = CorpusDB(path, normalizers)
-		try:
-			for stage in (CorpusDB.Stage.PREFLIGHT, CorpusDB.Stage.ADD):
-				db.set_stage(stage)
-				for doc in docs:
-					db.add(doc)
-		finally:
-			db.close()
+	def make(file, normalizers, docs):
+		db = FlavorBuilder(file, normalizers)
+		for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
+			db.set_stage(stage)
+			for doc in docs:
+				db.add(doc)
 
 	def _add_mappings(self, attr, value):
 		m = self._mappings[attr]
@@ -56,7 +50,7 @@ class CorpusDB:
 		return h5py.enum_dtype(mapping, basetype=np.min_scalar_type(len(mapping)))
 
 	def set_stage(self, stage: Stage):
-		if stage == CorpusDB.Stage.ADD:
+		if stage == FlavorBuilder.Stage.ADD:
 			for attr in self._mappings.keys():
 				self._enums[attr] = self._make_enum(attr)
 		self._stage = stage
@@ -77,12 +71,12 @@ class CorpusDB:
 
 		assert len(table) == len(texts)
 
-		if self._stage == CorpusDB.Stage.PREFLIGHT:
+		if self._stage == FlavorBuilder.Stage.PREFLIGHT:
 			for k, xs in data.items():
 				for x in xs:
 					self._add_mappings(k, x)
 
-		elif self._stage == CorpusDB.Stage.ADD:
+		elif self._stage == FlavorBuilder.Stage.ADD:
 			start = table["start"][token_mask]
 			end = table["end"][token_mask]
 
@@ -122,16 +116,63 @@ class CorpusDB:
 
 
 class Corpus:
-	def __init__(self, docs=None):
-		if docs is None:
-			docs = []
-		self._docs = list(docs)
+	def __init__(self, path):
+		path = Path(path)
+		if not path.is_dir():
+			raise ValueError(f"expected directory path, got '{path}'")
+		self._path = path
+
+		if not (path / "corpus.json").exists():
+			Corpus._create_corpus_json(path)
+		with open(path / "corpus.json", "r") as f:
+			names = json.loads(f.read())["documents"]
+
+		def load_doc(name):
+			p = path / name
+			doc = Document.load(p)
+			doc.metadata["origin"] = p
+			return doc
+
+		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+			self._docs = list(executor.map(load_doc, names))
+
 		self._ids = set([doc.unique_id for doc in self._docs])
 
-	def add(self, doc):
-		assert doc.unique_id not in self._ids
+		self._corpus_h5 = h5py.File(path / "corpus.h5", "a")
+		self._documents_group = self._corpus_h5.require_group("documents")
+		self._flavors_group = self._corpus_h5.require_group("flavors")
+
+	def close(self):
+		self._corpus_h5.close()
+
+	def add_flavor(self, flavor):
+		FlavorBuilder.make(
+			self._flavors_group.create_group(flavor.name),
+			flavor.normalizers,
+			self._docs)
+
+	@property
+	def flavors(self):
+		return list(self._flavors_group.keys())
+
+	def get_flavor(self, flavor):
+		return self._flavors_group[flavor]
+
+	def add_doc(self, doc, ignore_dup=False):
+		if doc.unique_id in self._ids:
+			if ignore_dup:
+				return
+			else:
+				raise ValueError(f"unique document id '{doc.unique_id}' is already in corpus")
+
 		self._docs.append(doc)
 		self._ids.add(doc.unique_id)
+
+		doc_path = self._path / (doc.caching_name + ".document")
+		doc_path.mkdir(exist_ok=False)
+		doc.save(doc_path)
+
+		Corpus._create_corpus_json(self._path)
 
 	@staticmethod
 	def _create_corpus_json(path):
@@ -145,43 +186,6 @@ class Corpus:
 				'documents': sorted(names)
 			}))
 
-	@staticmethod
-	def load(path):
-		path = Path(path)
-
-		if not (path / "corpus.json").exists():
-			Corpus._create_corpus_json(path)
-		with open(path / "corpus.json", "r") as f:
-			names = json.loads(f.read())["documents"]
-
-		def load_doc(name):
-			p = path / name
-			doc = Document.load(p)
-			doc.metadata["origin"] = p
-			return doc
-
-		with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-			docs = executor.map(load_doc, names)
-
-		return Corpus(docs)
-
-	def save(self, path):
-		names = set()
-		for doc in self._docs:
-			name = doc.unique_id
-			if name not in names:
-				names.add(name)
-			else:
-				raise ValueError(f"non-unique document name '{name}'")
-
-		path = Path(path)
-		path.mkdir(exist_ok=True)
-		for doc in self._docs:
-			doc_path = path / (doc.caching_name + ".document")
-			doc_path.mkdir(exist_ok=False)
-			doc.save(doc_path)
-		Corpus._create_corpus_json(path)
-
 	def __len__(self):
 		return len(self._docs)
 
@@ -191,9 +195,6 @@ class Corpus:
 
 	def __getitem__(self, k):
 		return self._docs[k]
-
-	def save_compact(self, path, normalizers: Dict):
-		CorpusDB.make(path, normalizers, self._docs)
 
 
 class LazyCorpus:

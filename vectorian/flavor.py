@@ -1,5 +1,6 @@
 import re
 import numpy as np
+from cached_property import cached_property
 
 
 def chain(callables):
@@ -174,7 +175,7 @@ def normalizer_dict(normalizers):
 	return data
 
 
-def default_normalizers():
+def vanilla_normalizers():
 	# Vectorian's default token mappings. You might want
 	# to adjust this by adding lowercase mapping and/or
 	# other pos tag mappings.
@@ -201,3 +202,27 @@ def default_normalizers():
 	)
 
 	return [txt, tok]
+
+
+class AbstractFlavor:
+	def __init__(self, name, normalizers):
+		self._name = name
+		self._normalizers = normalizers
+
+	@property
+	def name(self):
+		return self._name
+
+	@cached_property
+	def normalizers(self):
+		return normalizer_dict(self._normalizers)
+
+
+class VanillaFlavor(AbstractFlavor):
+	def __init__(self):
+		super().__init__("vanilla", vanilla_normalizers())
+
+
+class Flavor(AbstractFlavor):
+	def __init__(self, name, normalizers):
+		super().__init__(name, normalizers)
