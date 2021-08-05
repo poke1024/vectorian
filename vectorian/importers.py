@@ -100,6 +100,16 @@ def make_tokens_dict(tokens):
 	return res
 
 
+def get_text_from_spec(spec):
+	if isinstance(spec, Path):
+		with open(spec, "r") as f:
+			return f.read(), spec.stem, str(spec)
+	elif isinstance(spec, str):
+		return spec, "", "<string>"
+	else:
+		raise ValueError(f"unknown text specification {spec}")
+
+
 Metadata = namedtuple(
 	"Metadata", ["version", "origin", "author", "title", "locations"])
 
@@ -211,14 +221,13 @@ class Importer:
 class TextImporter(Importer):
 	# an importer for plain text files that does not assume any structure.
 
-	def __call__(self, path, author="Anonymous", title=None):
-		path = Path(path)
+	def __call__(self, spec, author="", title=None):
+		text_base, title_base, origin = get_text_from_spec(spec)
 
 		if title is None:
-			title = path.stem
+			title = title_base
 
-		with open(path, "r") as f:
-			text = self._preprocess_text(f.read())
+		text = self._preprocess_text(text_base)
 
 		locations = []
 
@@ -231,7 +240,7 @@ class TextImporter(Importer):
 
 		md = Metadata(
 			version="1.0",
-			origin=str(path),
+			origin=origin,
 			author=author,
 			title=title,
 			speakers={})
@@ -403,14 +412,14 @@ class MarkdownImporter(Importer):
 	_sections = re.compile(
 		r"\n#([^\n]+)\n", re.IGNORECASE)
 
-	def __call__(self, path, author="", title=None):
-		path = Path(path)
+	def __call__(self, text, author="", title=None):
+
+		text_base, title_base, origin = get_text_from_spec(text)
 
 		if title is None:
-			title = path.stem
+			title = title_base
 
-		with open(path, "r") as f:
-			text = "\n" + self._preprocess_text(f.read())
+		text = "\n" + text_base
 
 		heading_breaks = []
 		for m in MarkdownImporter._sections.finditer(text):
@@ -450,7 +459,7 @@ class MarkdownImporter(Importer):
 
 		md = Metadata(
 			version="1.0",
-			origin=str(path),
+			origin=origin,
 			author=author,
 			title=title,
 			locations={
@@ -462,22 +471,3 @@ class MarkdownImporter(Importer):
 
 		return self._make_doc(
 			md, sections, ['heading', 'paragraph'], locations)
-
-
-class StringImporter(Importer):
-	# a generic importer for short text strings for ad-hoc experiments.
-
-	def __call__(self, s, author="", title="", show_progress=False):
-		locations = [
-			[]
-		]
-
-		md = Metadata(
-			version="1.0",
-			origin="<string>",
-			author=author,
-			title=title,
-			locations={'type': 'text'})
-
-		return self._make_doc(
-			md, [self._preprocess_text(s)], [], locations, show_progress=show_progress)
