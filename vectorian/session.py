@@ -156,6 +156,8 @@ class Session:
 			else:
 				raise ValueError("please specify a flavor")
 
+		self._flavor = flavor
+
 		if embeddings is None:
 			embeddings = []
 
@@ -179,7 +181,6 @@ class Session:
 
 		self._vocab = core.Vocabulary(self._embedding_manager)
 
-		self._flavor = flavor
 		self._collection = Collection(
 			self, self._vocab, corpus)
 

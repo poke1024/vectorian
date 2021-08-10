@@ -606,6 +606,8 @@ class PreparedDocument:
 		self._doc = doc
 		self._session = session
 
+		self._corpus = corpus
+
 		storage = doc.storage
 		self._metadata = storage.metadata
 
@@ -646,6 +648,14 @@ class PreparedDocument:
 		return self._doc
 
 	@property
+	def corpus(self):
+		return self._corpus
+
+	@property
+	def corpus_id(self):
+		return self._corpus.get_unique_id(self._doc)
+
+	@property
 	def session(self):
 		return self._session
 
@@ -667,10 +677,6 @@ class PreparedDocument:
 	@property
 	def metadata(self):
 		return self._metadata
-
-	@property
-	def unique_id(self):
-		return self._doc.unique_id
 
 	@contextlib.contextmanager
 	def text(self):

@@ -27,7 +27,11 @@ class Query:
 		self._options = options
 
 	@property
-	def unique_id(self):
+	def corpus(self):
+		return None
+
+	@property
+	def corpus_id(self):
 		return None
 
 	@property
@@ -98,7 +102,11 @@ class PreparedQuery:
 		self._tokens = self._compiled.tokens
 
 	@property
-	def unique_id(self):
+	def corpus(self):
+		return None
+
+	@property
+	def corpus_id(self):
 		return None
 
 	@property

@@ -480,7 +480,8 @@ class CachedWordEmbedding(StaticEmbedding):
 		return self.__class__(**kwargs)
 
 	def create_instance(self, session):
-		normalizer = session.normalizer('text').to_callable()
+		normalizers = session.normalizers
+		normalizer = normalizers['text'].to_callable()
 		key = json.dumps({
 			'emb': self.unique_name,
 			'nrm': normalizer.ident,
@@ -1297,6 +1298,7 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 	def __init__(self, span_encoder, cache_size=150):
 		self._encoder = PartitionEncoder(span_encoder)
 		self._cache = cachetools.LRUCache(cache_size)
+		self._corpus = None
 
 	def save(self, path):
 		path = Path(path)
@@ -1347,12 +1349,21 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 		new = []
 		index = []
 
+		if docs and self._corpus is None:
+			self._corpus = docs[0].corpus
+
+		# we assume all docs stem from the same corpus. otherwise our caching
+		# ids would not be reliable.
+		assert all(doc.corpus in (None, self._corpus) for doc in docs)
+
+
 		def mk_cache_key(doc):
-			uid = doc.unique_id
-			if uid is not None:
-				return (uid,) + partition.cache_key
-			else:
+			if doc.corpus is None:
 				return None
+			uid = doc.corpus_id
+			if uid is None:
+				return None
+			return (uid,) + partition.cache_key
 
 		for i, doc in enumerate(docs):
 			cached = self._cache.get(mk_cache_key(doc))

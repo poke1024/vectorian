@@ -147,7 +147,7 @@ class Importer:
 				text = Importer._t[x](text)
 		return text
 
-	def _make_doc(self, md, partitions, loc_ax, locations, show_progress=True):
+	def _make_doc(self, md, partitions, loc_ax, locations, show_progress=True, extra_metadata=None):
 
 		pipe = self._nlp.pipe(
 			partitions,
@@ -172,6 +172,9 @@ class Importer:
 				desc=f'Importing {md.origin}',
 				disable=not show_progress):
 
+			if len(doc) < 1:
+				continue
+
 			doc_json = doc.to_json()
 
 			partition_tokens = doc_json['tokens']
@@ -189,7 +192,14 @@ class Importer:
 			text_len += len(doc_json['text'])
 
 			for e in self._embeddings:
-				contextual_vectors[e.name].append(e.encode(doc))
+				v = e.encode(doc)
+				if len(v.shape) != 2:
+					raise ValueError(f'expected (a, b), got {v.shape}')
+				if v.shape[0] != len(doc):
+					raise ValueError(f'expected ({len(doc)}, ...), got {v.shape}')
+				if v.shape[1] == 0:
+					raise ValueError(f'doc "{doc}" got illegal encoding: {v}')
+				contextual_vectors[e.name].append(v)
 
 		if not tokens:
 			return None
@@ -199,8 +209,12 @@ class Importer:
 			'document': compile_doc_spans(tokens)
 		}
 
+		if extra_metadata is None:
+			extra_metadata = {}
+
 		extended_metadata = dict(
 			**md._asdict(),
+			**extra_metadata,
 			loc_ax=loc_ax)
 
 		from vectorian.corpus.document import Document, InternalMemoryDocumentStorage
