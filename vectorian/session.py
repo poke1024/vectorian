@@ -169,7 +169,8 @@ class Session:
 			if embedding.is_contextual:
 				for doc in corpus:
 					if not doc.has_contextual_embedding(embedding.name):
-						raise RuntimeError(f"doc {doc.unique_id} misses contextual embedding {embedding.name}")
+						unique_id = corpus.get_unique_id(doc)
+						raise RuntimeError(f"doc {unique_id} misses contextual embedding {embedding.name}")
 
 		self._embedding_instances = collections.OrderedDict()
 		for embedding in self._embeddings:
