@@ -1349,12 +1349,17 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 		new = []
 		index = []
 
-		if docs and self._corpus is None:
-			self._corpus = docs[0].corpus
+		if self._corpus is None:
+			for doc in docs:
+				if doc.corpus is not None:
+					self._corpus = doc.corpus
+					break
 
 		# we assume all docs stem from the same corpus. otherwise our caching
 		# ids would not be reliable.
-		assert all(doc.corpus in (None, self._corpus) for doc in docs)
+		for doc in docs:
+			if doc.corpus not in (None, self._corpus):
+				raise RuntimeError(f"doc {doc} has corpus {doc.corpus}, expected either None or {self._corpus}")
 
 
 		def mk_cache_key(doc):
