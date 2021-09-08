@@ -4,7 +4,8 @@ core.cpython*.so
 __pycache__
 .ipynb_checkpoints
 .DS_Store
-Vectorian.egg-info
 /dist
 /mkdocs/site
 /pdoc/build
+/build
+/vectorian.egg-info
