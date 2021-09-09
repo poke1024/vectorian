@@ -3,7 +3,7 @@
 The Vectorian is a text search engine based on word embeddings and
 alignments. Its main intention is academic research and teaching purposes.
 
-API documentation can be found under https://poke1024.github.io/vectorian-2021/index.html
+API documentation can be found under https://poke1024.github.io/vectorian/index.html
 
 ## Design Goals
 
