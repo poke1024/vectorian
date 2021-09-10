@@ -104,12 +104,12 @@ def make_tokens_dict(tokens):
 	return res
 
 
-def get_text_from_spec(spec):
+def get_text_from_spec(spec, title):
 	if isinstance(spec, Path):
 		with open(spec, "r") as f:
-			return f.read(), spec.stem, str(spec)
+			return f.read(), spec.stem, title
 	elif isinstance(spec, str):
-		return spec, "", "<string>"
+		return spec, "", title or "<string>"
 	else:
 		raise ValueError(f"unknown text specification {spec}")
 
@@ -249,10 +249,7 @@ class TextImporter(Importer):
 	# an importer for plain text files that does not assume any structure.
 
 	def __call__(self, spec, author="", title=None, **kwargs):
-		text_base, title_base, origin = get_text_from_spec(spec)
-
-		if title is None:
-			title = title_base
+		text_base, title_base, origin = get_text_from_spec(spec, title)
 
 		text = self._preprocess_text(text_base)
 
@@ -447,11 +444,7 @@ class MarkdownImporter(Importer):
 		r"\n#([^\n]+)\n", re.IGNORECASE)
 
 	def __call__(self, text, author="", title=None, **kwargs):
-
-		text_base, title_base, origin = get_text_from_spec(text)
-
-		if title is None:
-			title = title_base
+		text_base, title_base, origin = get_text_from_spec(text, title)
 
 		text = "\n" + text_base
 

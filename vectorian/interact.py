@@ -971,7 +971,7 @@ class MatchRenderWidget:
 
 
 class QueryWidget:
-	def __init__(self, iquery):
+	def __init__(self, iquery, num_results=5, max_results=100):
 		self._iquery = iquery
 
 		self._query = widgets.Text(
@@ -998,7 +998,7 @@ class QueryWidget:
 			layout=widgets.Layout(width='100%', visibility='hidden'))
 
 		self._num_results_slider = widgets.IntSlider(
-			description='Results:', value=1, min=1, max=100, step=1,
+			description='Results:', value=num_results, min=1, max=max_results, step=1,
 			layout={'width': '40em'}, style=ROOT_LEVEL_STYLE)
 
 		self._location_formatter = vectorian.render.location.LocationFormatter()
@@ -1101,10 +1101,10 @@ class QueryWidget:
 
 
 class InteractiveQuery:
-	def __init__(self, session, nlp):
+	def __init__(self, session, nlp, **kwargs):
 		self._session = session
 		self._nlp = nlp
-		self._widget = QueryWidget(self)
+		self._widget = QueryWidget(self, **kwargs)
 
 	@property
 	def session(self):

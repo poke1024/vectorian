@@ -388,13 +388,13 @@ class LabSession(Session):
 		self._progress = None
 		self._last_progress_update = None
 
-	def interact(self, nlp):
+	def interact(self, nlp, **kwargs):
 		from vectorian.interact import InteractiveQuery
 
 		logger = logging.getLogger()
 		logger.setLevel(logging.WARNING)
 
-		q = InteractiveQuery(self, nlp)
+		q = InteractiveQuery(self, nlp, **kwargs)
 		return q.widget
 
 	def make_result(self, *args, **kwargs):
