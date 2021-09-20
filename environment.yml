@@ -4,17 +4,22 @@ channels:
   - conda-forge
   - pytorch
 dependencies:
-  - python=3.8
+  - python=3.9
   - xtl
   - xtensor
   - xsimd
   - xtensor-blas
   - xtensor-python
-  - faiss-cpu
+  - scikit-learn
+  - matplotlib
+  - skl2onnx
+  - onnxruntime
+  - h5py
+  - pyyaml
   - pip
   - pip:
       - pybind11~=2.6.2
-      - pyalign==0.3.3
+      - pyalign==0.3.5
       - smart-open>=3.0.0, <4.0.0
       - tqdm>=4.56.2
       - spacy>=3.0.0
@@ -25,13 +30,7 @@ dependencies:
       - yattag>=1.14.0
       - download>=0.3.5
       - cached-property>=1.5.2
-      - pyyaml>=5.4.1
       - gensim>=3.8.3, <4.0.0
-      - h5py~=2.10.0
-      - scikit-learn>=0.24.1
-      - skl2onnx>=1.8.0
-      - onnxruntime>=1.7.0
-      - matplotlib>=3.4.1
       - cachetools>=4.2.2
 variables:
   VECTORIAN_BLAS: 1
