@@ -10,6 +10,7 @@ import collections
 import contextlib
 import logging
 import functools
+import os
 
 from cached_property import cached_property
 from collections import namedtuple
@@ -507,6 +508,12 @@ class BruteForceIndex(Index):
 		super().__init__(*args, **kwargs)
 		self._nlp = nlp
 
+		self._max_threads = os.environ.get("VECTORIAN_NUM_THREADS")
+		if self._max_threads is None:
+			self._max_threads = multiprocessing.cpu_count()
+		else:
+			self._max_threads = max(1, int(self._max_threads))
+
 	def _find(self, query, n_threads=None, progress=None):
 		p_query = query.prepare(self._nlp)
 
@@ -524,7 +531,9 @@ class BruteForceIndex(Index):
 		done = 0
 
 		if n_threads is None:
-			n_threads = min(len(docs), multiprocessing.cpu_count())
+			n_threads = min(
+				len(docs),
+				self._max_threads)
 
 		results = None
 		with multiprocessing.pool.ThreadPool(processes=n_threads) as pool:

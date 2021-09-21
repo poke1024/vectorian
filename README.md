@@ -76,3 +76,14 @@ bokeh>=2.3.0
 * prospective support for GPU-based vector operations via cupy
 * removed pyarrow and the use of apache parquet in favor of h5py
 * support for prebuilt Linux wheels
+
+
+### Apple Silicon
+
+Default faiss builds currently crash on Apple M1, use
+
+```
+OMP_NUM_THREADS=1
+```
+
+before launching Vectorian to prevent this.
