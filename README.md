@@ -78,7 +78,26 @@ bokeh>=2.3.0
 * support for prebuilt Linux wheels
 
 
-### Apple Silicon
+## Some Tips for Debugging and other Issues
+
+### using ASAN on Linux
+
+LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)
+````
+
+### Debugging via lldb
+
+```
+lldb python -- your_script.py
+```
+
+### Forcing clang on Linux
+
+```
+export CC=clang
+```
+
+### Running on Apple Silicon
 
 Default faiss builds currently crash on Apple M1, use
 
