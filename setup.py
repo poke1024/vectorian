@@ -65,9 +65,11 @@ ext_modules = [
 	),
 ]
 
+exec(open("vectorian/_version.py").read())
+
 setup(
 	name='vectorian',
-	version='0.9.8',
+	version=__version__,
 	packages=find_packages(),
 	license='GPLv2',
 	author='Bernhard Liebl',
@@ -77,14 +79,3 @@ setup(
 	cmdclass={"build_ext": build_ext},
 	install_requires=required,
 )
-
-# some notes on debugging:
-
-# for linux asan, use:
-# LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)
-
-# debug with:
-# lldb python -- your_script.py
-
-# forcing clang on Linux:
-# export CC=clang

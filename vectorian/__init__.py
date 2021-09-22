@@ -1,5 +1,6 @@
 import os
 
+from vectorian._version import __version__
 
 def compile(for_debugging=False, force_rebuild=False):
 	if for_debugging:

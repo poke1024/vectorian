@@ -7,3 +7,4 @@
 [submodule "vectorian/core/lib/pyalign"]
 	path = vectorian/core/lib/pyalign
 	url = https://github.com/poke1024/pyalign
+	branch = 0.3.6

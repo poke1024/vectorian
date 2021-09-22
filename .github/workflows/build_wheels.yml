@@ -14,13 +14,16 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, macos-latest]  # , windows-latest
-        python: [39]
+        python: [38, 39]
         manylinux_image: [manylinux2014]
         include:
           - os: ubuntu-latest
             platform_id: manylinux_x86_64
           - os: macos-latest
             platform_id: macosx_universal2
+        exclude:
+          - os: macos-latest
+            python: 38
 
     steps:
       - uses: actions/checkout@v2
