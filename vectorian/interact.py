@@ -1,6 +1,7 @@
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import time
+import logging
 
 import vectorian.alignment
 import vectorian.embeddings
@@ -49,7 +50,11 @@ class FineTuneableWidget:
 		if options is None:
 			options = {}
 		i = [x[0] for x in self._types].index(name)
-		self._fine_tune = self._types[i][1](self._iquery, **options)
+		try:
+			self._fine_tune = self._types[i][1](self._iquery, **options)
+		except:
+			logging.error("error while creating " + self._types[i][1])
+			raise
 
 	def on_changed(self, change):
 		self._instantiate_fine_tune(change.new)
@@ -841,13 +846,13 @@ class TagWeightedAlignmentWidget:
 
 
 class PartitionEmbeddingWidget:
-	def __init__(self, iquery):
+	def __init__(self, iquery, encoder_index=0):
 		self._iquery = iquery
 		self._encoders = self._iquery.partition_encoders
 		keys = sorted(self._encoders.keys())
 		self._widget = widgets.Dropdown(
 			options=keys,
-			value=keys[0],
+			value=keys[encoder_index],
 			description='Model:',
 			disabled=False,
 			layout={'width': '25em'})
