@@ -971,6 +971,10 @@ class SpacyEmbedding(ContextualEmbedding):
 		super().__init__(transform)
 		self._nlp = nlp
 
+	@property
+	def nlp(self):
+		return self._nlp
+
 	@cached_property
 	def name(self):
 		meta = self._nlp.meta
