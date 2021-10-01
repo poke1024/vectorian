@@ -1050,7 +1050,7 @@ class SpacyVectorEmbedding(SpacyEmbedding):
 			if array is not None:
 				return array
 
-		array = np.array([token.vector for token in doc])
+		array = np.array([token.vector for token in self._nlp(doc.text)])
 
 		if self._cache is not None:
 			self._cache.put(doc.text, array)
