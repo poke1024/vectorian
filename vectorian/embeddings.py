@@ -86,13 +86,17 @@ def _download(url, path, force_download=False):
 			raise
 
 	if download_path != result_path:
+		extracted = []
 		with zipfile.ZipFile(download_path, 'r') as zf:
 			for zi in zf.infolist():
 				if zi.filename[-1] == '/':
 					continue
 				zi.filename = os.path.basename(zi.filename)
 				p = zf.extract(zi, result_path.parent)
-				Path(p).rename(result_path)
+				extracted.append(Path(p))
+
+		if len(extracted) == 1:
+			extracted[0].rename(result_path)
 
 		download_path.unlink()
 
