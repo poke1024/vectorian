@@ -86,6 +86,8 @@ class Query;
 typedef std::shared_ptr<Query> QueryRef;
 class Document;
 typedef std::shared_ptr<Document> DocumentRef;
+class Booster;
+typedef std::shared_ptr<Booster> BoosterRef;
 class Embedding;
 typedef std::shared_ptr<Embedding> EmbeddingRef;
 class Metric;

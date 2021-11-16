@@ -172,6 +172,21 @@ public:
 typedef std::shared_ptr<Spans> SpansRef;
 
 
+class Booster {
+    const py::array_t<float> m_boost_weights;
+
+public:
+    Booster(const py::array_t<float> &p_weights) :
+        m_boost_weights(p_weights) {
+    }
+
+    inline float get_boost(const size_t p_slice_id) const {
+        const auto weights = m_boost_weights.unchecked<1>();
+        return weights[p_slice_id];
+    }
+};
+
+
 class Document :
 	public std::enable_shared_from_this<Document>,
 	public ContextualVectorsContainer,
@@ -190,14 +205,16 @@ private:
 
 public:
 	Document(
-		int64_t p_document_id,
+		int64_t p_document_id, // unique index inside corpus
 		VocabularyRef p_vocab,
 		const py::dict &p_spans,
 		const py::dict &p_tokens,
 		const py::dict &p_metadata,
 		const py::dict &p_contextual_embeddings);
 
-	ResultSetRef find(const QueryRef &p_query);
+	ResultSetRef find(
+	    const QueryRef &p_query,
+	    const BoosterRef &p_booster);
 
 	inline VocabularyRef vocabulary() const {
 		return m_vocab;
@@ -251,7 +268,47 @@ public:
 	inline size_t max_len(const std::string &p_name, const size_t p_window_size) const {
 		return spans(p_name)->max_len(p_window_size);
 	}
-};
+
+	py::array_t<int32_t> count_keywords(
+   	    const py::dict &p_slice_strategy,
+	    const py::list &p_keywords) const {
+
+	    std::unordered_set<token_t> keywords;
+	    keywords.reserve(p_keywords.size());
+	    for (auto x : p_keywords) {
+	        const token_t x_id = m_vocab->token_to_id(x.cast<std::string>());
+	        if (x_id >= 0) {
+    	        keywords.insert(x_id);
+	        }
+	    }
+
+		const SliceStrategy slice_strategy(p_slice_strategy);
+	    const SpansRef spans = this->spans(slice_strategy.level);
+	    const size_t n_spans = spans->size();
+
+		const Token *s_tokens = this->tokens_vector()->data();
+
+        py::array_t<size_t> counts{static_cast<py::ssize_t>(n_spans)};
+    	auto mutable_counts = counts.mutable_unchecked<1>();
+        for (size_t i = 0; i < n_spans; i++) {
+            mutable_counts[i] = 0;
+        }
+
+	    spans->iterate(p_slice_strategy, [s_tokens, &keywords, &mutable_counts] (
+			const size_t slice_id, const size_t token_at, const size_t len_s) {
+
+                for (size_t i = 0; i < len_s; i++) {
+                    const Token &t = s_tokens[token_at + i];
+                    if (keywords.find(t.id) != keywords.end()) {
+                        mutable_counts[slice_id] += 1;
+                    }
+                }
+
+                return true;
+	    });
+
+	    return counts;
+	}};
 
 typedef std::shared_ptr<Document> DocumentRef;
 

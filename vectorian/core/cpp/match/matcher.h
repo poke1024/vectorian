@@ -7,16 +7,19 @@ class Matcher : public std::enable_shared_from_this<Matcher> {
 protected:
 	const QueryRef m_query;
 	const DocumentRef m_document;
+	const BoosterRef m_booster;
 	const MetricRef m_metric;
 
 public:
 	inline Matcher(
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MetricRef &p_metric) :
 
 		m_query(p_query),
 		m_document(p_document),
+		m_booster(p_booster),
 		m_metric(p_metric) {
 	}
 
@@ -59,6 +62,7 @@ protected:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options,
 		const GenSlices &p_gen_slices) const;
 
@@ -70,6 +74,7 @@ public:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options) const = 0;
 };
 
@@ -94,7 +99,8 @@ public:
 	MatcherRef create_matcher(
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
-		const DocumentRef &p_document) const;
+		const DocumentRef &p_document,
+		const BoosterRef &p_booster) const;
 
 	inline const MatcherOptions &options() const {
 		return m_options;
@@ -107,9 +113,10 @@ public:
 
 class ExternalMatcher : public Matcher {
 public:
-	ExternalMatcher(const QueryRef &p_query,
+	ExternalMatcher(
+	    const QueryRef &p_query,
 		const DocumentRef &p_document,
-		const MetricRef &p_metric) : Matcher(p_query, p_document, p_metric) {
+		const MetricRef &p_metric) : Matcher(p_query, p_document, BoosterRef(), p_metric) {
 	}
 
 	virtual void initialize() {

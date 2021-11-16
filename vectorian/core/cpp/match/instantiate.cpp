@@ -45,11 +45,12 @@ public:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 
-		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix] (
+		return make_matcher(p_query, p_metric, p_document, p_booster, p_matcher_options, [matrix] (
 			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
@@ -74,12 +75,13 @@ public:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto matrix = std::static_pointer_cast<StaticEmbeddingMetric>(p_metric)->matrix();
 		const auto options = m_options;
 
-		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix, options] (
+		return make_matcher(p_query, p_metric, p_document, p_booster, p_matcher_options, [matrix, options] (
 			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
@@ -98,13 +100,14 @@ public:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
 		const ContextualSimilarityMatrixRef matrix = std::static_pointer_cast<ContextualSimilarityMatrix>(
 			metric->matrix_factory()->create(CONTEXTUAL, p_document));
 
-		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix] (
+		return make_matcher(p_query, p_metric, p_document, p_booster, p_matcher_options, [matrix] (
 			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {
@@ -129,6 +132,7 @@ public:
 		const QueryRef &p_query,
 		const MetricRef &p_metric,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MatcherOptions &p_matcher_options) const {
 
 		const auto metric = std::static_pointer_cast<ContextualEmbeddingMetric>(p_metric);
@@ -136,7 +140,7 @@ public:
 			metric->matrix_factory()->create(CONTEXTUAL, p_document));
 		const auto options = m_options;
 
-		return make_matcher(p_query, p_metric, p_document, p_matcher_options, [matrix, options] (
+		return make_matcher(p_query, p_metric, p_document, p_booster, p_matcher_options, [matrix, options] (
 			const size_t slice_id,
 			const TokenSpan &s,
 			const TokenSpan &t) {

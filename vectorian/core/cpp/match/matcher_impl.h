@@ -21,10 +21,11 @@ public:
 	MatcherBase(
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MetricRef &p_metric,
 		Aligner &&p_aligner) :
 
-		Matcher(p_query, p_document, p_metric),
+		Matcher(p_query, p_document, p_booster, p_metric),
 		m_aligner(std::move(p_aligner)) {
 
 		const auto &slice_strategy = p_query->slice_strategy();
@@ -83,8 +84,9 @@ class MatcherImpl : public MatcherBase<Aligner> {
 
 		const MatcherRef matcher = this->shared_from_this();
 		const auto spans = this->m_document->spans(slice_strategy.level);
+		const auto &booster = this->m_booster;
 
-		const auto match_span = [&, s_tokens, t_tokens, len_t] (
+		const auto match_span = [&, s_tokens, t_tokens, len_t, booster] (
 			const size_t slice_id, const size_t token_at, const size_t len_s) {
 
 			p_run_match([&, s_tokens, t_tokens, slice_id, token_at, len_s, len_t] () {
@@ -94,7 +96,10 @@ class MatcherImpl : public MatcherBase<Aligner> {
 				    TokenSpan{s_tokens, static_cast<int32_t>(token_at), static_cast<int32_t>(len_s)},
 				    TokenSpan{t_tokens, 0, static_cast<int32_t>(len_t)});
 
-				return this->m_aligner.template make_match<Hook>(matcher, slice, p_matches);
+                const float boost = booster.get() ? booster->get_boost(slice_id) : 1.0f;
+
+                return this->m_aligner.template make_match<Hook>(
+				    matcher, slice, boost, p_matches);
 			});
 
 			return !this->m_query->aborted();
@@ -107,6 +112,7 @@ public:
 	MatcherImpl(
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MetricRef &p_metric,
 		Aligner &&p_aligner,
 		const Finalizer &p_finalizer,
@@ -115,14 +121,14 @@ public:
 		MatcherBase<Aligner>(
 			p_query,
 			p_document,
+			p_booster,
 			p_metric,
 			std::move(p_aligner)),
 		m_finalizer(p_finalizer),
 		m_slice_factory(p_slice_factory) {
 	}
 
-	virtual void match(
-		const ResultSetRef &p_matches) {
+	virtual void match(const ResultSetRef &p_matches) {
 
 		PPK_ASSERT(p_matches->size() == 0);
 
@@ -191,7 +197,8 @@ public:
 
 	MatcherRef create(
 		const QueryRef &p_query,
-		const DocumentRef &p_document) const {
+		const DocumentRef &p_document,
+		const BoosterRef &p_booster) const {
 
 		const auto token_filter = p_query->token_filter();
 
@@ -211,19 +218,20 @@ MatcherRef MinimalMatcherFactory::make_matcher(
 	const QueryRef &p_query,
 	const MetricRef &p_metric,
 	const DocumentRef &p_document,
+	const BoosterRef &p_booster,
 	const MatcherOptions &p_matcher_options,
 	const GenSlice &p_gen_slice) const {
 
-	const auto gen_matcher = [p_query, p_document, p_metric, p_matcher_options] (auto slice_factory) {
+	const auto gen_matcher = [p_query, p_document, p_booster, p_metric, p_matcher_options] (auto slice_factory) {
 		return create_alignment_matcher<Index>(
-			p_query, p_document, p_metric, p_matcher_options, slice_factory);
+			p_query, p_document, p_booster, p_metric, p_matcher_options, slice_factory);
 	};
 
 	FilteredMatcherFactory factory(
 		p_gen_slice,
 		gen_matcher);
 
-	return factory.create(p_query, p_document);
+	return factory.create(p_query, p_document, p_booster);
 }
 
 #endif // __VECTORIAN_MATCHER_IMPL__

@@ -119,7 +119,7 @@ class Query :
 public:
 	Query(
 		const py::object &p_index,
-		VocabularyRef p_vocab,
+		const VocabularyRef &p_vocab,
 		const py::dict &p_contextual_embeddings) :
 
 		m_index(p_index),
@@ -177,7 +177,8 @@ public:
 	}
 
 	ResultSetRef match(
-		const DocumentRef &p_document);
+	    const DocumentRef &p_document,
+	    const BoosterRef &p_booster);
 
 	bool aborted() const {
 		return m_aborted;

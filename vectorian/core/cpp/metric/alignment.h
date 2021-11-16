@@ -248,6 +248,7 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
+		const float p_boost,
 		const ResultSetRef &p_result_set) const {
 
 		const auto &algorithm = m_solver->algorithm();
@@ -273,7 +274,7 @@ public:
 
 		const float score_max = reference_score(
 			p_matcher->query(), p_slice, flow->max_score(p_slice));
-		const auto score = Score(aligner_score, score_max);
+		const auto score = Score(aligner_score, score_max, p_boost);
 
 		if (Hook) {
 			call_debug_hook(
@@ -422,6 +423,7 @@ class MakePyAlignMatcher {
 private:
 	const QueryRef m_query;
 	const DocumentRef m_document;
+	const BoosterRef m_booster;
 	const MetricRef m_metric;
 	const SliceFactory m_slice_factory;
 
@@ -432,11 +434,13 @@ public:
 	MakePyAlignMatcher(
 		const QueryRef &p_query,
 		const DocumentRef &p_document,
+		const BoosterRef &p_booster,
 		const MetricRef &p_metric,
 		const SliceFactory &p_slice_factory) :
 
 		m_query(p_query),
 		m_document(p_document),
+		m_booster(p_booster),
 		m_metric(p_metric),
 		m_slice_factory(p_slice_factory) {
 
@@ -460,7 +464,7 @@ public:
 				p_args...);
 		};
 
-		return make_matcher(m_query, m_document, m_metric, m_slice_factory,
+		return make_matcher(m_query, m_document, m_booster, m_metric, m_slice_factory,
 			std::move(InjectiveAlignment<Options, Algorithm>("alignment", gen)),
 			InjectiveAlignment<Options, Algorithm>::create_score_computer(m_slice_factory));
 	}
@@ -572,6 +576,7 @@ class WordMoversDistance {
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
+		const float p_boost,
 		const ResultSetRef &p_result_set,
 		const Solver &p_solver) {
 
@@ -586,7 +591,7 @@ class WordMoversDistance {
 
 		const float score_max = reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
-		const auto score = Score(r.score, score_max);
+		const auto score = Score(r.score, score_max, p_boost);
 
 		if (Hook) {
 			py::gil_scoped_acquire acquire;
@@ -636,6 +641,7 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
+		const float p_boost,
 		const ResultSetRef &p_result_set) {
 
 		const FlowFactoryRef<Index> flow_factory =
@@ -645,12 +651,14 @@ public:
 			return make_match<Hook>(
 				p_matcher,
 				p_slice,
+				p_boost,
 				p_result_set,
 				typename AbstractWMD<Index>::RelaxedSolver(flow_factory));
 		} else {
 			return make_match<Hook>(
 				p_matcher,
 				p_slice,
+				p_boost,
 				p_result_set,
 				typename AbstractWMD<Index>::FullSolver(flow_factory));
 		}
@@ -684,6 +692,7 @@ public:
 	inline MatchRef make_match(
 		const MatcherRef &p_matcher,
 		const Slice &p_slice,
+		const float p_boost,
 		const ResultSetRef &p_result_set) {
 
 		const FlowFactoryRef<Index> flow_factory =
@@ -694,7 +703,7 @@ public:
 
 		const float score_max = reference_score(
 			p_matcher->query(), p_slice, r.flow->max_score(p_slice));
-		const auto score = Score(r.score, score_max);
+		const auto score = Score(r.score, score_max, p_boost);
 
 		if (score > p_result_set->worst_score()) {
 			return p_result_set->add_match(
@@ -768,6 +777,7 @@ template<typename Index, typename SliceFactory>
 MatcherRef create_alignment_matcher(
 	const QueryRef &p_query,
 	const DocumentRef &p_document,
+	const BoosterRef &p_booster,
 	const MetricRef &p_metric,
 	const MatcherOptions &p_matcher_options,
 	const SliceFactory &p_factory) {
@@ -792,7 +802,7 @@ MatcherRef create_alignment_matcher(
 			alignment_def["options"].cast<py::dict>());
 
 		const auto make_matcher = MakePyAlignMatcher<PyAlignOptions, SliceFactory>(
-			p_query, p_document, p_metric, p_factory);
+			p_query, p_document, p_booster, p_metric, p_factory);
 
 		const auto matcher = pyalign::create_solver_factory(
 			*options.get(), make_matcher);
@@ -873,7 +883,7 @@ MatcherRef create_alignment_matcher(
 		}
 
 		return make_matcher(
-			p_query, p_document, p_metric, p_factory,
+			p_query, p_document, p_booster, p_metric, p_factory,
 			std::move(WordMoversDistance<Index>(WMDOptions{
 				relaxed, normalize_bow, symmetric, injective, pyemd, extra_mass_penalty})),
 			NoScoreComputer());
@@ -892,7 +902,7 @@ MatcherRef create_alignment_matcher(
 			extra_mass_penalty = alignment_def["extra_mass_penalty"].cast<float>();
 		}
 
-		return make_matcher(p_query, p_document, p_metric, p_factory,
+		return make_matcher(p_query, p_document, p_booster, p_metric, p_factory,
 			std::move(WordRotatorsDistance<Index>(
 				WRDOptions{normalize_magnitudes, pyemd, extra_mass_penalty})),
 			NoScoreComputer());

@@ -1,5 +1,6 @@
 #include "document.h"
 #include "query.h"
+#include "match/match.h"
 
 std::vector<VariableSpans::Span> unpack_spans(const py::dict &p_table) {
 	typedef VariableSpans::offset_t offset_t;
@@ -56,11 +57,13 @@ Document::Document(
 	add_dummy_token(*m_tokens.get());
 }
 
-ResultSetRef Document::find(const QueryRef &p_query) {
+ResultSetRef Document::find(
+    const QueryRef &p_query,
+    const BoosterRef &p_booster) {
 
 	if (m_tokens->empty()) {
 		return ResultSetRef();
 	}
 
-	return p_query->match(shared_from_this());
+	return p_query->match(shared_from_this(), p_booster);
 }

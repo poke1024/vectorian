@@ -3,6 +3,7 @@ import multiprocessing
 import multiprocessing.pool
 import time
 import numpy as np
+import scipy.signal
 import bisect
 import json
 import yaml
@@ -16,6 +17,7 @@ from cached_property import cached_property
 from collections import namedtuple
 from tqdm.autonotebook import tqdm
 from pathlib import Path
+from typing import List
 from vectorian.corpus.document import TokenTable, InternalMemoryText
 from vectorian.embeddings import Vectors, ProxyVectorsRef, prepare_docs
 
@@ -315,7 +317,7 @@ class CoreMatch(Match):
 
 	@property
 	def score(self):
-		return self._c_match.score_nrm
+		return self._c_match.score_val
 
 	@property
 	def score_max(self):
@@ -503,8 +505,51 @@ class DummyIndex(Index):
 		super().__init__(partition, None)
 
 
+class Convolve:
+	def __call__(self, x):
+		raise NotImplementedError()
+
+
+class GaussPulse(Convolve):
+	def __init__(self, width, fc, scale=1):
+		t = np.linspace(-1, 1, width, endpoint=True)
+		_, e = scipy.signal.gausspulse(t, fc=fc, retenv=True)
+		self._pulse = scale * (e / np.sum(e))
+		self._scale = scale
+
+	def __call__(self, x):
+		if self._pulse.shape[0] <= x.shape[0]:
+			return np.convolve(
+				x, self._pulse, mode='valid')
+		else:
+			return x * self._scale
+
+	def _ipython_display_(self):
+		import matplotlib.pyplot
+		matplotlib.pyplot.plot(self._pulse)
+
+
+class Boost:
+	def __init__(self, keywords: List[str], convolve:Convolve = None):
+		if convolve is None:
+			convolve = lambda x: x
+
+		self._keywords = keywords
+		self._convolve = convolve
+
+	def make_booster(self, partition, doc):
+		counts = doc.count_keywords(
+			partition.to_args(),
+			self._keywords)
+
+		w = self._convolve(counts)
+
+		return core.Booster(
+			w.astype(np.float32))
+
+
 class BruteForceIndex(Index):
-	def __init__(self, *args, nlp, **kwargs):
+	def __init__(self, *args, nlp, boost=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._nlp = nlp
 
@@ -514,16 +559,24 @@ class BruteForceIndex(Index):
 		else:
 			self._max_threads = max(1, int(self._max_threads))
 
+		self._boosters = {}
+		if boost:
+			for doc in self.session.c_documents:
+				self._boosters[doc.id] = boost.make_booster(
+					self.partition, doc)
+
+	def _find_in_doc(self, doc, c_query):
+		booster = self._boosters.get(doc.id)
+		return doc, doc.find(c_query, booster)
+
 	def _find(self, query, n_threads=None, progress=None):
 		p_query = query.prepare(self._nlp)
 
 		if len(p_query) == 0:
 			return []
 
-		c_query = p_query.compiled
-
-		def find_in_doc(x):
-			return x, x.find(c_query)
+		find_in_doc = functools.partial(
+			self._find_in_doc, c_query=p_query.compiled)
 
 		docs = self.session.c_documents
 
