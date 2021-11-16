@@ -293,39 +293,50 @@ public:
 };
 
 class Score {
-	const float m_normalized; // overall score in [0, 1]
-	const float m_max; // max of unnormalized
+    const float m_raw;
+	const float m_max; // max of m_raw, for normalization into [0, 1]
+	const float m_boost;
+	const float m_value;
 
 public:
-	inline Score(const float p_value, const float p_max) :
-		m_normalized(p_value / p_max),
-	    m_max(p_max) {
+	inline Score(const float p_raw, const float p_max, const float p_boost = 0.0f) :
+		m_raw(p_raw),
+	    m_max(p_max),
+	    m_boost(p_boost),
+	    m_value((p_raw / p_max) * (1.0f + m_boost)) {
 	}
 
-	inline float normalized() const {
-		return m_normalized;
+	inline float value() const {
+		return m_value;
 	}
 
 	inline float max() const {
 		return m_max;
 	}
 
+	inline Score boosted(const float p_boost) const {
+	    return Score(m_raw, m_max, m_boost + p_boost);
+	}
+
 	inline bool operator<(const Score &p_score) const {
-		return m_normalized < p_score.m_normalized;
+		return m_value < p_score.m_value;
 	}
 
 	inline bool operator>(const Score &p_score) const {
-		return m_normalized > p_score.m_normalized;
+		return m_value > p_score.m_value;
 	}
 
 	inline bool operator>=(const Score &p_score) const {
-		return m_normalized >= p_score.m_normalized;
+		return m_value >= p_score.m_value;
 	}
 
 	inline bool operator==(const Score &p_score) const {
-		return m_normalized == p_score.m_normalized;
+		return m_value == p_score.m_value;
 	}
 };
+
+class Match;
+typedef std::shared_ptr<Match> MatchRef;
 
 class Match {
 private:
@@ -345,6 +356,8 @@ public:
 		const int32_t p_slice_id,
 		const FlowRef<int16_t> &p_flow,
 		const Score &p_score);
+
+	MatchRef boosted(const float p_amount) const;
 
 	inline const MatcherRef &matcher() const {
 		return m_matcher;
@@ -366,8 +379,8 @@ public:
 		return m_score;
 	}
 
-	inline float score_nrm() const {
-		return m_score.normalized();
+	inline float score_val() const {
+		return m_score.value();
 	}
 
 	inline float score_max() const {
@@ -410,7 +423,5 @@ public:
 		}
 	}*/
 };
-
-typedef std::shared_ptr<Match> MatchRef;
 
 #endif // __VECTORIAN_MATCH_H__

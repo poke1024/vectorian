@@ -11,7 +11,7 @@ struct Match::compare_by_score {
 		const MatchRef &a,
 		const MatchRef &b) const {
 
-		if (C<float>()(a->score().normalized(), b->score().normalized())) {
+		if (C<float>()(a->score().value(), b->score().value())) {
 			return true;
 		} else if (a->score() == b->score()) {
 

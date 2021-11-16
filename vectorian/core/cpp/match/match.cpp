@@ -52,6 +52,14 @@ Match::Match(
 	m_score(p_score) {
 }
 
+MatchRef Match::boosted(const float p_amount) const {
+    return std::make_shared<Match>(
+        m_matcher,
+        MatchDigest(m_digest),
+        m_score.boosted(p_amount)
+    );
+}
+
 py::dict Match::flow_to_py() const {
 	return m_digest.flow->to_py();
 }
