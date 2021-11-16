@@ -519,8 +519,9 @@ class GaussPulse(Convolve):
 
 	def __call__(self, x):
 		if self._pulse.shape[0] <= x.shape[0]:
-			return np.convolve(
-				x, self._pulse, mode='valid')
+			y = np.convolve(
+				x, self._pulse, mode='same')
+			return y
 		else:
 			return x * self._scale
 
@@ -529,27 +530,46 @@ class GaussPulse(Convolve):
 		matplotlib.pyplot.plot(self._pulse)
 
 
-class Boost:
-	def __init__(self, keywords: List[str], convolve:Convolve = None):
-		if convolve is None:
-			convolve = lambda x: x
+class Signal:
+	def __call__(self, doc, partition):
+		raise NotImplementedError()
 
+
+class KeywordSignal(Signal):
+	def __init__(self, *keywords, max_count=1, strength=1):
 		self._keywords = keywords
-		self._convolve = convolve
+		self._max_count = max_count
+		self._strength = strength
 
-	def make_booster(self, partition, doc):
+	def __call__(self, doc, partition):
 		counts = doc.count_keywords(
 			partition.to_args(),
 			self._keywords)
 
-		w = self._convolve(counts)
+		if self._max_count is not None:
+			counts = np.minimum(counts, self._max_count)
+
+		return counts.astype(np.float32) * self._strength
+
+
+class Booster:
+	def __init__(self, signal: Signal, convolve:Convolve = None):
+		if convolve is None:
+			convolve = lambda x: x
+
+		self._signal = signal
+		self._convolve = convolve
+
+	def compile(self, doc, partition):
+		w = self._convolve(
+			self._signal(doc, partition))
 
 		return core.Booster(
 			w.astype(np.float32))
 
 
 class BruteForceIndex(Index):
-	def __init__(self, *args, nlp, boost=None, **kwargs):
+	def __init__(self, *args, nlp, booster=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._nlp = nlp
 
@@ -560,10 +580,10 @@ class BruteForceIndex(Index):
 			self._max_threads = max(1, int(self._max_threads))
 
 		self._boosters = {}
-		if boost:
+		if booster:
 			for doc in self.session.c_documents:
-				self._boosters[doc.id] = boost.make_booster(
-					self.partition, doc)
+				self._boosters[doc.id] = booster.compile(
+					doc, self.partition)
 
 	def _find_in_doc(self, doc, c_query):
 		booster = self._boosters.get(doc.id)

@@ -271,7 +271,7 @@ public:
 
 	py::array_t<int32_t> count_keywords(
    	    const py::dict &p_slice_strategy,
-	    const py::list &p_keywords) const {
+	    const py::tuple &p_keywords) const {
 
 	    std::unordered_set<token_t> keywords;
 	    keywords.reserve(p_keywords.size());
