@@ -3,7 +3,6 @@ import multiprocessing
 import multiprocessing.pool
 import time
 import numpy as np
-import scipy.signal
 import bisect
 import json
 import yaml
@@ -17,7 +16,7 @@ from cached_property import cached_property
 from collections import namedtuple
 from tqdm.autonotebook import tqdm
 from pathlib import Path
-from typing import List
+
 from vectorian.corpus.document import TokenTable, InternalMemoryText
 from vectorian.embeddings import Vectors, ProxyVectorsRef, prepare_docs
 
@@ -505,69 +504,6 @@ class DummyIndex(Index):
 		super().__init__(partition, None)
 
 
-class Convolve:
-	def __call__(self, x):
-		raise NotImplementedError()
-
-
-class GaussPulse(Convolve):
-	def __init__(self, width, fc, scale=1):
-		t = np.linspace(-1, 1, width, endpoint=True)
-		_, e = scipy.signal.gausspulse(t, fc=fc, retenv=True)
-		self._pulse = scale * (e / np.sum(e))
-		self._scale = scale
-
-	def __call__(self, x):
-		if self._pulse.shape[0] <= x.shape[0]:
-			y = np.convolve(
-				x, self._pulse, mode='same')
-			return y
-		else:
-			return x * self._scale
-
-	def _ipython_display_(self):
-		import matplotlib.pyplot
-		matplotlib.pyplot.plot(self._pulse)
-
-
-class Signal:
-	def __call__(self, doc, partition):
-		raise NotImplementedError()
-
-
-class KeywordSignal(Signal):
-	def __init__(self, *keywords, max_count=1, strength=1):
-		self._keywords = keywords
-		self._max_count = max_count
-		self._strength = strength
-
-	def __call__(self, doc, partition):
-		counts = doc.count_keywords(
-			partition.to_args(),
-			self._keywords)
-
-		if self._max_count is not None:
-			counts = np.minimum(counts, self._max_count)
-
-		return counts.astype(np.float32) * self._strength
-
-
-class Booster:
-	def __init__(self, signal: Signal, convolve:Convolve = None):
-		if convolve is None:
-			convolve = lambda x: x
-
-		self._signal = signal
-		self._convolve = convolve
-
-	def compile(self, doc, partition):
-		w = self._convolve(
-			self._signal(doc, partition))
-
-		return core.Booster(
-			w.astype(np.float32))
-
-
 class BruteForceIndex(Index):
 	def __init__(self, *args, nlp, booster=None, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -581,8 +517,8 @@ class BruteForceIndex(Index):
 
 		self._boosters = {}
 		if booster:
-			for doc in self.session.c_documents:
-				self._boosters[doc.id] = booster.compile(
+			for doc in self.session.documents:
+				self._boosters[doc.compiled.id] = booster.compile(
 					doc, self.partition)
 
 	def _find_in_doc(self, doc, c_query):

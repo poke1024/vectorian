@@ -15,6 +15,7 @@ import vectorian.importers as importers
 import vectorian.session as session
 import vectorian.metrics as metrics
 import vectorian.alignment as alignment
+import vectorian.booster as booster
 
 # "metrics" is the older name, "similarity" the newer name
 similarity = metrics

@@ -299,11 +299,11 @@ class Score {
 	const float m_value;
 
 public:
-	inline Score(const float p_raw, const float p_max, const float p_boost = 0.0f) :
+	inline Score(const float p_raw, const float p_max, const float p_boost = 1.0f) :
 		m_raw(p_raw),
 	    m_max(p_max),
 	    m_boost(p_boost),
-	    m_value((p_raw / p_max) * (1.0f + m_boost)) {
+	    m_value((p_raw / p_max) * m_boost) {
 	}
 
 	inline float value() const {
