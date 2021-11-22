@@ -54,11 +54,11 @@ class Signal:
 	def __call__(self, doc: PreparedDocument, partition: Partition):
 		raise NotImplementedError()
 
-	def filtered(self, width, method="max"):
-		return FilteredSignal(self, Signal._filters[method](width))
+	def smoothed(self, width, method="max"):
+		return SmoothedSignal(self, Signal._filters[method](width))
 
 
-class FilteredSignal(Signal):
+class SmoothedSignal(Signal):
 	def __init__(self, base, filter_):
 		self._base = base
 		self._filter = filter_
@@ -67,7 +67,7 @@ class FilteredSignal(Signal):
 		return self._filter(self._base(doc, partition))
 
 
-class KeywordSignal(Signal):
+class _FastKeywordSignal(Signal):
 	def __init__(self, *keywords, max_count=1):
 		self._keywords = keywords
 		self._max_count = max_count
@@ -83,6 +83,9 @@ class KeywordSignal(Signal):
 
 
 class CustomSignal(Signal):
+	def spans_to_signal(self, spans):
+		raise NotImplementedError()
+
 	def __call__(self, doc: PreparedDocument, partition: Partition):
 		spans = list(doc.spans(partition))
 		signal = self.spans_to_signal(spans)
@@ -91,7 +94,36 @@ class CustomSignal(Signal):
 		return signal
 
 
-class Booster:
+class KeywordSignal(CustomSignal):
+	def __init__(self, *keywords, max_count=1, same=None):
+		self._keywords = set(keywords)
+		self._max_count = max_count
+		self._same = same
+
+	def _check(self, x):
+		if self._same is None:
+			return x in self._keywords
+		else:
+			for y in self._keywords:
+				if self._same(x, y):
+					return True
+			return False
+
+	def spans_to_signal(self, spans):
+		w = np.zeros((len(spans),), dtype=np.float32)
+		for i, span in enumerate(spans):
+			n = 0
+			for token in span:
+				if self._check(token.text):
+					n += 1
+			w[i] = n
+
+		w = np.minimum(w, self._max_count)
+
+		return w / self._max_count
+
+
+class Saliency:
 	def __init__(self, strength=0.5):
 		self._f = []
 		self._w = []

@@ -505,7 +505,7 @@ class DummyIndex(Index):
 
 
 class BruteForceIndex(Index):
-	def __init__(self, *args, nlp, booster=None, **kwargs):
+	def __init__(self, *args, nlp, saliency=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._nlp = nlp
 
@@ -515,15 +515,15 @@ class BruteForceIndex(Index):
 		else:
 			self._max_threads = max(1, int(self._max_threads))
 
-		self._boosters = {}
-		if booster:
+		self._saliency = {}
+		if saliency:
 			for doc in self.session.documents:
-				self._boosters[doc.compiled.id] = booster.compile(
+				self._saliency[doc.compiled.id] = saliency.compile(
 					doc, self.partition)
 
 	def _find_in_doc(self, doc, c_query):
-		booster = self._boosters.get(doc.id)
-		return doc, doc.find(c_query, booster)
+		saliency = self._saliency.get(doc.id)
+		return doc, doc.find(c_query, saliency)
 
 	def _find(self, query, n_threads=None, progress=None):
 		p_query = query.prepare(self._nlp)
