@@ -139,8 +139,8 @@ class Saliency:
 		self._w.append(weight)
 
 	def compile(self, doc: PreparedDocument, partition: Partition):
-		if not np.isclose(np.sum(self._w), 1):
-			raise ValueError("weights must sum up to 1")
+		w_sum = np.sum(self._w)
+		normal_w = np.array(self._w) / w_sum
 
 		signals = [np.ones((doc.n_spans(partition),), dtype=np.float32)]
 		signals.extend([f(doc, partition) for f in self._f])
@@ -148,7 +148,7 @@ class Saliency:
 		if len(signals) == 1:
 			w = [1]
 		else:
-			w = [1 - self._strength] + (np.array(self._w) * self._strength).tolist()
+			w = [1 - self._strength] + (normal_w * self._strength).tolist()
 
 		return core.Booster(
 			np.average(signals, axis=0, weights=w))
