@@ -7,6 +7,9 @@ import uuid
 import sqlite3
 import contextlib
 import tempfile
+import shutil
+import datetime
+import uuid
 
 from vectorian.corpus.document import Document
 from vectorian.tqdm import tqdm
@@ -313,6 +316,23 @@ class Corpus:
 
 
 class TemporaryCorpus(Corpus):
+	@staticmethod
+	def create_temp_path():
+		temp_dir = Path.home() / ".vectorian" / "temp"
+		temp_dir.mkdir(exist_ok=True, parents=True)
+		return temp_dir
+
+	@staticmethod
+	def clear():
+		shutil.rmtree(TemporaryCorpus.create_temp_path())
+
 	def __init__(self):
-		path = tempfile.mkdtemp(prefix="vectorian_corpus")
+		event_id = datetime.datetime.now().strftime(
+			"%Y%m-%d%H-%M%S-") + str(uuid.uuid4())
+
+		path = Path(tempfile.mkdtemp(
+			prefix="vectorian_corpus_" + event_id,
+			dir=TemporaryCorpus.create_temp_path()))
+		assert len(list(path.iterdir())) == 0
+
 		super().__init__(path)
