@@ -1,6 +1,6 @@
 import vectorian.core as core
+from vectorian.tqdm import tqdm
 
-from tqdm.autonotebook import tqdm
 from pathlib import Path
 from cached_property import cached_property
 from functools import partial

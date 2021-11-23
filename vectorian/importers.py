@@ -3,11 +3,11 @@ import logging
 import numpy as np
 import download
 
-from tqdm.autonotebook import tqdm
 from pathlib import Path
 from collections import namedtuple
 
 from vectorian.embeddings import ContextualEmbedding, Vectors, ProxyVectorsRef
+from vectorian.tqdm import tqdm
 
 
 def normalize_dashes(s):

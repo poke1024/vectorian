@@ -9,8 +9,8 @@ import contextlib
 import tempfile
 
 from vectorian.corpus.document import Document
+from vectorian.tqdm import tqdm
 from pathlib import Path
-from tqdm.autonotebook import tqdm
 
 
 class FlavorRecord:

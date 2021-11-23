@@ -7,7 +7,6 @@ import concurrent.futures
 
 from cached_property import cached_property
 from functools import lru_cache
-from tqdm.autonotebook import tqdm
 
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
@@ -16,6 +15,7 @@ from vectorian.metrics import CosineSimilarity, TokenSimilarity, NetworkFlowSimi
 from vectorian.embeddings import OpenedVectorsCache, Vectors
 from vectorian.flavor import Flavor, VanillaFlavor
 from vectorian.corpus.corpus import Corpus
+from vectorian.tqdm import tqdm
 
 
 class Result:

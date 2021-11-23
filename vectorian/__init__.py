@@ -10,6 +10,10 @@ def compile(for_debugging=False, force_rebuild=False):
 	import vectorian.core
 
 
+def set_verbose(level):
+	os.environ["VECTORIAN_VERBOSE"] = str(level)
+
+
 import vectorian.embeddings as embeddings
 import vectorian.importers as importers
 import vectorian.session as session
