@@ -546,6 +546,10 @@ class Token:
 		with self._doc.text() as text:
 			return text.get()[self.to_slice()]
 
+	@property
+	def normalized_text(self):
+		return self._doc.compiled.token_str(self._index)
+
 	def _repr_html_(self):
 		return Token._html_template.format(
 			style=Token._css, text=html.escape(self.text))

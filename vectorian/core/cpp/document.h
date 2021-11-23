@@ -243,6 +243,10 @@ public:
 		return to_py_array(m_tokens, n_tokens());
 	}
 
+	std::string token_str(size_t i) const {
+    	return std::string(m_vocab->id_to_token(m_tokens->at(i).id));
+	}
+
 	inline const TokenVectorRef &tokens_vector() const {
 		return m_tokens;
 	}

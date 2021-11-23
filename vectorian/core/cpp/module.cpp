@@ -129,6 +129,7 @@ PYBIND11_MODULE(core, m) {
 	document.def("__repr__", &Document::__str__);
 	document.def_property_readonly("id", &Document::id);
 	document.def_property_readonly("tokens", &Document::py_tokens);
+	document.def("token_str", &Document::token_str);
 	document.def_property_readonly("path", &Document::path);
 	document.def_property_readonly("metadata", &Document::metadata);
 	document.def_property_readonly("n_tokens", &Document::n_tokens);
