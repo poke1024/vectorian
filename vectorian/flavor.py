@@ -158,33 +158,16 @@ class SimpleTokenNormalizer(TokenNormalizer):
 			yield text[start:end]
 
 
-def normalizer_dict(normalizers):
-	data = {}
-	for x in normalizers:
-		if isinstance(x, TextNormalizer):
-			k = 'text'
-		elif isinstance(x, TokenNormalizer):
-			k = 'token'
-		else:
-			raise ValueError(f"illegal normalizer {x}")
-		if k in data:
-			raise ValueError(f"duplicate {k}")
-		data[k] = x
-	if len(data) < 2:
-		raise ValueError("missing normalizers")
-	return data
-
-
 def vanilla_normalizers():
 	# Vectorian's default token mappings. You might want
 	# to adjust this by adding lowercase mapping and/or
 	# other pos tag mappings.
 
-	txt = TextNormalizer()
-	txt.sub(r"\W", "")
-	txt.filter("isalpha")
+	text = TextNormalizer()
+	text.sub(r"\W", "")
+	text.filter("isalpha")
 
-	tok = SimpleTokenNormalizer(
+	tokens = SimpleTokenNormalizer(
 		rewrite={
 			# rewrite PROPN as NOUN to fix accuracy
 
@@ -201,7 +184,10 @@ def vanilla_normalizers():
 		}
 	)
 
-	return [txt, tok]
+	return {
+		'text': text,
+		'token': tokens
+	}
 
 
 class AbstractFlavor:
@@ -215,7 +201,7 @@ class AbstractFlavor:
 
 	@cached_property
 	def normalizers(self):
-		return normalizer_dict(self._normalizers)
+		return self._normalizers
 
 
 class VanillaFlavor(AbstractFlavor):
