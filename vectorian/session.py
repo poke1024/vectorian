@@ -14,7 +14,8 @@ from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSimilarity, TokenSimilarity, NetworkFlowSimilarity, SpanSimilarity
 from vectorian.embeddings import OpenedVectorsCache, Vectors
-from vectorian.flavor import VanillaFlavor
+from vectorian.flavor import Flavor, VanillaFlavor
+from vectorian.corpus.corpus import Corpus
 
 
 class Result:
@@ -145,18 +146,26 @@ SessionEmbedding = collections.namedtuple(
 	"SessionEmbedding", ["factory", "instance"])
 
 
-class Session:
-	def __init__(self, corpus, embeddings=None, flavor=None):
-		if flavor is None:
-			c_flavors = corpus.flavors
-			if not c_flavors or (len(c_flavors) == 1 and c_flavors[0] == "vanilla"):
-				flavor = VanillaFlavor()
-				if not c_flavors:
-					corpus.add_flavor(flavor)
-			else:
-				raise ValueError("please specify a flavor")
+def _default_flavor(corpus: Corpus, flavor:Flavor = None):
+	if flavor is None:
+		c_flavors = corpus.flavors
+		if not c_flavors or tuple(c_flavors) == ("vanilla",):
+			flavor = VanillaFlavor()
+			if not c_flavors:
+				corpus.add_flavor(flavor)
+			return flavor
+		else:
+			raise ValueError("please specify a flavor")
 
-		self._flavor = flavor
+	if flavor.name not in corpus.flavors:
+		raise ValueError(f"flavor '{flavor.name}' does not exist in corpus")
+
+	return flavor
+
+
+class Session:
+	def __init__(self, corpus: Corpus, embeddings=None, flavor:Flavor = None):
+		self._flavor = _default_flavor(corpus, flavor)
 
 		if embeddings is None:
 			embeddings = []

@@ -6,6 +6,7 @@ import enum
 import uuid
 import sqlite3
 import contextlib
+import tempfile
 
 from vectorian.corpus.document import Document
 from pathlib import Path
@@ -236,6 +237,7 @@ class Corpus:
 		self._conn.close()
 
 	def add_flavor(self, flavor):
+		assert self._flavors_path.exists()
 		path = self._flavors_path / f"{flavor.name}.h5"
 		if path.exists():
 			raise RuntimeError(f"flavor {flavor.name} already exists")
@@ -292,6 +294,10 @@ class Corpus:
 		self._add_doc(unique_id, doc)
 
 	@property
+	def path(self):
+		return self._path
+
+	@property
 	def docs(self):
 		return self._docs.values()
 
@@ -304,3 +310,9 @@ class Corpus:
 
 	def __getitem__(self, k):
 		return self._ordered_docs[k]
+
+
+class TemporaryCorpus(Corpus):
+	def __init__(self):
+		path = tempfile.mkdtemp(prefix="vectorian_corpus")
+		super().__init__(path)
