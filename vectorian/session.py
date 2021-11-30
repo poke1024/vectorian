@@ -11,7 +11,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSimilarity, TokenSimilarity, NetworkFlowSimilarity, SpanSimilarity
+from vectorian.metrics import CosineSimilarity, TokenSim, SpanFlowSim, SpanSim
 from vectorian.embeddings import OpenedVectorsCache, Vectors
 from vectorian.flavor import Flavor, VanillaFlavor
 from vectorian.corpus.corpus import Corpus
@@ -129,7 +129,7 @@ class Partition:
 		return self._session.max_len(self._level, self._window_size)
 
 	def index(self, metric, nlp=None, **kwargs):
-		if not isinstance(metric, SpanSimilarity):
+		if not isinstance(metric, SpanSim):
 			raise TypeError(metric)
 
 		if nlp:
@@ -213,8 +213,8 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._embeddings[0]
-		return NetworkFlowSimilarity(
-			TokenSimilarity(
+		return SpanFlowSim(
+			TokenSim(
 				embedding, CosineSimilarity()))
 
 	@cached_property

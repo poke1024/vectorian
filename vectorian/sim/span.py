@@ -1,11 +1,11 @@
-from vectorian.alignment import SpanFlowStrategy, LocalAlignment
+from vectorian.alignment import FlowStrategy, LocalAlignment
 from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
-from vectorian.sim.token import AbstractTokenSimilarity
+from vectorian.sim.token import AbstractTokenSim
 from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
 from vectorian.alignment import ConstantGapCost
 
 
-class SpanSimilarity:
+class SpanSim:
 	def create_index(self, partition):
 		raise NotImplementedError()
 
@@ -13,15 +13,15 @@ class SpanSimilarity:
 		raise NotImplementedError()
 
 
-class NetworkFlowSimilarity(SpanSimilarity):
+class SpanFlowSim(SpanSim):
 	def __init__(
 		self,
-		token_sim: AbstractTokenSimilarity,
-		flow_strategy: SpanFlowStrategy = None,
+		token_sim: AbstractTokenSim,
+		flow_strategy: FlowStrategy = None,
 		tag_weights: dict = None,
 		**kwargs):
 
-		if not isinstance(token_sim, AbstractTokenSimilarity):
+		if not isinstance(token_sim, AbstractTokenSim):
 			raise TypeError(token_sim)
 
 		if flow_strategy is None:
@@ -30,7 +30,7 @@ class NetworkFlowSimilarity(SpanSimilarity):
 				't': ConstantGapCost(0)
 			})
 
-		if not isinstance(flow_strategy, SpanFlowStrategy):
+		if not isinstance(flow_strategy, FlowStrategy):
 			raise TypeError(flow_strategy)
 
 		self._token_sim = token_sim
@@ -70,7 +70,7 @@ class NetworkFlowSimilarity(SpanSimilarity):
 			}
 
 
-class SpanEmbeddingSimilarity(SpanSimilarity):
+class SpanEmbeddingSim(SpanSim):
 	def __init__(self, encoder, sim=None):
 		if sim is None:
 			sim = CosineSimilarity()
@@ -93,4 +93,4 @@ class SpanEmbeddingSimilarity(SpanSimilarity):
 
 	@property
 	def name(self):
-		return "SpanEmbeddingSimilarity"
+		return "SpanEmbeddingSim"

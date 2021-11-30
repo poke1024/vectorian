@@ -1,7 +1,7 @@
 from vectorian.sim.vector import VectorSimilarity
 
 
-class AbstractTokenSimilarity:
+class AbstractTokenSim:
 	@property
 	def is_modifier(self):
 		return False
@@ -15,7 +15,7 @@ class AbstractTokenSimilarity:
 		raise NotImplementedError()
 
 
-class TokenSimilarity(AbstractTokenSimilarity):
+class TokenSim(AbstractTokenSim):
 	def __init__(self, embedding, sim: VectorSimilarity):
 		self._embedding = embedding
 		self._sim = sim

@@ -18,17 +18,17 @@ scope of this introduction.
 
 ## Constructing an `Index`
 
-An `Index` is created from two components, a `Partition` and a `SpanSimilarity`:
+An `Index` is created from two components, a `Partition` and a `SpanSim`:
 
 * The given `Partition` indicates the granularity of search and which items
 should get indexed for searching (see the section on [Documents](../documents)
 for more details). In short, `Partition` models how to create `Span`s from
 `Document`s.
-* The `SpanSimilarity` models the approach taken to compute the similarity
+* The `SpanSim` models the approach taken to compute the similarity
 of two `Span`s (e.g. a specific sort of alignment). See the section on
 [Span Similarity](../sim_span) for more details.
 
-Here is an example (`my_span_sim` is an instance of `SpanSimilarity`):
+Here is an example (`my_span_sim` is an instance of `SpanSim`):
 
 ```
 my_index = session.partition("document").index(my_span_sim, nlp)

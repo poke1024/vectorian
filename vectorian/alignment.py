@@ -6,7 +6,7 @@ from typing import Dict, Union
 from pyalign.gaps import *
 
 
-class SpanFlowStrategy:
+class FlowStrategy:
 	def to_description(self, partition):
 		raise NotImplementedError()
 
@@ -14,7 +14,7 @@ class SpanFlowStrategy:
 		raise NotImplementedError()
 
 
-class AlignmentStrategy(SpanFlowStrategy):
+class AlignmentFlow(FlowStrategy):
 	"""
 	A strategy to align two sequences - i.e. matching one sequence against the
 	other sequences through a number of insertions and deletions while keeping
@@ -31,7 +31,7 @@ class AlignmentStrategy(SpanFlowStrategy):
 		}
 
 
-class TransportStrategy(SpanFlowStrategy):
+class TransportFlow(FlowStrategy):
 	"""
 	A strategy to match two sequences by posing a transport problem in a network.
 	The order of tokens is not inherently important in such formulations.
@@ -40,7 +40,7 @@ class TransportStrategy(SpanFlowStrategy):
 	pass
 
 
-class GlobalAlignment(AlignmentStrategy):
+class GlobalAlignment(AlignmentFlow):
 	"""
 	Models global alignments as originally described by Needleman and Wunsch (1970).
 
@@ -89,7 +89,7 @@ class GlobalAlignment(AlignmentStrategy):
 		return self._make_args(core.pyalign.Locality.GLOBAL, self._gap)
 
 
-class SemiGlobalAlignment(AlignmentStrategy):
+class SemiGlobalAlignment(AlignmentFlow):
 	"""
 	Models semiglobal (also called "end gaps free" or "free-shift") alignments.
 
@@ -121,7 +121,7 @@ class SemiGlobalAlignment(AlignmentStrategy):
 		return self._make_args(core.pyalign.Locality.SEMIGLOBAL, self._gap)
 
 
-class LocalAlignment(AlignmentStrategy):
+class LocalAlignment(AlignmentFlow):
 	"""
 	Models local alignments as described by Smith, Waterman and Beyer (1976).
 
@@ -177,7 +177,7 @@ class LocalAlignment(AlignmentStrategy):
 		return self._make_args(core.pyalign.Locality.LOCAL, self._gap)
 
 
-class WordMoversDistance(TransportStrategy):
+class WordMoversDistance(TransportFlow):
 	"""
 	Implements various variants of the Word Mover's Distance. The original full
 	WMD described by Kusner et al. can be instantiated through `wmd("nbow")`. The
@@ -273,7 +273,7 @@ class WordMoversDistance(TransportStrategy):
 		}
 
 
-class WordRotatorsDistance(TransportStrategy):
+class WordRotatorsDistance(TransportFlow):
 	"""
 	Implements the Word Rotators Distance by Yokoi et al.
 

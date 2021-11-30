@@ -33,9 +33,9 @@ that allows searches. See [Sessions](../sessions) for more details.
 
 * from your `Session`, create a `Partition` - which specifies how `Document`s should be split into searchable units,
 e.g. sentences. See [Documents](../documents) for more details.
-* create a `SpanSimilarity` that models the approach to compare document spans.
+* create a `SpanSim` that models the approach to compare document spans.
 See [Span Similarity](../sim_span) for more details.
-* from `Partition` and `SpanSimilarity`, create an `Index` - which specifies the strategy,
+* from `Partition` and `SpanSim`, create an `Index` - which specifies the strategy,
 i.e. algorithm, we employ for searching. See [Index](../vec_index) for more details.
 * perform a search on that `Index` (using a query text)
 * retrieve the `Result` and the `Match`es for that search
@@ -98,19 +98,19 @@ session = vectorian.session.LabSession(
     normalizers="default")
 ```
 
-Now we create a `NetworkFlowSimilarity`, which
-is a special form of `SpanSimilarity` that allows us to
+Now we create a `SpanFlowSim`, which
+is a special form of `SpanSim` that allows us to
 specify the Waterman-Smith-Beyer alignment algorithm.
 Note that we base this alignment on a concept of token similarity
 that is computed through the the cosine similarity over the GloVe
 embedding we specified earlier.
 
 ```
-token_similarity = vectorian.similarity.TokenSimilarity(
+token_similarity = vectorian.similarity.TokenSim(
     glove,
     vectorian.similarity.CosineSimilarity())
 
-span_similarity = vectorian.similarity.NetworkFlowSimilarity(
+span_similarity = vectorian.similarity.SpanFlowSim(
     token_sim=token_similarity,
     flow_strategy=vectorian.alignment.LocalAlignment(
         gap=vectorian.alignment.smooth_gap_cost(5)))

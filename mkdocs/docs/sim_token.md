@@ -1,8 +1,8 @@
 # Token Similarity
 
-## TokenSimilarity
+## TokenSim
 
-`vectorian.sim.token.TokenSimilarity` describes a strategy to compute a similarity
+`vectorian.sim.token.TokenSim` describes a strategy to compute a similarity
 score from embeddings. It consists of two things:
 
 * a specific embedding which serves as the source of vectors (e.g. fastText)
@@ -11,7 +11,7 @@ score from embeddings. It consists of two things:
 The first item is modelled by `vectorian.embedding.Embedding` in the Vectorian, the
 latter by `vectorian.sim.vector.VectorSimilarity`.
 
-![Basic Operators implementing TokenSimilarity](images/sim_token.png)
+![Basic Operators implementing TokenSim](images/sim_token.png)
 
 ## VectorSimilarity
 
@@ -31,7 +31,7 @@ example further below).
 The following diagram shows which `VectorSimilarity`s are currently implemented
 in the Vectorian.
 
-![Basic Operators implementing TokenSimilarity](images/sim_vector.png)
+![Basic Operators implementing TokenSim](images/sim_vector.png)
 
 ## Modifiers on VectorSimilarity
 
@@ -48,7 +48,7 @@ in `fastText`, where similarity between two vectors **u** and **v** is calculate
 as `cos(phi) - 0.2`, if `phi` is the angle between **u** and **v**.
 
 ```
-vectorian.sim.token.TokenSimilarity(
+vectorian.sim.token.TokenSim(
     fastText,
     vectorian.sim.vector.ModifiedVectorSimilarity(
         vectorian.sim.vector.CosineSimilarity(),
@@ -61,26 +61,26 @@ with `ModifiedVectorSimilarity` are shown in the following diagram:
 
 ![Kernels for modifying similarities](images/sim_kernel.png)
 
-## Modifiers on TokenSimilarity
+## Modifiers on TokenSim
 
-The Vectorian also allows you to build completely new `TokenSimilarity`
-strategies that are capable of combining different `TokenSimilarity` instances
+The Vectorian also allows you to build completely new `TokenSim`
+strategies that are capable of combining different `TokenSim` instances
 that employ different embeddings.
 
 One such example is `vectorian.sim.modifier.MixedTokenSimilarity`, which takes a
-number of `TokenSimilarity` instances and combines them in a weighted sum.
+number of `TokenSim` instances and combines them in a weighted sum.
 
-Here is an example that combines two different `TokenSimilarity` instances to
-build a new mixed `TokenSimilarity`:
+Here is an example that combines two different `TokenSim` instances to
+build a new mixed `TokenSim`:
 
 ```
 vectorian.sim.modifier.MixedTokenSimilarity(
 	[
-        vectorian.sim.token.TokenSimilarity(
+        vectorian.sim.token.TokenSim(
             fastText,
             vectorian.sim.vector.CosineSimilarity(),
         ),
-        vectorian.sim.token.TokenSimilarity(
+        vectorian.sim.token.TokenSim(
             glove,
             vectorian.sim.vector.ModifiedVectorSimilarity(
                 vectorian.sim.vector.CosineSimilarity(),
@@ -91,7 +91,7 @@ vectorian.sim.modifier.MixedTokenSimilarity(
 ```
 
 Other combinators are possible. For example, `MaximumTokenSimilarity` takes the
-highest similarity of a number of given `TokenSimilarity`s for each token.
+highest similarity of a number of given `TokenSim`s for each token.
 Accordingly, `MinimumTokenSimilarity` takes the lowest similarity.
 
 The following diagram shows all such multi-embedding combinators which are

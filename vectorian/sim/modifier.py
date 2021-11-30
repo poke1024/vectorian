@@ -1,11 +1,11 @@
 import numpy as np
 
 from typing import List
-from vectorian.sim.token import AbstractTokenSimilarity
+from vectorian.sim.token import AbstractTokenSim
 from vectorian.sim.kernel import UnaryOperator, Kernel
 
 
-class TokenSimilarityModifier(AbstractTokenSimilarity):
+class TokenSimilarityModifier(AbstractTokenSim):
 	@property
 	def is_modifier(self):
 		return True

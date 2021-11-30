@@ -3508,7 +3508,7 @@
 											"top": 63,
 											"width": 111,
 											"height": 13,
-											"text": "SpanSimilarity"
+											"text": "SpanSim"
 										},
 										{
 											"_type": "LabelView",
@@ -5404,7 +5404,7 @@
 					"_parent": {
 						"$ref": "AAAAAAFF+qBWK6M3Z8Y="
 					},
-					"name": "SpanSimilarity"
+					"name": "SpanSim"
 				},
 				{
 					"_type": "UMLClass",

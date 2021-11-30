@@ -604,6 +604,18 @@ class Word2VecVectors(GensimVectors):
 			self._path, binary=self._binary)
 
 
+class OneHotEncoding(StaticEmbedding):
+	class Instance(StaticEmbeddingInstance):
+		pass
+
+	def create_instance(self, session):
+		return OneHotEncoding.Instance()
+
+	@property
+	def name(self):
+		return "one-hot"
+
+
 class KeyedVectors(StaticEmbedding):
 	# using this class directly circumvents Vectorian's token
 	# normalization. use with care.
@@ -970,7 +982,7 @@ class ContextualEmbedding(Embedding):
 		raise NotImplementedError()
 
 
-class SpacyEmbedding(ContextualEmbedding):
+class AbstractSpacyEmbedding(ContextualEmbedding):
 	def __init__(self, nlp, transform=None):
 		super().__init__(transform)
 		self._nlp = nlp
@@ -1035,7 +1047,7 @@ class VectorCache:
 			return np.load(self._path / (stem + ".npy"))
 
 
-class SpacyVectorEmbedding(SpacyEmbedding):
+class SpacyEmbedding(AbstractSpacyEmbedding):
 	def __init__(self, nlp, dimension, cache=None, **kwargs):
 		super().__init__(nlp, **kwargs)
 		self._dimension = dimension
@@ -1046,7 +1058,7 @@ class SpacyVectorEmbedding(SpacyEmbedding):
 		return self._dimension
 
 	def pca(self, n_dims):
-		return SpacyVectorEmbedding(self._nlp, PCACompression(n_dims))
+		return SpacyEmbedding(self._nlp, PCACompression(n_dims))
 
 	def encode(self, doc):
 		if self._cache is not None:
@@ -1062,7 +1074,7 @@ class SpacyVectorEmbedding(SpacyEmbedding):
 		return array
 
 
-class SpacyTransformerEmbedding(SpacyEmbedding):
+class SpacyTransformerEmbedding(AbstractSpacyEmbedding):
 	@property
 	def dimension(self):
 		if self._transform is not None:
