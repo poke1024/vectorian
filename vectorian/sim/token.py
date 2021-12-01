@@ -1,4 +1,4 @@
-from vectorian.sim.vector import VectorSimilarity
+from vectorian.sim.vector import VectorSim
 
 
 class AbstractTokenSim:
@@ -16,7 +16,7 @@ class AbstractTokenSim:
 
 
 class TokenSim(AbstractTokenSim):
-	def __init__(self, embedding, sim: VectorSimilarity):
+	def __init__(self, embedding, sim: VectorSim):
 		self._embedding = embedding
 		self._sim = sim
 

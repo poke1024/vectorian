@@ -108,7 +108,7 @@ embedding we specified earlier.
 ```
 token_similarity = vectorian.similarity.TokenSim(
     glove,
-    vectorian.similarity.CosineSimilarity())
+    vectorian.similarity.CosineSim())
 
 span_similarity = vectorian.similarity.SpanFlowSim(
     token_sim=token_similarity,

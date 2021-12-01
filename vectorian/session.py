@@ -11,7 +11,7 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSimilarity, TokenSim, SpanFlowSim, SpanSim
+from vectorian.metrics import CosineSim, TokenSim, SpanFlowSim, SpanSim
 from vectorian.embeddings import OpenedVectorsCache, Vectors
 from vectorian.flavor import Flavor, VanillaFlavor
 from vectorian.corpus.corpus import Corpus
@@ -215,7 +215,7 @@ class Session:
 		embedding = self._embeddings[0]
 		return SpanFlowSim(
 			TokenSim(
-				embedding, CosineSimilarity()))
+				embedding, CosineSim()))
 
 	@cached_property
 	def documents(self):

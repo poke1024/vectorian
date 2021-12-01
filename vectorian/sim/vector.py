@@ -14,7 +14,7 @@ except ImportError:
 	get_array_module = lambda obj: np
 
 
-class VectorSimilarity:
+class VectorSim:
 	"""A strategy to compute a scalar representing similarity from pairs of vectors."""
 
 	def __call__(self, a: AbstractVectors, b: AbstractVectors, out: np.ndarray):
@@ -45,7 +45,7 @@ class VectorSimilarity:
 		raise NotImplementedError()
 
 
-class LoggingSimilarity(VectorSimilarity):
+class LoggingSimilarity(VectorSim):
 	def __init__(self, path, base):
 		self._path = path
 		self._base = base
@@ -60,18 +60,18 @@ class LoggingSimilarity(VectorSimilarity):
 		self._base(a, b, out)
 
 
-class CosineSimilarity(VectorSimilarity):
+class CosineSim(VectorSim):
 	"""Computes cosine similarity, i.e. the cosine of the angle between two vectors"""
 
 	def compute(self, a, b, out):
 		"""
 		.. note::
-		   By definition in `VectorSimilarity`, the scalars in `out` have meaningful values
+		   By definition in `VectorSim`, the scalars in `out` have meaningful values
 		   between 0 and 1. Cosine similarity however generates values in the range [-1, 1].
 		   As a cosine of 0 already implies orthogonality and thus high unsimilarity, and
 		   negative values are clipped to 0 this is usually not an issue. If you want to
 		   regard negative cosine similarity values as similar, you need to modify these
-		   values by using `ModifiedVectorSimilarity` with operators such as
+		   values by using `ModifiedVectorSim` with operators such as
 		   `vectorian.sim.kernel.Bias` and `vectorian.sim.kernel.Scale`.
 		"""
 
@@ -82,7 +82,7 @@ class CosineSimilarity(VectorSimilarity):
 		return "cosine"
 
 
-class ImprovedSqrtCosineSimilarity(VectorSimilarity):
+class ImprovedSqrtCosineSim(VectorSim):
 	"""
 	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”
 	Journal of Big Data, vol. 4, no. 1, Dec. 2017, p. 25. DOI.org (Crossref), doi:10.1186/s40537-017-0083-6.
@@ -119,12 +119,12 @@ class ImprovedSqrtCosineSimilarity(VectorSimilarity):
 		return "improved-sqrt-cosine"
 
 
-class PNormDistance(VectorSimilarity):
+class PNormDistance(VectorSim):
 	"""Computes distance between vectors using a p-norm.
 
 	.. note::
 		By computing a distance instead of a similarity, this component breaks the
-		definition of `VectorSimilarity`. In order to be used as a similarity,
+		definition of `VectorSim`. In order to be used as a similarity,
 		it needs to be combined with `vectorian.sim.kernel.DistanceToSimilarity`.
 	"""
 
@@ -154,7 +154,7 @@ class EuclideanDistance(PNormDistance):
 		super().__init__(p=2, scale=scale)
 
 
-class DirectionalDistance(VectorSimilarity):
+class DirectionalDistance(VectorSim):
 	def __init__(self, dir):
 		self._dir = dir
 
@@ -163,13 +163,13 @@ class DirectionalDistance(VectorSimilarity):
 		np.linalg.multi_dot([d, self._dir.T], out=out)
 
 
-class ModifiedVectorSimilarity(VectorSimilarity):
-	"""VectorSimilarity whose output is modified by one or more operators."""
+class ModifiedVectorSim(VectorSim):
+	"""VectorSim whose output is modified by one or more operators."""
 
-	def __init__(self, source: VectorSimilarity, *operators: List[UnaryOperator]):
+	def __init__(self, source: VectorSim, *operators: List[UnaryOperator]):
 		"""
 		Args:
-			source (VectorSimilarity): the underlying similarity that is going to
+			source (VectorSim): the underlying similarity that is going to
 				be modified
 			operators (List[UnaryOperator]): one or more operators that modify the
 				similarity scalar

@@ -9,38 +9,38 @@ score from embeddings. It consists of two things:
 * a strategy to compute a scalar similarity value from two vectors
 
 The first item is modelled by `vectorian.embedding.Embedding` in the Vectorian, the
-latter by `vectorian.sim.vector.VectorSimilarity`.
+latter by `vectorian.sim.vector.VectorSim`.
 
 ![Basic Operators implementing TokenSim](images/sim_token.png)
 
-## VectorSimilarity
+## VectorSim
 
-`vectorian.sim.vector.VectorSimilarity` is a strategy that describes how to
+`vectorian.sim.vector.VectorSim` is a strategy that describes how to
 compute a scalar similarity value from two given embedding vectors. The resulting
 value is expected to lie between 0 (which implies minimum similarity) and 1 (which
 implies maximum similarity). Negative values will be clipped to 0 later in the
 pipeline.
 
-An obvious choice for `VectorSimilarity` is `vectorian.sim.token.CosineSimilarity`,
+An obvious choice for `VectorSim` is `vectorian.sim.token.CosineSim`,
 which computes the cosine of the angle between two embedding vectors.
 
-Other `VectorSimilarity` implementations based on other metrics are possible. It is
+Other `VectorSim` implementations based on other metrics are possible. It is
 also possible to compute distances and later convert them to similarities (see
 example further below).
 
-The following diagram shows which `VectorSimilarity`s are currently implemented
+The following diagram shows which `VectorSim`s are currently implemented
 in the Vectorian.
 
 ![Basic Operators implementing TokenSim](images/sim_vector.png)
 
-## Modifiers on VectorSimilarity
+## Modifiers on VectorSim
 
-Using `vectorian.sim.token.ModifiedVectorSimilarity` and one or more
+Using `vectorian.sim.token.ModifiedVectorSim` and one or more
 `vectorian.sim.kernel.UnaryOperator`s it is possible to perform additional
-operations on a `VectorSimilarity`.
+operations on a `VectorSim`.
 
 Note that this kind of operations are always based eventually on *one* single
-embedding, since all such computations boil down to one root `VectorSimilarity`,
+embedding, since all such computations boil down to one root `VectorSim`,
 which usually operates on a single embedding.
 
 For example the following code models a similarity based on the embedding stored
@@ -50,14 +50,14 @@ as `cos(phi) - 0.2`, if `phi` is the angle between **u** and **v**.
 ```
 vectorian.sim.token.TokenSim(
     fastText,
-    vectorian.sim.vector.ModifiedVectorSimilarity(
-        vectorian.sim.vector.CosineSimilarity(),
+    vectorian.sim.vector.ModifiedVectorSim(
+        vectorian.sim.vector.CosineSim(),
         vectorian.sim.kernel.Bias(-0.2)
     ))
 ```
 
 The currently available unary operators (like e.g. `Bias`) that can be used
-with `ModifiedVectorSimilarity` are shown in the following diagram:
+with `ModifiedVectorSim` are shown in the following diagram:
 
 ![Kernels for modifying similarities](images/sim_kernel.png)
 
@@ -78,12 +78,12 @@ vectorian.sim.modifier.MixedTokenSimilarity(
 	[
         vectorian.sim.token.TokenSim(
             fastText,
-            vectorian.sim.vector.CosineSimilarity(),
+            vectorian.sim.vector.CosineSim(),
         ),
         vectorian.sim.token.TokenSim(
             glove,
-            vectorian.sim.vector.ModifiedVectorSimilarity(
-                vectorian.sim.vector.CosineSimilarity(),
+            vectorian.sim.vector.ModifiedVectorSim(
+                vectorian.sim.vector.CosineSim(),
                 vectorian.sim.kernel.Bias(-0.2)
             )),
     ],
@@ -101,10 +101,10 @@ currently implemented:
 
 ## Distances and Similarities
 
-Here is an example of using a Euclidean distance as a `VectorSimilarity`:
+Here is an example of using a Euclidean distance as a `VectorSim`:
 
 ```
-vectorian.metrics.ModifiedVectorSimilarity(
+vectorian.metrics.ModifiedVectorSim(
     vectorian.sim.token.PNormDistance(p=2),
     vectorian.sim.kernel.RadialBasis(gamma=2.5),
     vectorian.sim.kernel.DistanceToSimilarity()

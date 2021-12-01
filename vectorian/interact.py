@@ -86,7 +86,7 @@ class CosineMetricWidget:
 		return self._vbox
 
 	def make(self):
-		return vectorian.metrics.CosineSimilarity()
+		return vectorian.metrics.CosineSim()
 
 
 class ImprovedSqrtCosineMetricWidget:
@@ -98,7 +98,7 @@ class ImprovedSqrtCosineMetricWidget:
 		return self._vbox
 
 	def make(self):
-		return vectorian.metrics.ImprovedSqrtCosineSimilarity()
+		return vectorian.metrics.ImprovedSqrtCosineSim()
 
 
 class PNormWidget:
@@ -128,7 +128,7 @@ class PNormWidget:
 		return self._vbox
 
 	def make(self):
-		return vectorian.metrics.ModifiedVectorSimilarity(
+		return vectorian.metrics.ModifiedVectorSim(
 			vectorian.metrics.PNormDistance(p=self._p.value),
 			vectorian.metrics.RadialBasis(self._scale.value)
 		)
@@ -858,7 +858,7 @@ class PartitionEmbeddingWidget:
 			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.SpanEmbeddingSim(
+		return vectorian.metrics.SpanEncoderSim(
 			self._encoders[self._widget.value].to_cached())
 
 	def describe(self):

@@ -12,7 +12,7 @@ There are two kind of `SpanSim` strategies the Vectorian supports, and
 they are handled in two separate classes:
 
 * `SpanFlowSim` models span flows (e.g. alignments and WMD)
-* `SpanEmbeddingSim` models span embeddings
+* `SpanEncoderSim` models span embeddings
 
 ![Implementations of SpanSim](images/sim_span.png)
 
@@ -39,7 +39,7 @@ cosine similarity over a pretrained GloVe embedding of dimension 50:
 vectorian.metrics.SpanFlowSim(
     token_sim=vectorian.metrics(
         vectorian.embeddings.PretrainedGloVe('6B', ndims=50),
-        vectorian.sim.vector.CosineSimilarity()
+        vectorian.sim.vector.CosineSim()
     ),
     flow_strategy=vectorian.alignment.WatermanSmithBeyer(
         gap=vectorian.alignment.ExponentialGapCost(cutoff=5),

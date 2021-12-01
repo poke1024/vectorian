@@ -1,7 +1,7 @@
 from vectorian.alignment import FlowStrategy, LocalAlignment
 from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
 from vectorian.sim.token import AbstractTokenSim
-from vectorian.sim.vector import VectorSimilarity, CosineSimilarity
+from vectorian.sim.vector import VectorSim, CosineSim
 from vectorian.alignment import ConstantGapCost
 
 
@@ -70,12 +70,12 @@ class SpanFlowSim(SpanSim):
 			}
 
 
-class SpanEmbeddingSim(SpanSim):
+class SpanEncoderSim(SpanSim):
 	def __init__(self, encoder, sim=None):
 		if sim is None:
-			sim = CosineSimilarity()
-		assert isinstance(sim, VectorSimilarity)
-		if not isinstance(sim, CosineSimilarity):
+			sim = CosineSim()
+		assert isinstance(sim, VectorSim)
+		if not isinstance(sim, CosineSim):
 			raise NotImplementedError()
 		self._encoder = encoder
 		self._sim = sim
@@ -93,4 +93,4 @@ class SpanEmbeddingSim(SpanSim):
 
 	@property
 	def name(self):
-		return "SpanEmbeddingSim"
+		return "SpanEncoderSim"
