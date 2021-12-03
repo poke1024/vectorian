@@ -580,30 +580,166 @@ def augment_xq(xq):
 	return np.hstack((xq, extracol.reshape(-1, 1)))
 
 
-class PartitionEmbeddingIndex(Index):
-	def __init__(self, partition, metric, encoder, nlp, vectors=None, faiss_description='Flat'):
-		import faiss
-
-		super().__init__(partition, metric)
+class AbstractSpanEncoderIndex(Index):
+	def __init__(self, partition, span_sim, nlp):
+		super().__init__(partition, span_sim)
 
 		self._partition = partition
-		self._metric = metric
-		self._encoder = encoder
+		self._span_sim = span_sim
 		self._nlp = nlp
 
 		session = self._partition.session
+		self._session = session
 
 		doc_starts = [0]
 		for i, doc in enumerate(session.documents):
 			doc_starts.append(doc.n_spans(self._partition))
 		self._doc_starts = np.cumsum(np.array(doc_starts, dtype=np.int32))
 
+	@property
+	def session(self):
+		return self._session
+
+	@property
+	def corpus_vec(self):
+		raise NotImplementedError()
+
+	def _unpack_index(self, i):
+		doc_index = bisect.bisect_left(self._doc_starts, i)
+		if doc_index > 0 and self._doc_starts[doc_index] > i:
+			doc_index -= 1
+		sent_index = i - self._doc_starts[doc_index]
+		return doc_index, sent_index
+
+	def _make_match(self, query, score, doc_index, sent_index):
+		doc = self.session.documents[doc_index]
+
+		span = doc.span(self._partition, sent_index)
+
+		regions = [Region(
+			s=span.text.strip(),
+			match=None, gap_penalty=0)]
+
+		return PyMatch(
+			self,
+			query,
+			doc,
+			sent_index,
+			score,
+			self._span_sim.name,
+			regions=regions,
+			level="span"
+		)
+
+	def save(self, path):
+		path = Path(path)
+		path.mkdir(exist_ok=True)
+
+		offset = 0
+		session = self._partition.session
+		corpus_vec = self.corpus_vec.ummodified
+
+		for doc in tqdm(session.documents, desc="Saving"):
+			size = doc.n_spans(self._partition)
+			np.save(
+				str(path / (doc.caching_name + ".npy")),
+				corpus_vec[offset:size],
+				allow_pickle=False)
+			offset += size
+
+		with open(path / "index.json", "w") as f:
+			f.write(json.dumps({
+				'class': self.__class__.__name__,
+				'partition': self._partition.to_args()
+			}))
+
+	'''
+	@staticmethod
+	def load(session, metric, encoder, path, **kwargs):
+		path = Path(path)
+		corpus_vec = []
+		with open(path / "index.json", "r") as f:
+			data = json.loads(f.read())
+		for i, doc in enumerate(session.documents):
+			p = path / (doc.caching_name + ".npy")
+			if not p.exists():
+				raise FileNotFoundError(p)
+			corpus_vec.append(np.load(p))
+		corpus_vec = np.vstack(corpus_vec)
+		return FaissCosineIndex(
+			session.partition(**data["partition"]),
+			metric, encoder, corpus_vec, **kwargs)
+	'''
+
+
+class SpanEncoderIndex(AbstractSpanEncoderIndex):
+	def __init__(self, partition, span_sim, encoder, nlp, vector_sim, vectors=None):
+		super().__init__(partition, span_sim, nlp)
+
+		self._encoder = encoder
+		self._vector_sim = vector_sim
+
+		if vectors is not None:
+			corpus_vec = Vectors(vectors)
+		else:
+			corpus_vec = encoder.encode(
+				self._session.documents, partition, pbar=True)
+
+		self._corpus_vec = corpus_vec
+
+	@property
+	def corpus_vec(self):
+		raise self._corpus_vec
+
+	def _find(self, query, progress=None):
+		query_vec = self._encoder.encode(
+			prepare_docs([query], nlp=self._nlp), self._partition)
+
+		if query_vec.unmodified.shape[0] != 1:
+			raise RuntimeError(
+				"query produced more than one embedding")
+
+		sim = np.zeros(
+			(self._corpus_vec.unmodified.shape[0], 1),
+			dtype=query_vec.unmodified.dtype)
+
+		self._vector_sim.compute(
+			self._corpus_vec,
+			query_vec,
+			sim)
+
+		sim = sim.reshape(-1)
+		sim[np.isnan(sim)] = -np.inf
+		index = np.argsort(sim)
+
+		max_matches = query.options["max_matches"]
+
+		matches = []
+		for i in reversed(index[-max_matches::]):
+			if sim[i] < 0:
+				break
+
+			doc_index, sent_index = self._unpack_index(i)
+
+			matches.append(self._make_match(
+				query, sim[i], doc_index, sent_index))
+
+		return matches
+
+
+class FaissCosineIndex(AbstractSpanEncoderIndex):
+	def __init__(self, partition, span_sim, encoder, nlp, vectors=None, faiss_description='Flat'):
+		import faiss
+
+		super().__init__(partition, span_sim, nlp)
+
+		self._encoder = encoder
+
 		if vectors is not None:
 			corpus_vec = vectors
 		else:
 			corpus_vec = encoder.encode(
-				session.documents, partition, pbar=True)
-			# FIXME normalization should only apply to cosine metrics
+				self._session.documents, partition, pbar=True)
 			corpus_vec = corpus_vec.normalized
 
 		corpus_vec = corpus_vec.astype(np.float32)
@@ -615,7 +751,6 @@ class PartitionEmbeddingIndex(Index):
 
 		self._ip_to_l2 = faiss_description.split(",")[-1] != "Flat"
 
-		# FIXME the following should only apply to cosine metrics
 		if self._ip_to_l2:
 			corpus_vec = augment_xb(corpus_vec)
 			metric = faiss.METRIC_L2
@@ -631,56 +766,22 @@ class PartitionEmbeddingIndex(Index):
 		self._index = index
 		self._corpus_vec = corpus_vec
 
-	@property
-	def session(self):
-		return self._partition.session
-
 	@staticmethod
-	def load(session, metric, encoder, path):
-		path = Path(path)
-		corpus_vec = []
-		with open(path / "index.json", "r") as f:
-			data = json.loads(f.read())
-		if data["metric"] != "sentence_embedding":
-			raise RuntimeError(f"index at {path} is not a SentenceEmbedding index")
-		for i, doc in enumerate(session.documents):
-			p = path / (doc.caching_name + ".npy")
-			if not p.exists():
-				raise FileNotFoundError(p)
-			corpus_vec.append(np.load(p))
-		corpus_vec = np.vstack(corpus_vec)
-		return PartitionEmbeddingIndex(
-			session.partition(**data["partition"]),
-			metric, encoder, corpus_vec)
+	def is_available():
+		try:
+			import faiss
+		except ImportError:
+			return False
+		return True
 
-	def save(self, path):
-		path = Path(path)
-		path.mkdir(exist_ok=True)
-
-		offset = 0
-		session = self._partition.session
-
-		for doc in tqdm(session.documents, desc="Saving"):
-			size = doc.n_spans(self._partition)
-			np.save(
-				str(path / (doc.caching_name + ".npy")),
-				self._corpus_vec[offset:size],
-				allow_pickle=False)
-			offset += size
-
-		with open(path / "index.json", "w") as f:
-			f.write(json.dumps({
-				'metric': 'sentence_embedding',
-				'partition': self._partition.to_args()
-			}))
+	@property
+	def corpus_vec(self):
+		raise Vectors(self._corpus_vec)
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder.encode(
 			prepare_docs([query], nlp=self._nlp), self._partition)
-
-		# FIXME normalization should only apply to cosine metrics
 		query_vec = query_vec.normalized
-
 		query_vec = query_vec.astype(np.float32)
 
 		if query_vec.shape[0] != 1:
@@ -700,36 +801,9 @@ class PartitionEmbeddingIndex(Index):
 			if i < 0:
 				break
 
-			doc_index = bisect.bisect_left(self._doc_starts, i)
-			if doc_index > 0 and self._doc_starts[doc_index] > i:
-				doc_index -= 1
-			sent_index = i - self._doc_starts[doc_index]
+			doc_index, sent_index = self._unpack_index(i)
 
-			#print(i, doc_index, sent_index, self._doc_starts)
-
-			doc = self.session.documents[doc_index]
-			score = d
-
-			#print(c_doc, sentence_id)
-			#print(c_doc.sentence(sentence_id))
-			#print(score, d)
-
-			span = doc.span(self._partition, sent_index)
-			#print(sent_text, len(sent_text), c_doc.sentence_info(sent_index))
-
-			regions = [Region(
-				s=span.text.strip(),
-				match=None, gap_penalty=0)]
-
-			matches.append(PyMatch(
-				self,
-				query,
-				doc,
-				sent_index,
-				score,
-				self._metric.name,
-				regions=regions,
-				level="span"
-			))
+			matches.append(self._make_match(
+				query, d, doc_index, sent_index))
 
 		return matches

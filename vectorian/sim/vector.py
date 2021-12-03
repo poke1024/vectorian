@@ -82,6 +82,19 @@ class CosineSim(VectorSim):
 		return "cosine"
 
 
+class FuzzyJaccardSim(VectorSim):
+	def compute(self, a, b, out):
+		for i, a_v in enumerate(a.unmodified):
+			for j, b_v in enumerate(b.unmodified):
+				p = np.sum(np.minimum(a_v, b_v))
+				q = np.sum(np.maximum(a_v, b_v))
+				out[i, j] = p / q
+
+	@property
+	def name(self):
+		return "fuzzy-jaccard"
+
+
 class ImprovedSqrtCosineSim(VectorSim):
 	"""
 	Sohangir, Sahar, and Dingding Wang. “Improved Sqrt-Cosine Similarity Measurement.”

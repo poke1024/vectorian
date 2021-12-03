@@ -1265,7 +1265,7 @@ def prepare_docs(docs, nlp):
 	return [_prepare_doc(doc, nlp) for doc in docs]
 
 
-class AbstractPartitionEncoder:
+class AbstractSpanEncoder:
 	def vector_size(self, session):
 		raise NotImplementedError()
 
@@ -1277,16 +1277,16 @@ class AbstractPartitionEncoder:
 		raise NotImplementedError()
 
 
-class PartitionEncoder(AbstractPartitionEncoder):
-	def __init__(self, span_encoder):
-		self._span_encoder = span_encoder
+class SpanEncoder(AbstractSpanEncoder):
+	def __init__(self, span_embedding):
+		self._span_embedding = span_embedding
 
 	def vector_size(self, session):
-		return self._span_encoder.vector_size(session)
+		return self._span_embedding.vector_size(session)
 
 	@property
 	def embedding(self):  # i.e. token embedding
-		return self._span_encoder.embedding
+		return self._span_embedding.embedding
 
 	def encode(self, docs, partition, pbar=False):
 		n_spans = [doc.n_spans(partition) for doc in docs]
@@ -1305,18 +1305,18 @@ class PartitionEncoder(AbstractPartitionEncoder):
 					yield doc, spans
 					pbar_instance.update(len(spans))
 
-		for i, v in enumerate(self._span_encoder.encode(partition.session, gen_spans())):
+		for i, v in enumerate(self._span_embedding.encode(partition.session, gen_spans())):
 			out[i_spans[i]:i_spans[i + 1], :] = v
 
 		return Vectors(out)
 
 	def to_cached(self, cache_size=150):
-		return CachedPartitionEncoder(self._encoder, cache_size)
+		return CachedSpanEncoder(self._encoder, cache_size)
 
 
-class CachedPartitionEncoder(AbstractPartitionEncoder):
-	def __init__(self, span_encoder, cache_size=150):
-		self._encoder = PartitionEncoder(span_encoder)
+class CachedSpanEncoder(AbstractSpanEncoder):
+	def __init__(self, span_embedding, cache_size=150):
+		self._encoder = SpanEncoder(span_embedding)
 		self._cache = cachetools.LRUCache(cache_size)
 		self._corpus = None
 
@@ -1418,7 +1418,7 @@ class CachedPartitionEncoder(AbstractPartitionEncoder):
 		return self
 
 
-class AbstractSpanEncoder:
+class AbstractSpanEmbedding:
 	def __init__(self):
 		pass
 
@@ -1433,7 +1433,7 @@ class AbstractSpanEncoder:
 		raise NotImplementedError()
 
 
-class TokenEmbeddingAggregator(AbstractSpanEncoder):
+class AggregatedSpanEmbedding(AbstractSpanEmbedding):
 	# simple aggregated token embeddings, e.g. unweighted token
 	# averaging as described by Mikolov et al.
 	# in "Distributed representations of words and phrases and their
@@ -1484,7 +1484,7 @@ class TokenEmbeddingAggregator(AbstractSpanEncoder):
 			yield out
 
 
-class SpanTextEncoder(AbstractSpanEncoder):
+class AbstractTextEmbedding(AbstractSpanEmbedding):
 	def __init__(self, chunk_size=50):
 		super().__init__()
 		self._chunk_size = chunk_size
@@ -1495,13 +1495,17 @@ class SpanTextEncoder(AbstractSpanEncoder):
 	def vector_size(self, session):
 		raise NotImplementedError()
 
+	@property
+	def embedding(self):
+		return None  # i.e. no token embedding
+
 	def encode(self, session, doc_spans):
 		for doc, spans in doc_spans:
 			#for chunk in chunks(spans, self._chunk_size):
 			yield self._encode_text([span.text for span in spans])
 
 
-class SpanEncoder(SpanTextEncoder):
+class TextEmbedding(AbstractTextEmbedding):
 	def __init__(self, encode, vector_size=768, **kwargs):
 		super().__init__(**kwargs)
 		self._encode = encode
@@ -1509,10 +1513,6 @@ class SpanEncoder(SpanTextEncoder):
 
 	def vector_size(self, session):
 		return self._vector_size
-
-	@property
-	def embedding(self):  # i.e. token embedding
-		return None
 
 	def _encode_text(self, texts):
 		return self._encode(texts)

@@ -29,8 +29,8 @@ compute one embedding for a span of tokens. We do not specify an explicit
 strategy for dealing with individual tokens. Instead we provide an encoder
 that takes a span of tokens and outputs an embedding. To allow various kinds
 of approaches (such as building span embeddings from token embeddings) the
-actual encoder is wrapped inside other classes such as `SpanEncoder` and
-`PartitionEncoder` (more on this later).
+actual encoder is wrapped inside other classes such as `TextEmbedding` and
+`SpanEncoder` (more on this later).
 
 Here is an example of setting up a Waterman-Smith-Beyer alignment that uses
 cosine similarity over a pretrained GloVe embedding of dimension 50:

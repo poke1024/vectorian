@@ -698,7 +698,13 @@ class PreparedDocument:
 		if partition.level == "token":
 			return self.n_tokens
 		else:
-			n = self._spans[partition.level]['start'].shape[0]
+			start = self._spans[partition.level]['start']
+			n = start.shape[0]
+
+			n_tokens = self._tokens["idx"].shape[0]
+			while n > 0 and start[n - 1] >= n_tokens:
+				n -= 1
+
 			k = n // partition.window_step
 			if (k * partition.window_step) < n:
 				k += 1

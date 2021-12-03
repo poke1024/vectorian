@@ -1,8 +1,9 @@
 from vectorian.alignment import FlowStrategy, LocalAlignment
-from vectorian.index import BruteForceIndex, PartitionEmbeddingIndex
+from vectorian.index import BruteForceIndex, SpanEncoderIndex, FaissCosineIndex
 from vectorian.sim.token import AbstractTokenSim
 from vectorian.sim.vector import VectorSim, CosineSim
 from vectorian.alignment import ConstantGapCost
+from vectorian.embeddings import SpanEncoder
 
 
 class SpanSim:
@@ -71,22 +72,25 @@ class SpanFlowSim(SpanSim):
 
 
 class SpanEncoderSim(SpanSim):
-	def __init__(self, encoder, sim=None):
+	def __init__(self, encoder: SpanEncoder, sim: VectorSim = None):
 		if sim is None:
 			sim = CosineSim()
 		assert isinstance(sim, VectorSim)
-		if not isinstance(sim, CosineSim):
-			raise NotImplementedError()
 		self._encoder = encoder
-		self._sim = sim
+		self._vector_sim = sim
 
 	def create_index(self, partition, **kwargs):
-		return PartitionEmbeddingIndex(
-			partition, self, self._encoder, **kwargs)
+		if isinstance(self._vector_sim, CosineSim) and FaissCosineIndex.is_available():
+			return FaissCosineIndex(partition, self, self._encoder, **kwargs)
+		else:
+			return SpanEncoderIndex(
+				partition, self, self._encoder, vector_sim=self._vector_sim, **kwargs)
 
+	'''
 	def load_index(self, session, path, **kwargs):
-		return PartitionEmbeddingIndex.load(
-			session, self, self._encoder, path, **kwargs)
+		return SpanEncoderIndex.load(
+			session, self, self._encoder, path, vector_sim=self._vector_sim, **kwargs)
+	'''
 
 	def to_args(self, index):
 		return None
