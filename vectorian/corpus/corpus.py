@@ -85,10 +85,10 @@ class FlavorBuilder:
 		self._stage = None
 
 	@staticmethod
-	def make(root, flavor, docs):
-		builder = FlavorBuilder(root, flavor.normalizers)
+	def make(root, normalization, docs):
+		builder = FlavorBuilder(root, normalization.normalizers)
 
-		with tqdm(total=2 * len(docs), desc=f"Adding Flavor '{flavor.name}'") as pbar:
+		with tqdm(total=2 * len(docs), desc=f"Adding Normalization '{normalization.name}'") as pbar:
 			for stage in (FlavorBuilder.Stage.PREFLIGHT, FlavorBuilder.Stage.ADD):
 				builder.set_stage(stage)
 				for unique_id, doc in docs.items():
@@ -239,24 +239,24 @@ class Corpus:
 		self._corpus_h5.close()
 		self._conn.close()
 
-	def add_flavor(self, flavor):
+	def add_normalization(self, normalization):
 		assert self._flavors_path.exists()
-		path = self._flavors_path / f"{flavor.name}.h5"
+		path = self._flavors_path / f"{normalization.name}.h5"
 		if path.exists():
-			raise RuntimeError(f"flavor {flavor.name} already exists")
+			raise RuntimeError(f"Normalization {normalization.name} already exists")
 		with h5py.File(path, 'w') as hf:
 			FlavorBuilder.make(
 				hf,
-				flavor,
+				normalization,
 				self._docs)
 
-	def del_flavor(self, flavor_name):
-		p = self._flavors_path / f"{flavor_name}.h5"
+	def del_normalization(self, normalization_name):
+		p = self._flavors_path / f"{normalization_name}.h5"
 		if p.exists() and p.is_file():
 			p.unlink()
 
 	@property
-	def flavors(self):
+	def normalizations(self):
 		names = []
 		for p in self._flavors_path.iterdir():
 			if p.suffix == ".h5":

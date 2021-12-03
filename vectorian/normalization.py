@@ -190,7 +190,7 @@ def vanilla_normalizers():
 	}
 
 
-class AbstractFlavor:
+class AbstractNormalization:
 	def __init__(self, name, normalizers):
 		self._name = name
 		self._normalizers = normalizers
@@ -204,11 +204,11 @@ class AbstractFlavor:
 		return self._normalizers
 
 
-class VanillaFlavor(AbstractFlavor):
+class VanillaNormalization(AbstractNormalization):
 	def __init__(self):
 		super().__init__("vanilla", vanilla_normalizers())
 
 
-class Flavor(AbstractFlavor):
+class Normalization(AbstractNormalization):
 	def __init__(self, name, normalizers):
 		super().__init__(name, normalizers)

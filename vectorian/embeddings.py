@@ -1433,7 +1433,7 @@ class AbstractSpanEmbedding:
 		raise NotImplementedError()
 
 
-class AggregatedSpanEmbedding(AbstractSpanEmbedding):
+class AggSpanEmbedding(AbstractSpanEmbedding):
 	# simple aggregated token embeddings, e.g. unweighted token
 	# averaging as described by Mikolov et al.
 	# in "Distributed representations of words and phrases and their

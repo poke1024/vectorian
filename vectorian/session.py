@@ -13,7 +13,7 @@ from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.metrics import CosineSim, TokenSim, SpanFlowSim, SpanSim
 from vectorian.embeddings import OpenedVectorsCache, Vectors
-from vectorian.flavor import Flavor, VanillaFlavor
+from vectorian.normalization import Normalization, VanillaNormalization
 from vectorian.corpus.corpus import Corpus
 from vectorian.tqdm import tqdm
 
@@ -57,7 +57,7 @@ class Collection:
 		self._vocab = vocab
 		self._docs = []
 
-		with corpus.flavor_cache(session.flavor.name) as flavor_cache:
+		with corpus.flavor_cache(session.normalization.name) as flavor_cache:
 
 			with tqdm(desc="Preparing Documents", total=len(corpus)) as pbar:
 				def prepare_doc(doc):
@@ -146,26 +146,26 @@ SessionEmbedding = collections.namedtuple(
 	"SessionEmbedding", ["factory", "instance"])
 
 
-def _default_flavor(corpus: Corpus, flavor:Flavor = None):
-	if flavor is None:
-		c_flavors = corpus.flavors
-		if not c_flavors or tuple(c_flavors) == ("vanilla",):
-			flavor = VanillaFlavor()
-			if not c_flavors:
-				corpus.add_flavor(flavor)
-			return flavor
+def _default_normalization(corpus: Corpus, normalization:Normalization = None):
+	if normalization is None:
+		c_norms = corpus.normalizations
+		if not c_norms or tuple(c_norms) == ("vanilla",):
+			normalization = VanillaNormalization()
+			if not c_norms:
+				corpus.add_normalization(normalization)
+			return normalization
 		else:
-			raise ValueError("please specify a flavor")
+			raise ValueError("please specify a Normalization")
 
-	if flavor.name not in corpus.flavors:
-		raise ValueError(f"flavor '{flavor.name}' does not exist in corpus")
+	if normalization.name not in corpus.flavors:
+		raise ValueError(f"Normalization '{normalization.name}' does not exist in corpus")
 
-	return flavor
+	return normalization
 
 
 class Session:
-	def __init__(self, corpus: Corpus, embeddings=None, flavor:Flavor = None):
-		self._flavor = _default_flavor(corpus, flavor)
+	def __init__(self, corpus: Corpus, embeddings=None, normalization:Normalization = None):
+		self._normalization = _default_normalization(corpus, normalization)
 
 		if embeddings is None:
 			embeddings = []
@@ -204,12 +204,12 @@ class Session:
 		return self._vocab
 
 	@property
-	def flavor(self):
-		return self._flavor
+	def normalization(self):
+		return self._normalization
 
 	@property
 	def normalizers(self):
-		return self._flavor.normalizers
+		return self._normalization.normalizers
 
 	def default_metric(self):
 		embedding = self._embeddings[0]
