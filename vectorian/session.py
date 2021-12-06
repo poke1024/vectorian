@@ -11,8 +11,8 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSim, TokenSim, SpanFlowSim, SpanSim
-from vectorian.embeddings import OpenedVectorsCache, Vectors
+from vectorian.metrics import CosineSim, EmbeddingTokenSim, TE_SpanSim, SpanSim
+from vectorian.embeddings import OpenedVectorsCache, Vectors, TokenEmbedding
 from vectorian.normalization import Normalization, VanillaNormalization
 from vectorian.corpus.corpus import Corpus
 from vectorian.tqdm import tqdm
@@ -172,9 +172,9 @@ class Session:
 
 		self._embedding_manager = core.EmbeddingManager()
 
-		self._embeddings = tuple(embeddings)
+		self._token_embeddings = tuple(filter(lambda x: isinstance(x, TokenEmbedding), embeddings))
 
-		for embedding in self._embeddings:
+		for embedding in self._token_embeddings:
 			if embedding.is_contextual:
 				for doc in corpus:
 					if not doc.has_contextual_embedding(embedding.name):
@@ -182,7 +182,7 @@ class Session:
 						raise RuntimeError(f"doc {unique_id} misses contextual embedding {embedding.name}")
 
 		self._embedding_instances = collections.OrderedDict()
-		for embedding in self._embeddings:
+		for embedding in self._token_embeddings:
 			instance = embedding.create_instance(self)
 			self._embedding_instances[instance.name] = SessionEmbedding(
 				factory=embedding,
@@ -194,7 +194,7 @@ class Session:
 		self._collection = Collection(
 			self, self._vocab, corpus)
 
-		self._vocab.compile_embeddings()  # i.e. static embeddings
+		self._vocab.compile_embeddings()  # i.e. static token embeddings
 		self._embedding_manager.compile_contextual()
 
 		self._vectors_cache = OpenedVectorsCache()
@@ -212,9 +212,9 @@ class Session:
 		return self._normalization.normalizers
 
 	def default_metric(self):
-		embedding = self._embeddings[0]
-		return SpanFlowSim(
-			TokenSim(
+		embedding = self._token_embeddings[0]
+		return TE_SpanSim(
+			EmbeddingTokenSim(
 				embedding, CosineSim()))
 
 	@cached_property
@@ -254,6 +254,9 @@ class Session:
 		if window_step is None:
 			window_step = window_size
 		return Partition(self, level, window_size, window_step)
+
+	def index(self, *args, **kwargs):
+		return self.partition("sentence").index(*args, **kwargs)
 
 	def word_vec(self, embedding, token_or_tokens):
 		from vectorian.corpus.document import Token

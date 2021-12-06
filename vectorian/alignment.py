@@ -6,7 +6,7 @@ from typing import Dict, Union
 from pyalign.gaps import *
 
 
-class FlowStrategy:
+class Optimizer:
 	def to_description(self, partition):
 		raise NotImplementedError()
 
@@ -14,7 +14,7 @@ class FlowStrategy:
 		raise NotImplementedError()
 
 
-class AlignmentFlow(FlowStrategy):
+class Alignment(Optimizer):
 	"""
 	A strategy to align two sequences - i.e. matching one sequence against the
 	other sequences through a number of insertions and deletions while keeping
@@ -31,7 +31,7 @@ class AlignmentFlow(FlowStrategy):
 		}
 
 
-class TransportFlow(FlowStrategy):
+class OptimalTransport(Optimizer):
 	"""
 	A strategy to match two sequences by posing a transport problem in a network.
 	The order of tokens is not inherently important in such formulations.
@@ -40,7 +40,7 @@ class TransportFlow(FlowStrategy):
 	pass
 
 
-class GlobalAlignment(AlignmentFlow):
+class GlobalAlignment(Alignment):
 	"""
 	Models global alignments as originally described by Needleman and Wunsch (1970).
 
@@ -89,7 +89,7 @@ class GlobalAlignment(AlignmentFlow):
 		return self._make_args(core.pyalign.Locality.GLOBAL, self._gap)
 
 
-class SemiGlobalAlignment(AlignmentFlow):
+class SemiGlobalAlignment(Alignment):
 	"""
 	Models semiglobal (also called "end gaps free" or "free-shift") alignments.
 
@@ -121,7 +121,7 @@ class SemiGlobalAlignment(AlignmentFlow):
 		return self._make_args(core.pyalign.Locality.SEMIGLOBAL, self._gap)
 
 
-class LocalAlignment(AlignmentFlow):
+class LocalAlignment(Alignment):
 	"""
 	Models local alignments as described by Smith, Waterman and Beyer (1976).
 
@@ -177,7 +177,7 @@ class LocalAlignment(AlignmentFlow):
 		return self._make_args(core.pyalign.Locality.LOCAL, self._gap)
 
 
-class WordMoversDistance(TransportFlow):
+class WordMoversDistance(OptimalTransport):
 	"""
 	Implements various variants of the Word Mover's Distance. The original full
 	WMD described by Kusner et al. can be instantiated through `wmd("nbow")`. The
@@ -273,7 +273,7 @@ class WordMoversDistance(TransportFlow):
 		}
 
 
-class WordRotatorsDistance(TransportFlow):
+class WordRotatorsDistance(OptimalTransport):
 	"""
 	Implements the Word Rotators Distance by Yokoi et al.
 

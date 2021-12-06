@@ -98,7 +98,7 @@ session = vectorian.session.LabSession(
     normalizers="default")
 ```
 
-Now we create a `SpanFlowSim`, which
+Now we create a `TE_SpanSim`, which
 is a special form of `SpanSim` that allows us to
 specify the Waterman-Smith-Beyer alignment algorithm.
 Note that we base this alignment on a concept of token similarity
@@ -106,13 +106,13 @@ that is computed through the the cosine similarity over the GloVe
 embedding we specified earlier.
 
 ```
-token_similarity = vectorian.similarity.TokenSim(
+token_similarity = vectorian.similarity.EmbeddingTokenSim(
     glove,
     vectorian.similarity.CosineSim())
 
-span_similarity = vectorian.similarity.SpanFlowSim(
+span_similarity = vectorian.similarity.TE_SpanSim(
     token_sim=token_similarity,
-    flow_strategy=vectorian.alignment.LocalAlignment(
+    optimizer=vectorian.alignment.LocalAlignment(
         gap=vectorian.alignment.smooth_gap_cost(5)))
 ```
 

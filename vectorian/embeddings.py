@@ -182,6 +182,21 @@ class TokenEmbedding:
 	def name(self):
 		raise NotImplementedError()
 
+	def to_token_sim(self, vector_sim=None):
+		from vectorian.sim.token import EmbeddingTokenSim
+		from vectorian.sim.vector import CosineSim
+
+		if vector_sim is None:
+			vector_sim = CosineSim()
+
+		return EmbeddingTokenSim(self, vector_sim)
+
+	def to_sentence_sim(self, optimizer, vector_sim=None):
+		from vectorian.sim.span import SpanSim
+
+		token_sim = self.to_token_sim(vector_sim)
+		return SpanSim.from_token_sim(token_sim, optimizer)
+
 
 class StaticEmbedding(TokenEmbedding):
 	@property
@@ -1418,7 +1433,7 @@ class CachedSpanEncoder(AbstractSpanEncoder):
 		return self
 
 
-class AbstractSpanEmbedding:
+class SentenceEmbedding:
 	def __init__(self):
 		pass
 
@@ -1432,12 +1447,21 @@ class AbstractSpanEmbedding:
 	def encode(self, session, doc_spans):
 		raise NotImplementedError()
 
+	@staticmethod
+	def from_token_embedding(embedding, agg=np.mean):
+		return TE_SentenceEmbedding(embedding, agg)
 
-class AggSpanEmbedding(AbstractSpanEmbedding):
-	# simple aggregated token embeddings, e.g. unweighted token
-	# averaging as described by Mikolov et al.
-	# in "Distributed representations of words and phrases and their
-	# compositionality.", 2013.
+	@staticmethod
+	def from_encoder(encode):
+		return EA_SentenceEmbedding(encode)
+
+
+class TE_SentenceEmbedding(SentenceEmbedding):  # from token embedding
+	# aggregated token embeddings are used in many publication e.g.:
+	# * Mikolov et al., "Distributed representations of words and
+	# phrases and their compositionality.", 2013.
+	# * Zhelezniak et al., "DON’T SETTLE FOR AVERAGE, GO FOR THE MAX:
+	# FUZZY SETS AND MAX-POOLED WORD VECTORS", 2019.
 
 	def __init__(self, embedding, agg=np.mean):
 		super().__init__()
@@ -1445,7 +1469,7 @@ class AggSpanEmbedding(AbstractSpanEmbedding):
 		self._agg = agg
 
 		if embedding.is_contextual and embedding.transform is not None:
-			raise RuntimeError("cannot use transformed contextual embedding with TokenAggregator")
+			raise NotImplementedError("cannot use transformed contextual embedding")
 
 	@property
 	def embedding(self):
@@ -1484,7 +1508,7 @@ class AggSpanEmbedding(AbstractSpanEmbedding):
 			yield out
 
 
-class AbstractTextEmbedding(AbstractSpanEmbedding):
+class FullTextSentenceEmbedding(SentenceEmbedding):
 	def __init__(self, chunk_size=50):
 		super().__init__()
 		self._chunk_size = chunk_size
@@ -1505,7 +1529,7 @@ class AbstractTextEmbedding(AbstractSpanEmbedding):
 			yield self._encode_text([span.text for span in spans])
 
 
-class TextEmbedding(AbstractTextEmbedding):
+class EA_SentenceEmbedding(FullTextSentenceEmbedding):  # using an encoder architecture
 	def __init__(self, encode, vector_size=768, **kwargs):
 		super().__init__(**kwargs)
 		self._encode = encode

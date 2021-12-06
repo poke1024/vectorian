@@ -1,7 +1,7 @@
 from vectorian.sim.vector import VectorSim
 
 
-class AbstractTokenSim:
+class TokenSim:
 	@property
 	def is_modifier(self):
 		return False
@@ -15,7 +15,7 @@ class AbstractTokenSim:
 		raise NotImplementedError()
 
 
-class TokenSim(AbstractTokenSim):
+class EmbeddingTokenSim(TokenSim):
 	def __init__(self, embedding, sim: VectorSim):
 		self._embedding = embedding
 		self._sim = sim

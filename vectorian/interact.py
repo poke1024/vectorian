@@ -249,7 +249,7 @@ class TokenSimilarityAtomWidget:
 		return self._hbox
 
 	def make(self):
-		return vectorian.metrics.TokenSim(
+		return vectorian.metrics.EmbeddingTokenSim(
 			self._embedding.make(),
 			self._metric.make())
 
@@ -762,9 +762,9 @@ class AlignmentWidget(FineTuneableWidget):
 		return self._fine_tune.make_token_sim()
 
 	def make(self):
-		return vectorian.metrics.SpanFlowSim(
+		return vectorian.metrics.TE_SpanSim(
 			token_sim=self.make_token_sim(),
-			flow_strategy=self.make_alignment())
+			optimizer=self.make_alignment())
 
 	def describe(self):
 		return ''.join([
@@ -824,9 +824,9 @@ class TagWeightedAlignmentWidget:
 		])
 
 	def make(self):
-		return vectorian.metrics.SpanFlowSim(
+		return vectorian.metrics.TE_SpanSim(
 			token_sim=self._alignment.make_token_sim(),
-			flow_strategy=self._alignment.make_alignment(),
+			optimizer=self._alignment.make_alignment(),
 			tag_weights=self._tag_weights)
 
 	@property
@@ -858,7 +858,7 @@ class PartitionEmbeddingWidget:
 			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.SpanEncoderSim(
+		return vectorian.metrics.SE_SpanSim(
 			self._encoders[self._widget.value].to_cached())
 
 	def describe(self):

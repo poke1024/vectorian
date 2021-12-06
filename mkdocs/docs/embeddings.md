@@ -5,7 +5,7 @@
 Note that the term *embedding* in this whole section always refers to
 *token embeddings*. Document or sentence embeddings are not handled
 via the `TokenEmbedding` class in the Vectorian. In order to use the latter,
-use a `SpanEncoderSim` together with an `Index`, see the
+use a `SE_SpanSim` together with an `Index`, see the
 sections on [Span Similarity](sim_span.md) and [Index](vec_index.md).
 
 ## Overview
