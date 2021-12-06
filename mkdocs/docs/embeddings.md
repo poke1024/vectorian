@@ -4,7 +4,7 @@
 
 Note that the term *embedding* in this whole section always refers to
 *token embeddings*. Document or sentence embeddings are not handled
-via the `Embedding` class in the Vectorian. In order to use the latter,
+via the `TokenEmbedding` class in the Vectorian. In order to use the latter,
 use a `SpanEncoderSim` together with an `Index`, see the
 sections on [Span Similarity](sim_span.md) and [Index](vec_index.md).
 
@@ -20,7 +20,7 @@ in detail.
 
 ## The Zoo
 
-One of the easiest way to create an `Embedding` instance is to use the
+One of the easiest way to create an `TokenEmbedding` instance is to use the
 `Zoo` class, which offers a small set of pretrained embeddings. Note that
 Vectorian's model zoo is not aimed at offering a wide variety of currently
 available embeddings and is more geared towards enabling quick and easy
@@ -90,7 +90,7 @@ without a huge loss in quality.
 A small but important topic with static topic is how embedding vectors are
 to be chosen given various tokens that have been normalized to the same
 base form. The approach taken is refered to as `sampling` in the Vectorian
-and can be configured in various `Embedding` classes (see the `embedding_sampling`
+and can be configured in various `TokenEmbedding` classes (see the `embedding_sampling`
 argument in the `PretrainedGensimVectors` constructor for example).
 
 Let us assume we have two tokens, "behold" and "Behold", that have both been

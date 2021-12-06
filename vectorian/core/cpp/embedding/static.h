@@ -31,7 +31,7 @@ public:
 	}
 };
 
-class StaticEmbedding : public Embedding {
+class StaticEmbedding : public TokenEmbedding {
 	py::object m_vectors; // type: vectorian.embeddings.Vectors
 	size_t m_size;
 

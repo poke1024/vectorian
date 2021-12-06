@@ -3,14 +3,14 @@
 ## What is a Session?
 
 A `Session` brings together a fixed set of `Document`s and a fixed set of
-`Embedding`s. It is the basis for creating an `Index`.
+`TokenEmbedding`s. It is the basis for creating an `Index`.
 
 Creating a `Session` performs two important preprocessing steps of the data:
 
 * all text and embedding data is mapped to a fixed vocabulary
 * tokens are normalized according to given rules
 
-Establishing a fixed vocabulary (from `Document`s and `Embedding`s) allows
+Establishing a fixed vocabulary (from `Document`s and `TokenEmbedding`s) allows
 the Vectorian to build data structures that are highly optimized for ensuing
 operations.
 

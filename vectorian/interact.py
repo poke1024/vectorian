@@ -267,7 +267,7 @@ class TokenSimilarityMetricWidget:
 
 		self._options = [
 			{
-				'name': 'One Embedding',
+				'name': 'One TokenEmbedding',
 				'multiple': False,
 				'weights': False,
 				'make': self._make_one
@@ -875,7 +875,7 @@ class PartitionMetricWidget(FineTuneableWidget):
 	_types = [
 		('Alignment', AlignmentWidget),
 		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
-		('Partition Embedding', PartitionEmbeddingWidget)
+		('Partition TokenEmbedding', PartitionEmbeddingWidget)
 	]
 
 	_default = 'Alignment'

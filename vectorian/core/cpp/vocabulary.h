@@ -181,7 +181,7 @@ class EmbeddingManager;
 typedef std::shared_ptr<EmbeddingManager> EmbeddingManagerRef;
 
 class EmbeddingManager {
-	struct Embedding {
+	struct TokenEmbedding {
 		py::object embedding; // py embedding session instance
 		py::str py_name;
 		EmbeddingType type;
@@ -190,7 +190,7 @@ class EmbeddingManager {
 	};
 
 	std::unordered_map<std::string, size_t> m_embeddings_by_name;
-	std::vector<Embedding> m_embeddings;
+	std::vector<TokenEmbedding> m_embeddings;
 	bool m_is_compiled;
 
 public:
@@ -238,7 +238,7 @@ public:
 		const size_t next_id = m_embeddings.size();
 		m_embeddings_by_name[p_embedding.attr("name").cast<std::string>()] = next_id;
 
-		Embedding e;
+		TokenEmbedding e;
 		e.embedding = p_embedding;
 		e.py_name = p_embedding.attr("name").cast<py::str>();
 		e.type = p_embedding.attr("is_static").cast<bool>() ? STATIC : CONTEXTUAL;
@@ -291,7 +291,7 @@ protected:
 		PPK_ASSERT(m_tokens.size() == 0);
 
 		std::vector<const std::vector<std::string>*> emb_tokens;
-		for (Embedding &e : m_embeddings) {
+		for (TokenEmbedding &e : m_embeddings) {
 			emb_tokens.push_back(&e.embedding->tokens());
 		}
 
@@ -299,7 +299,7 @@ protected:
 			const auto &tokens = *emb_tokens[0];
 
 			m_tokens.reserve(tokens.size());
-			for (Embedding &e : m_embeddings) {
+			for (TokenEmbedding &e : m_embeddings) {
 				e.map.reserve(tokens.size());
 			}
 
@@ -343,7 +343,7 @@ protected:
 					m_tokens.add(s);
 					last_token = &s;
 
-					for (Embedding &e : m_embeddings) {
+					for (TokenEmbedding &e : m_embeddings) {
 						e.map.push_back(-1);
 					}
 				}

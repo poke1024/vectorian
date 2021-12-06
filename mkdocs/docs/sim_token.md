@@ -8,7 +8,7 @@ score from embeddings. It consists of two things:
 * a specific embedding which serves as the source of vectors (e.g. fastText)
 * a strategy to compute a scalar similarity value from two vectors
 
-The first item is modelled by `vectorian.embedding.Embedding` in the Vectorian, the
+The first item is modelled by `vectorian.embedding.TokenEmbedding` in the Vectorian, the
 latter by `vectorian.sim.vector.VectorSim`.
 
 ![Basic Operators implementing TokenSim](images/sim_token.png)

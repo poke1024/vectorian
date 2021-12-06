@@ -13,20 +13,20 @@ different concepts relate.
 In most abstract terms, to perform a search in the Vectorian you need to (refer
 to the diagram above):
 
-1. create a `Session` from `Embedding`s and `Document`s
+1. create a `Session` from `TokenEmbedding`s and `Document`s
 2. create an `Index` from the `Session` through specifying a `Partition`
 3. perform a search on the `Index` to get `Result`s and `Match`es
 
 ## Creating a `Session`
 
-* create one or multiple `Embedding`s you want to work with. This boils down
+* create one or multiple `TokenEmbedding`s you want to work with. This boils down
 to choosing which embedding(s) you want to base your token similarity
 computations on. See [Embeddings](../embeddings) for more details.
 * import (or load) one or multiple `Document`s that contain the text you
 want to search over. `Document`s in the Vectorian are created using different
 kinds of `Importer`s (these perform parsing tasks using a spaCy `NLP` class).
 See [Documents](../documents) for more details.
-* create a `Session` that bundles `Embedding`s and `Document`s in a way
+* create a `Session` that bundles `TokenEmbedding`s and `Document`s in a way
 that allows searches. See [Sessions](../sessions) for more details.
 
 ## Creating an `Index`
@@ -51,7 +51,7 @@ Prepare by importing the `vectorian` module:
 import vectorian
 ```
 
-Now create an `Embedding`. We choose the 50-dimensional
+Now create an `TokenEmbedding`. We choose the 50-dimensional
 variant of the pretrained GloVe 6B (see https://nlp.stanford.edu/projects/glove/):
 
 ```

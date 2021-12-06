@@ -470,7 +470,7 @@
 											"top": 287,
 											"width": 95,
 											"height": 13,
-											"text": "Embedding"
+											"text": "TokenEmbedding"
 										},
 										{
 											"_type": "LabelView",
@@ -4859,7 +4859,7 @@
 					"_parent": {
 						"$ref": "AAAAAAFF+qBWK6M3Z8Y="
 					},
-					"name": "Embedding"
+					"name": "TokenEmbedding"
 				},
 				{
 					"_type": "UMLClass",

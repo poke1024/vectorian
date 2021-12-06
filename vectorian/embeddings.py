@@ -166,7 +166,7 @@ def _load_glove_txt(csv_path):
 	return tokens, embeddings
 
 
-class Embedding:
+class TokenEmbedding:
 	@property
 	def is_static(self):
 		return False
@@ -183,7 +183,7 @@ class Embedding:
 		raise NotImplementedError()
 
 
-class StaticEmbedding(Embedding):
+class StaticEmbedding(TokenEmbedding):
 	@property
 	def is_static(self):
 		return True
@@ -955,7 +955,7 @@ class PCACompression(Transform):
 		return f'pca:{self._n_dims}'
 
 
-class ContextualEmbedding(Embedding):
+class ContextualEmbedding(TokenEmbedding):
 	def __init__(self, transform=None):
 		self._transform = transform
 

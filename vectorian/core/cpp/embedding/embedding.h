@@ -3,14 +3,14 @@
 
 #include "common.h"
 
-class Embedding : public std::enable_shared_from_this<Embedding> {
+class TokenEmbedding : public std::enable_shared_from_this<TokenEmbedding> {
 	const std::string m_name;
 
 public:
-	Embedding(const std::string &p_name) : m_name(p_name) {
+	TokenEmbedding(const std::string &p_name) : m_name(p_name) {
 	}
 
-	virtual ~Embedding() {
+	virtual ~TokenEmbedding() {
 	}
 
 	const std::string &name() const {

@@ -19,7 +19,7 @@ StaticEmbedding::StaticEmbedding(
 	py::object p_embedding_factory,
 	py::list p_tokens) :
 
-	Embedding(p_embedding_factory.attr("name").cast<std::string>()),
+	TokenEmbedding(p_embedding_factory.attr("name").cast<std::string>()),
 	m_size(0) {
 
 	m_vectors = p_embedding_factory.attr("get_embeddings")(p_tokens);

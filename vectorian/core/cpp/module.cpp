@@ -82,14 +82,14 @@ PYBIND11_MODULE(core, m) {
 	embedding_manager.def("compile_static", &EmbeddingManager::compile_static);
 	embedding_manager.def("compile_contextual", &EmbeddingManager::compile_contextual);
 
-	py::class_<Embedding, EmbeddingRef> embedding(m, "Embedding");
+	py::class_<TokenEmbedding, EmbeddingRef> embedding(m, "TokenEmbedding");
 
-	py::class_<StaticEmbedding, Embedding, StaticEmbeddingRef> static_embedding(m, "StaticEmbedding");
+	py::class_<StaticEmbedding, TokenEmbedding, StaticEmbeddingRef> static_embedding(m, "StaticEmbedding");
 	static_embedding.def(py::init<py::object, py::list>());
 	static_embedding.def_property_readonly("vectors", &StaticEmbedding::py_vectors);
 	static_embedding.def_property_readonly("size", &StaticEmbedding::size);
 
-	py::class_<ContextualEmbedding, Embedding, ContextualEmbeddingRef> contextual_embedding(m, "ContextualEmbedding");
+	py::class_<ContextualEmbedding, TokenEmbedding, ContextualEmbeddingRef> contextual_embedding(m, "ContextualEmbedding");
 	contextual_embedding.def(py::init<const std::string&>());
 
 	py::class_<Vocabulary, VocabularyRef> vocabulary(m, "Vocabulary");

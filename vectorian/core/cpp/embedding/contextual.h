@@ -4,12 +4,12 @@
 #include "common.h"
 #include "embedding/embedding.h"
 
-class ContextualEmbedding : public Embedding {
+class ContextualEmbedding : public TokenEmbedding {
 public:
 	ContextualEmbedding(
 		const std::string &p_name) :
 
-		Embedding(p_name) {
+		TokenEmbedding(p_name) {
 	}
 
 	/*virtual MetricRef create_metric(
