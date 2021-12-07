@@ -13,7 +13,7 @@ from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
 from vectorian.sim.vector import CosineSim
 from vectorian.sim.token import EmbeddingTokenSim
-from vectorian.sim.span import SpanSim, SpanSimFromTokenEmbeddings
+from vectorian.sim.span import SpanSim, OptimizedSpanSim
 from vectorian.embedding.vectors import OpenedVectorsCache, Vectors
 from vectorian.embedding.token import TokenEmbedding
 from vectorian.normalization import Normalization, VanillaNormalization
@@ -168,6 +168,7 @@ def _default_normalization(corpus: Corpus, normalization:Normalization = None):
 
 class Session:
 	def __init__(self, corpus: Corpus, embeddings=None, normalization:Normalization = None):
+		self._corpus = corpus
 		self._normalization = _default_normalization(corpus, normalization)
 
 		if embeddings is None:
@@ -203,6 +204,10 @@ class Session:
 		self._vectors_cache = OpenedVectorsCache()
 
 	@property
+	def corpus(self):
+		return self._corpus
+
+	@property
 	def vocab(self):
 		return self._vocab
 
@@ -216,7 +221,7 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._token_embeddings[0]
-		return SpanSimFromTokenEmbeddings(
+		return OptimizedSpanSim(
 			EmbeddingTokenSim(
 				embedding, CosineSim()))
 

@@ -98,7 +98,7 @@ session = vectorian.session.LabSession(
     normalizers="default")
 ```
 
-Now we create a `SpanSimFromTokenEmbeddings`, which
+Now we create a `OptimizedSpanSim`, which
 is a special form of `SpanSim` that allows us to
 specify the Waterman-Smith-Beyer alignment algorithm.
 Note that we base this alignment on a concept of token similarity
@@ -110,7 +110,7 @@ token_similarity = vectorian.similarity.EmbeddingTokenSim(
     glove,
     vectorian.similarity.CosineSim())
 
-span_similarity = vectorian.similarity.SpanSimFromTokenEmbeddings(
+span_similarity = vectorian.similarity.OptimizedSpanSim(
     token_sim=token_similarity,
     optimizer=vectorian.alignment.LocalAlignment(
         gap=vectorian.alignment.smooth_gap_cost(5)))

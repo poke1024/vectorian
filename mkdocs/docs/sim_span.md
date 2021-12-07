@@ -11,8 +11,8 @@ two spans (i.e. sequences) of tokens, e.g. between to sentences.
 There are two kind of `SpanSim` strategies the Vectorian supports, and
 they are handled in two separate classes:
 
-* `SpanSimFromTokenEmbeddings` models span flows (e.g. alignments and WMD)
-* `SpanSimFromSpanEmbeddings` models span embeddings
+* `OptimizedSpanSim` models span flows (e.g. alignments and WMD)
+* `EmbeddedSpanSim` models span embeddings
 
 ![Implementations of SpanSim](images/sim_span.png)
 
@@ -21,7 +21,7 @@ between pairs of spans on a token level. On the one hand this can mean classical
 alignments - e.g. Needleman-Wunsch or Smith-Waterman. On the other hand,
 "flows" also include network-based approaches such as Word Mover's Distance.
 The exact kind of strategy is specified using a
-[`Optimizer`](#Optimizer) in the `SpanSimFromTokenEmbeddings` constructor.
+[`Optimizer`](#Optimizer) in the `OptimizedSpanSim` constructor.
 
 The term "span embeddings" is a generalization of what is usually called
 "document embeddings" or "sentence embeddings". With this strategy we
@@ -30,13 +30,13 @@ strategy for dealing with individual tokens. Instead we provide an encoder
 that takes a span of tokens and outputs an embedding. To allow various kinds
 of approaches (such as building span embeddings from token embeddings) the
 actual encoder is wrapped inside other classes such as `TextEmbedding` and
-`SpanEncoder` (more on this later).
+`InMemorySpanEncoder` (more on this later).
 
 Here is an example of setting up a Waterman-Smith-Beyer alignment that uses
 cosine similarity over a pretrained GloVe embedding of dimension 50:
 
 ```
-vectorian.metrics.SpanSimFromTokenEmbeddings(
+vectorian.metrics.OptimizedSpanSim(
     token_sim=vectorian.metrics(
         vectorian.embeddings.PretrainedGloVe('6B', ndims=50),
         vectorian.sim.vector.CosineSim()

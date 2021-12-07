@@ -16,9 +16,8 @@ class SpanEmbedding:
 		raise NotImplementedError()
 
 	def to_sentence_sim(self, vector_sim=None):
-		from vectorian.sim.span import SpanSimFromSpanEmbeddings
-
-		return SpanSimFromSpanEmbeddings(self, vector_sim)
+		from vectorian.sim.span import EmbeddedSpanSim
+		return EmbeddedSpanSim(self, vector_sim)
 
 
 class AggregatedTokenEmbedding(SpanEmbedding):

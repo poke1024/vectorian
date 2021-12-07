@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import h5py
+import cachetools
 
 from pathlib import Path
 from .vectors import Vectors
@@ -25,7 +26,7 @@ def prepare_docs(docs, nlp):
 	return [_prepare_doc(doc, nlp) for doc in docs]
 
 
-class AbstractSpanEncoder:
+class SpanEncoder:
 	def vector_size(self, session):
 		raise NotImplementedError()
 
@@ -37,7 +38,7 @@ class AbstractSpanEncoder:
 		raise NotImplementedError()
 
 
-class SpanEncoder(AbstractSpanEncoder):
+class InMemorySpanEncoder(SpanEncoder):
 	def __init__(self, span_embedding):
 		self._span_embedding = span_embedding
 
@@ -74,11 +75,11 @@ class SpanEncoder(AbstractSpanEncoder):
 		return CachedSpanEncoder(self._encoder, cache_size)
 
 
-class CachedSpanEncoder(AbstractSpanEncoder):
-	def __init__(self, span_embedding, cache_size=150):
-		self._encoder = SpanEncoder(span_embedding)
+class CachedSpanEncoder(SpanEncoder):
+	def __init__(self, session, span_embedding, cache_size=150):
+		self._corpus = session.corpus
+		self._encoder = InMemorySpanEncoder(span_embedding)
 		self._cache = cachetools.LRUCache(cache_size)
-		self._corpus = None
 
 	def save(self, path):
 		path = Path(path)
@@ -129,12 +130,6 @@ class CachedSpanEncoder(AbstractSpanEncoder):
 		new = []
 		index = []
 
-		if self._corpus is None:
-			for doc in docs:
-				if doc.corpus is not None:
-					self._corpus = doc.corpus
-					break
-
 		# we assume all docs stem from the same corpus. otherwise our caching
 		# ids would not be reliable.
 		for doc in docs:
@@ -171,6 +166,8 @@ class CachedSpanEncoder(AbstractSpanEncoder):
 				cache_key = mk_cache_key(new[i])
 				if cache_key is not None:
 					self._cache[cache_key] = v_doc
+					#self._corpus.get_doc_path(new[i]) / "span_emb"
+					# store_to_cache(cache_key, v_doc)
 
 		return Vectors(out)
 

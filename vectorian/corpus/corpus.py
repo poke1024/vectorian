@@ -274,6 +274,10 @@ class Corpus:
 	def get_doc_index(self, doc):
 		return self._unique_id_to_index[self._doc_to_unique_id[id(doc)]]
 
+	def get_doc_path(self, doc):
+		uid = self.get_unique_id(doc)
+		return self._documents_path / uid
+
 	def _add_doc(self, unique_id, doc):
 		self._docs[unique_id] = doc
 		self._doc_to_unique_id[id(doc)] = unique_id

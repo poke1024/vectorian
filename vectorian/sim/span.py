@@ -14,7 +14,7 @@ class SpanSim:
 		raise NotImplementedError()
 
 
-class SpanSimFromTokenEmbeddings(SpanSim):
+class OptimizedSpanSim(SpanSim):
 	def __init__(
 		self,
 		token_sim: TokenSim,
@@ -71,20 +71,20 @@ class SpanSimFromTokenEmbeddings(SpanSim):
 			}
 
 
-class SpanSimFromSpanEmbeddings(SpanSim):
+class EmbeddedSpanSim(SpanSim):
 	def __init__(self, embedding: SpanEmbedding, sim: VectorSim = None):
 		if sim is None:
 			sim = CosineSim()
 		assert isinstance(sim, VectorSim)
-		self._encoder = CachedSpanEncoder(embedding)
+		self._embedding = embedding
 		self._vector_sim = sim
 
 	def create_index(self, partition, **kwargs):
 		if isinstance(self._vector_sim, CosineSim) and FaissCosineIndex.is_available():
-			return FaissCosineIndex(partition, self, self._encoder, **kwargs)
+			return FaissCosineIndex(partition, self._embedding, self, **kwargs)
 		else:
 			return SpanEncoderIndex(
-				partition, self, self._encoder, vector_sim=self._vector_sim, **kwargs)
+				partition, self._embedding, self, vector_sim=self._vector_sim, **kwargs)
 
 	'''
 	def load_index(self, session, path, **kwargs):
@@ -97,4 +97,4 @@ class SpanSimFromSpanEmbeddings(SpanSim):
 
 	@property
 	def name(self):
-		return "SpanSimFromSpanEmbeddings"
+		return "EmbeddedSpanSim"

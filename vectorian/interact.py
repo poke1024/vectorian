@@ -762,7 +762,7 @@ class AlignmentWidget(FineTuneableWidget):
 		return self._fine_tune.make_token_sim()
 
 	def make(self):
-		return vectorian.metrics.SpanSimFromTokenEmbeddings(
+		return vectorian.metrics.OptimizedSpanSim(
 			token_sim=self.make_token_sim(),
 			optimizer=self.make_alignment())
 
@@ -824,7 +824,7 @@ class TagWeightedAlignmentWidget:
 		])
 
 	def make(self):
-		return vectorian.metrics.SpanSimFromTokenEmbeddings(
+		return vectorian.metrics.OptimizedSpanSim(
 			token_sim=self._alignment.make_token_sim(),
 			optimizer=self._alignment.make_alignment(),
 			tag_weights=self._tag_weights)
@@ -858,7 +858,7 @@ class PartitionEmbeddingWidget:
 			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.SpanSimFromSpanEmbeddings(
+		return vectorian.metrics.EmbeddedSpanSim(
 			self._encoders[self._widget.value].to_cached())
 
 	def describe(self):

@@ -582,8 +582,11 @@ def augment_xq(xq):
 
 
 class AbstractSpanEncoderIndex(Index):
-	def __init__(self, partition, span_sim, nlp):
+	def __init__(self, partition, embedding, span_sim, nlp):
 		super().__init__(partition, span_sim)
+
+		from vectorian.embedding.encoder import CachedSpanEncoder
+		self._encoder = CachedSpanEncoder(partition.session, embedding)
 
 		self._partition = partition
 		self._span_sim = span_sim
@@ -674,16 +677,15 @@ class AbstractSpanEncoderIndex(Index):
 
 
 class SpanEncoderIndex(AbstractSpanEncoderIndex):
-	def __init__(self, partition, span_sim, encoder, nlp, vector_sim, vectors=None):
-		super().__init__(partition, span_sim, nlp)
+	def __init__(self, partition, embedding, span_sim, nlp, vector_sim, vectors=None):
+		super().__init__(partition, embedding, span_sim, nlp)
 
-		self._encoder = encoder
 		self._vector_sim = vector_sim
 
 		if vectors is not None:
 			corpus_vec = Vectors(vectors)
 		else:
-			corpus_vec = encoder.encode(
+			corpus_vec = self._encoder.encode(
 				self._session.documents, partition, pbar=True)
 
 		self._corpus_vec = corpus_vec
@@ -729,17 +731,15 @@ class SpanEncoderIndex(AbstractSpanEncoderIndex):
 
 
 class FaissCosineIndex(AbstractSpanEncoderIndex):
-	def __init__(self, partition, span_sim, encoder, nlp, vectors=None, faiss_description='Flat'):
+	def __init__(self, partition, embedding, span_sim, nlp, vectors=None, faiss_description='Flat'):
 		import faiss
 
-		super().__init__(partition, span_sim, nlp)
-
-		self._encoder = encoder
+		super().__init__(partition, embedding, span_sim, nlp)
 
 		if vectors is not None:
 			corpus_vec = vectors
 		else:
-			corpus_vec = encoder.encode(
+			corpus_vec = self._encoder.encode(
 				self._session.documents, partition, pbar=True)
 			corpus_vec = corpus_vec.normalized
 

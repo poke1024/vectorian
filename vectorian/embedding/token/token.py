@@ -24,10 +24,10 @@ class TokenEmbedding:
 		return EmbeddingTokenSim(self, vector_sim)
 
 	def to_sentence_sim(self, optimizer, vector_sim=None):
-		from vectorian.sim.span import SpanSimFromTokenEmbeddings
+		from vectorian.sim.span import OptimizedSpanSim
 
 		token_sim = self.to_token_sim(vector_sim)
-		return SpanSimFromTokenEmbeddings(token_sim, optimizer)
+		return OptimizedSpanSim(token_sim, optimizer)
 
 	def to_sentence_embedding(self, agg):
 		from vectorian.embedding.span import AggregatedTokenEmbedding
