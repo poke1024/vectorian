@@ -3,7 +3,6 @@ import vectorian.core as core
 import html
 import numpy as np
 import contextlib
-import zipfile
 import h5py
 import uuid
 import logging
@@ -11,7 +10,7 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 from cached_property import cached_property
-from vectorian.embeddings import MaskedVectorsRef, ExternalMemoryVectorsRef
+from vectorian.embedding.vectors import MaskedVectorsRef, ExternalMemoryVectorsRef
 
 
 class TokenTable:

@@ -3,7 +3,7 @@ from vectorian.index import BruteForceIndex, SpanEncoderIndex, FaissCosineIndex
 from vectorian.sim.token import TokenSim
 from vectorian.sim.vector import VectorSim, CosineSim
 from vectorian.alignment import ConstantGapCost
-from vectorian.embeddings import TokenEmbedding, SentenceEmbedding
+from vectorian.embedding.span import SpanEmbedding
 
 
 class SpanSim:
@@ -13,20 +13,8 @@ class SpanSim:
 	def to_args(self, index):
 		raise NotImplementedError()
 
-	@staticmethod
-	def from_token_embedding(embedding: TokenEmbedding, optimizer: Optimizer, vector_sim=None, **kwargs):
-		return TE_SpanSim(embedding.create_token_sim(vector_sim), optimizer, **kwargs)
 
-	@staticmethod
-	def from_token_sim(sim: TokenSim, optimizer: Optimizer, **kwargs):
-		return TE_SpanSim(sim, optimizer, **kwargs)
-
-	@staticmethod
-	def from_sentence_embedding(embedding: SentenceEmbedding = None, encoder=None):
-		return SE_SpanSim(embedding)
-
-
-class TE_SpanSim(SpanSim):  # i.e. SpanSim using TokenEmbeddings
+class SpanSimFromTokenEmbeddings(SpanSim):
 	def __init__(
 		self,
 		token_sim: TokenSim,
@@ -83,8 +71,8 @@ class TE_SpanSim(SpanSim):  # i.e. SpanSim using TokenEmbeddings
 			}
 
 
-class SE_SpanSim(SpanSim):  # i.e. SpanSim using SentenceEmbeddings
-	def __init__(self, embedding: SentenceEmbedding, sim: VectorSim = None):
+class SpanSimFromSpanEmbeddings(SpanSim):
+	def __init__(self, embedding: SpanEmbedding, sim: VectorSim = None):
 		if sim is None:
 			sim = CosineSim()
 		assert isinstance(sim, VectorSim)
@@ -109,4 +97,4 @@ class SE_SpanSim(SpanSim):  # i.e. SpanSim using SentenceEmbeddings
 
 	@property
 	def name(self):
-		return "SE_SpanSim"
+		return "SpanSimFromSpanEmbeddings"

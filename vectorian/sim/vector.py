@@ -3,7 +3,7 @@ import numpy as np
 from typing import List
 
 from vectorian.sim.kernel import UnaryOperator
-from vectorian.embeddings import AbstractVectors
+from vectorian.embedding.vectors import AbstractVectors
 from vectorian.sim.kernel import Kernel
 
 # inspired by https://github.com/explosion/thinc/blob/master/thinc/types.py

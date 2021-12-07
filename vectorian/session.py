@@ -11,8 +11,11 @@ from functools import lru_cache
 from vectorian.render.render import Renderer
 from vectorian.render.excerpt import ExcerptRenderer
 from vectorian.render.location import LocationFormatter
-from vectorian.metrics import CosineSim, EmbeddingTokenSim, TE_SpanSim, SpanSim
-from vectorian.embeddings import OpenedVectorsCache, Vectors, TokenEmbedding
+from vectorian.sim.vector import CosineSim
+from vectorian.sim.token import EmbeddingTokenSim
+from vectorian.sim.span import SpanSim, SpanSimFromTokenEmbeddings
+from vectorian.embedding.vectors import OpenedVectorsCache, Vectors
+from vectorian.embedding.token import TokenEmbedding
 from vectorian.normalization import Normalization, VanillaNormalization
 from vectorian.corpus.corpus import Corpus
 from vectorian.tqdm import tqdm
@@ -213,7 +216,7 @@ class Session:
 
 	def default_metric(self):
 		embedding = self._token_embeddings[0]
-		return TE_SpanSim(
+		return SpanSimFromTokenEmbeddings(
 			EmbeddingTokenSim(
 				embedding, CosineSim()))
 

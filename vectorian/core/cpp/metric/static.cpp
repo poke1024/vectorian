@@ -35,7 +35,7 @@ SimilarityMatrixRef StaticEmbeddingSimilarityMatrixFactory::build_static_similar
 		mutable_indices[j] = t_rel;
 	}
 
-	const auto py_embeddings = py::module_::import("vectorian.embeddings");
+	const auto py_embeddings = py::module_::import("vectorian.embedding.vectors");
 	const auto t_vectors = py_embeddings.attr("StackedVectors")(sources, indices);
 
 	size_t offset = 0;

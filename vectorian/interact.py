@@ -4,7 +4,7 @@ import time
 import logging
 
 import vectorian.alignment
-import vectorian.embeddings
+import vectorian.embedding
 import vectorian.metrics
 import vectorian.session
 import vectorian.core as core
@@ -762,7 +762,7 @@ class AlignmentWidget(FineTuneableWidget):
 		return self._fine_tune.make_token_sim()
 
 	def make(self):
-		return vectorian.metrics.TE_SpanSim(
+		return vectorian.metrics.SpanSimFromTokenEmbeddings(
 			token_sim=self.make_token_sim(),
 			optimizer=self.make_alignment())
 
@@ -824,7 +824,7 @@ class TagWeightedAlignmentWidget:
 		])
 
 	def make(self):
-		return vectorian.metrics.TE_SpanSim(
+		return vectorian.metrics.SpanSimFromTokenEmbeddings(
 			token_sim=self._alignment.make_token_sim(),
 			optimizer=self._alignment.make_alignment(),
 			tag_weights=self._tag_weights)
@@ -858,7 +858,7 @@ class PartitionEmbeddingWidget:
 			layout={'width': '25em'})
 
 	def make(self):
-		return vectorian.metrics.SE_SpanSim(
+		return vectorian.metrics.SpanSimFromSpanEmbeddings(
 			self._encoders[self._widget.value].to_cached())
 
 	def describe(self):

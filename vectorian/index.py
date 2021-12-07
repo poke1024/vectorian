@@ -17,7 +17,8 @@ from collections import namedtuple
 from pathlib import Path
 
 from vectorian.corpus.document import TokenTable, InternalMemoryText
-from vectorian.embeddings import Vectors, ProxyVectorsRef, prepare_docs
+from vectorian.embedding.vectors import Vectors, ProxyVectorsRef
+from vectorian.embedding.encoder import prepare_docs
 from vectorian.tqdm import tqdm
 
 

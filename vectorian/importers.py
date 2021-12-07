@@ -6,7 +6,8 @@ import download
 from pathlib import Path
 from collections import namedtuple
 
-from vectorian.embeddings import ContextualEmbedding, Vectors, ProxyVectorsRef
+from vectorian.embedding.token import ContextualEmbedding
+from vectorian.embedding.vectors import Vectors, ProxyVectorsRef
 from vectorian.tqdm import tqdm
 
 

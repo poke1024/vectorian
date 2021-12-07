@@ -14,7 +14,7 @@ def set_verbose(level):
 	os.environ["VECTORIAN_VERBOSE"] = str(level)
 
 
-import vectorian.embeddings as embeddings
+import vectorian.embedding as embeddings
 import vectorian.importers as importers
 import vectorian.session as session
 import vectorian.metrics as metrics
