@@ -35,7 +35,7 @@ class SpanEncoder:
 		raise NotImplementedError()
 
 	@property
-	def embedding(self):
+	def token_embedding(self):
 		raise NotImplementedError()
 
 	def encode(self, docs, pbar=False):
@@ -51,8 +51,8 @@ class InMemorySpanEncoder(SpanEncoder):
 		return self._embedding.vector_size(session)
 
 	@property
-	def embedding(self):  # i.e. token embedding
-		return self._embedding.embedding
+	def token_embedding(self):
+		return self._embedding.token_embedding
 
 	def encode(self, docs, pbar=False):
 		partition = self._partition
@@ -114,8 +114,8 @@ class CachedSpanEncoder(SpanEncoder):
 		return self._encoder.vector_size(session)
 
 	@property
-	def embedding(self):
-		return self._encoder.embedding
+	def token_embedding(self):
+		return self._encoder.token_embedding
 
 	def _mk_cache_key(self, doc):
 		if doc.corpus is None:
