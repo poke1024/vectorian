@@ -75,7 +75,8 @@ class EmbeddedSpanSim(SpanSim):
 	def __init__(self, embedding: SpanEmbedding, sim: VectorSim = None):
 		if sim is None:
 			sim = CosineSim()
-		assert isinstance(sim, VectorSim)
+		if not isinstance(sim, VectorSim):
+			raise TypeError(f"{sim} is expected to be a VectorSim")
 		self._embedding = embedding
 		self._vector_sim = sim
 

@@ -2,12 +2,11 @@ import numpy as np
 import json
 import h5py
 import cachetools
-import sqlite3
-import uuid
 
 from pathlib import Path
-from .vectors import Vectors
+from .vectors import Vectors, ExternalMemoryVectors
 from vectorian.tqdm import tqdm
+from vectorian.corpus import Document
 
 
 def chunks(x, n):
@@ -88,53 +87,23 @@ class CachedSpanEncoder(SpanEncoder):
 		super().__init__(partition)
 
 		self._corpus = partition.session.corpus
+		self._catalog = self._corpus.embedding_catalog
 		self._encoder = InMemorySpanEncoder(partition, span_embedding)
 		self._embedding = span_embedding
 		self._cache = cachetools.LRUCache(cache_size)
 		self._uuid = self._gen_uuid()
 
 	def _gen_uuid(self):
-		conf_key = json.dumps({
-			'embedding': self._embedding.unique_id,
+		return self._catalog.add_embedding("span", {
+			'embedding': self._embedding.name,
 			'partition': self._partition.cache_key
 		})
 
-
-		return unique_id
-
-	def _emb_cache_path(self, doc):
-		p = self._corpus.get_doc_path(doc) / "span_embeddings" / (self._uuid + ".h5")
-		if not p.exists():
-			return None
-
-
-	def save(self, path):
-		path = Path(path)
-		index = []
-		with h5py.File(path.parent / (path.name + ".h5"), 'w') as f:
-			for k, v in self._cache.items():
-				f.create_dataset(str(len(index)), data=v)
-				index.append(k)
-		with open(path.parent / (path.name + ".json"), "w") as f:
-			f.write(json.dumps(index))
-
-	def try_load(self, path):
-		path = Path(path)
-		if not (path.parent / (path.name + ".json")).exists():
-			return False
-		with open(path.parent / (path.name + ".json"), "r") as f:
-			index = json.loads(f.read())
-		if len(index) > self._cache.maxsize:
-			raise RuntimeError("cache is too small")
-		with h5py.File(path.parent / (path.name + ".h5"), 'r') as f:
-			for i, key in enumerate(index):
-				self._cache[tuple(key)] = np.array(f[str(i)])
-
-		return True
-
-	def load(self, path):
-		if not self.try_load(path):
-			raise FileNotFoundError(path)
+	def _emb_path(self, doc, mutable=False):
+		emb_path = Document.embedding_path(self._corpus.get_doc_path(doc.doc))
+		if mutable and not emb_path.exists():
+			emb_path.mkdir(exist_ok=True, parents=True)
+		return emb_path / self._uuid
 
 	def cache(self, docs, partition, pbar=True):
 		if len(docs) > self._cache.maxsize:
@@ -156,11 +125,24 @@ class CachedSpanEncoder(SpanEncoder):
 			return None
 		return uid
 
+	def _load(self, doc):
+		cache_key = self._mk_cache_key(doc)
+		if cache_key is None:
+			return None
+		data = self._cache.get(cache_key)
+		if data is None:
+			p = self._emb_path(doc)
+			if p.exists():
+				data = ExternalMemoryVectors.load(p).unmodified
+				self._cache[cache_key] = data
+		return data
+
 	def _store(self, doc, v_doc):
 		cache_key = self._mk_cache_key(doc)
 		if cache_key is not None:
 			self._cache[cache_key] = v_doc
-			Vectors(v_doc).save(emb_path / unique_id)
+			p = self._emb_path(doc, mutable=True)
+			Vectors(v_doc).save(p)
 
 	def encode(self, docs, pbar=False):
 		partition = self._partition
@@ -180,7 +162,7 @@ class CachedSpanEncoder(SpanEncoder):
 				raise RuntimeError(f"doc {doc} has corpus {doc.corpus}, expected either None or {self._corpus}")
 
 		for i, doc in enumerate(docs):
-			cached = self._cache.get(mk_cache_key(doc))
+			cached = self._load(doc)
 			if cached is not None:
 				out[i_spans[i]:i_spans[i + 1], :] = cached
 			else:
@@ -188,7 +170,7 @@ class CachedSpanEncoder(SpanEncoder):
 				index.append(i)
 
 		if new:
-			v = self._encoder.encode(new, partition, pbar).unmodified
+			v = self._encoder.encode(new, pbar).unmodified
 
 			n_spans_new = [n_spans[i] for i in index]
 			i_spans_new = np.cumsum([0] + n_spans_new)
@@ -196,7 +178,6 @@ class CachedSpanEncoder(SpanEncoder):
 			for j, i in enumerate(index):
 				v_doc = v[i_spans_new[j]:i_spans_new[j + 1], :]
 				out[i_spans[i]:i_spans[i + 1], :] = v_doc
-
 				self._store(new[i], v_doc)
 
 		return Vectors(out)

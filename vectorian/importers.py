@@ -7,6 +7,7 @@ from pathlib import Path
 from collections import namedtuple
 
 from vectorian.embedding.token import ContextualEmbedding
+from vectorian.embedding.span import SpanEmbedding
 from vectorian.embedding.vectors import Vectors, ProxyVectorsRef
 from vectorian.tqdm import tqdm
 
@@ -131,7 +132,13 @@ class Importer:
 			preprocessors = ["normalize-dashes"]
 
 		for embedding in embeddings:
-			if not isinstance(embedding, ContextualEmbedding):
+			if isinstance(embedding, SpanEmbedding):
+				# we cannot preprocess span embeddings here, since we do not know
+				# which partition configuration (e.g. sentences) they will run on.
+				# therefore only at time of index creation can we compute the span
+				# embeddings.
+				raise TypeError(f"SpanEmbedding {embedding} is not allowed here")
+			elif not isinstance(embedding, ContextualEmbedding):
 				raise TypeError(f"expected ContextualEmbedding, got {embedding}")
 
 		self._nlp = nlp

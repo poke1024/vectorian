@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import datetime
 import uuid
+import json
 
 from vectorian.corpus.document import Document
 from vectorian.tqdm import tqdm
@@ -216,6 +217,9 @@ class EmbeddingsCatalog:
 		return rows
 
 	def add_embedding(self, level, key):
+		if not isinstance(key, str):
+			key = json.dumps(key)
+
 		cur = self._conn.cursor()
 		try:
 			cur.execute("""
@@ -299,6 +303,10 @@ class Corpus:
 		self._corpus_h5.close()
 		self._conn.close()
 
+	@property
+	def embedding_catalog(self):
+		return self._catalog
+
 	def add_normalization(self, normalization):
 		assert self._flavors_path.exists()
 		path = self._flavors_path / f"{normalization.name}.h5"
@@ -329,7 +337,12 @@ class Corpus:
 			yield FlavorCache(hf)
 
 	def get_unique_id(self, doc):
-		return self._doc_to_unique_id[id(doc)]
+		if not isinstance(doc, Document):
+			raise TypeError(f"{doc} is expected to be a Document")
+		uid = self._doc_to_unique_id.get(id(doc))
+		if uid is None:
+			raise RuntimeError(f"unable to find {doc} in {self}")
+		return uid
 
 	def get_doc_index(self, doc):
 		return self._unique_id_to_index[self._doc_to_unique_id[id(doc)]]

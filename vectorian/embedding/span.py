@@ -94,7 +94,7 @@ class AggregatedTokenEmbedding(SpanEmbedding):
 			yield out
 
 
-class FullTextSpanEmbedding(SpanEmbedding):
+class PureSpanEmbedding(SpanEmbedding):
 	def __init__(self, chunk_size=50):
 		super().__init__()
 		self._chunk_size = chunk_size
@@ -115,7 +115,7 @@ class FullTextSpanEmbedding(SpanEmbedding):
 			yield self._encode_text([span.text for span in spans])
 
 
-class SpacySpanEmbedding(FullTextSpanEmbedding):
+class SpacySpanEmbedding(PureSpanEmbedding):
 	def __init__(self, nlp, **kwargs):
 		super().__init__(**kwargs)
 		self._nlp = nlp
@@ -132,7 +132,7 @@ class SpacySpanEmbedding(FullTextSpanEmbedding):
 		return [self._nlp(t).vector for t in texts]
 
 
-class LambdaSpanEmbedding(FullTextSpanEmbedding):
+class LambdaSpanEmbedding(PureSpanEmbedding):
 	def __init__(self, encode, name, vector_size=768, **kwargs):
 		super().__init__(**kwargs)
 		self._encode = encode

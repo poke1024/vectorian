@@ -451,9 +451,13 @@ class Document:
 		self._save_embeddings(embedding_catalog, path)
 
 	@staticmethod
+	def embedding_path(doc_path):
+		return doc_path / "embeddings"
+
+	@staticmethod
 	def _load_embeddings(catalog, path):
 		contextual_embeddings = dict()
-		emb_path = path / "embeddings"
+		emb_path = Document.embedding_path(path)
 
 		for k, filename in catalog.get_embeddings("token"):
 			if (emb_path / filename).exists():
@@ -463,7 +467,7 @@ class Document:
 
 	def _save_embeddings(self, catalog, path):
 		if self._contextual_embeddings:
-			emb_path = path / "embeddings"
+			emb_path = Document.embedding_path(path)
 			emb_path.mkdir(exist_ok=True, parents=True)
 
 			for k, vectors in self._contextual_embeddings.items():
