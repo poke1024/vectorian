@@ -178,7 +178,7 @@ class CachedSpanEncoder(SpanEncoder):
 			for j, i in enumerate(index):
 				v_doc = v[i_spans_new[j]:i_spans_new[j + 1], :]
 				out[i_spans[i]:i_spans[i + 1], :] = v_doc
-				self._store(new[i], v_doc)
+				self._store(docs[i], v_doc)
 
 		return Vectors(out)
 
