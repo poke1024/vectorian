@@ -20,8 +20,6 @@ def stats_from_sentence_bert(nlp):
 
 	meta = nlp.meta
 	dimension = meta.get('vectors', {}).get('width')
-	if dimension is None:
-		return None
 
 	sentence_bert = None
 	for name, x in nlp.pipeline:
@@ -38,6 +36,9 @@ def stats_from_sentence_bert(nlp):
 	lang = meta['lang']
 	name = f"sentence-bert-{lang}-{model_name}"
 
+	if dimension is None or dimension == 0:
+		dimension = nlp("").vector.shape[0]
+
 	return Stats(name, dimension)
 
 
@@ -48,12 +49,12 @@ def stats_from_meta(nlp):
 		return None
 
 	dimension = vectors.get("width")
-	if dimension is None:
-		return None
-
 	name = vectors.get("name")
 	if name is None:
 		return None
+
+	if dimension is None or dimension == 0:
+		dimension = nlp("").vector.shape[0]
 
 	return Stats(name, dimension)
 
