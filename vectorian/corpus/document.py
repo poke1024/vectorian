@@ -460,7 +460,7 @@ class Document:
 		emb_path = Document.embedding_path(path)
 
 		for k, filename in catalog.get_embeddings("token"):
-			if (emb_path / filename).exists():
+			if (emb_path / (filename + ".h5")).exists():
 				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / filename)
 
 		return contextual_embeddings

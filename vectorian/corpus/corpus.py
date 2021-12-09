@@ -3,7 +3,7 @@ import numpy as np
 import h5py
 import collections
 import enum
-import uuid
+import threading
 import sqlite3
 import contextlib
 import tempfile
@@ -192,7 +192,7 @@ class FlavorBuilder:
 				self._add(unique_id, doc, text.get(), table, base_mask)
 
 
-class EmbeddingsCatalog:
+class EmbeddingCatalog:
 	def __init__(self, path):
 		self._conn = sqlite3.connect(path)
 
@@ -230,7 +230,7 @@ class EmbeddingsCatalog:
 			cur.close()
 
 		if unique_id is not None:
-			return unique_id
+			return unique_id[0]
 
 		unique_id = uuid.uuid1().hex
 
@@ -269,10 +269,18 @@ class Corpus:
 				CREATE TABLE IF NOT EXISTS text(
 					unique_id TEXT PRIMARY KEY, content TEXT)''')
 
-		embedding_catalog = EmbeddingsCatalog(path / "embeddings.db")
-		self._catalog = embedding_catalog
+		data = threading.local()
+
+		def create_catalog():
+			return EmbeddingCatalog(path / "embeddings.db")
 
 		def load_doc(unique_id):
+			if 'catalog' in data.__dict__:
+				embedding_catalog = data.catalog
+			else:
+				embedding_catalog = create_catalog()
+				data.catalog = embedding_catalog
+
 			p = self._documents_path / unique_id
 			doc = Document.load_from_corpus(
 				unique_id,
@@ -280,7 +288,7 @@ class Corpus:
 				self._corpus_sql,
 				self._documents_group[unique_id],
 				embedding_catalog)
-			#doc.metadata["origin"] = p
+
 			return unique_id, doc
 
 		unique_ids = list(self._documents_group.keys())
@@ -289,6 +297,7 @@ class Corpus:
 		self._doc_to_unique_id = {}
 		self._unique_id_to_index = {}
 		self._ordered_docs = []
+		self._catalog = create_catalog()
 
 		with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
 			for unique_id, doc in tqdm(
