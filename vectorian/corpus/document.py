@@ -149,7 +149,8 @@ class Table:
 		data = self._col.get(k)
 		if data is None:
 			data = self._get(k)
-			self._col[k] = data
+			if data is not None:
+				self._col[k] = data
 		return data
 
 	def __setitem__(self, k, v):
@@ -380,21 +381,21 @@ class Document:
 		return name in self._contextual_embeddings
 
 	@staticmethod
-	def load_from_corpus(unique_id, doc_path, doc_sql, doc_group):
-		contextual_embeddings = Document._load_embeddings(doc_path)
+	def load_from_corpus(unique_id, doc_path, doc_sql, doc_group, embedding_catalog):
+		contextual_embeddings = Document._load_embeddings(embedding_catalog, doc_path)
 		return Document(CorpusDocumentStorage(
 			doc_path, doc_sql, doc_group, unique_id), contextual_embeddings)
 
 	@staticmethod
-	def load_from_fs(path):
+	def load_from_fs(path, embedding_catalog):
 		path = Path(path)
 		if path.suffix != ".document":
 			raise ValueError(f"document path '{path}' must end in '.document'")
 
-		contextual_embeddings = Document._load_embeddings(path)
+		contextual_embeddings = Document._load_embeddings(embedding_catalog, path)
 		return Document(ExternalMemoryDocumentStorage(path), contextual_embeddings)
 
-	def save_to_corpus(self, unique_id, doc_path, doc_sql, doc_group):
+	def save_to_corpus(self, unique_id, doc_path, doc_sql, doc_group, embedding_catalog):
 		doc_group.attrs["metadata"] = json.dumps(self._storage.metadata)
 
 		with self._storage.tokens() as tokens:
@@ -419,9 +420,9 @@ class Document:
 						INSERT INTO text(unique_id, content) VALUES (?, ?)
 						''', (unique_id, text.get()))
 
-		self._save_embeddings(doc_path)
+		self._save_embeddings(embedding_catalog, doc_path)
 
-	def save_to_fs(self, path):
+	def save_to_fs(self, path, embedding_catalog):
 		path = Path(path)
 
 		if not path.is_dir():
@@ -447,36 +448,28 @@ class Document:
 			with open(path / "document.txt", "w") as f:
 				f.write(text.get())
 
-		self._save_embeddings(path)
+		self._save_embeddings(embedding_catalog, path)
 
 	@staticmethod
-	def _load_embeddings(path):
+	def _load_embeddings(catalog, path):
 		contextual_embeddings = dict()
 		emb_path = path / "embeddings"
-		emb_json_path = emb_path / "info.json"
-		if emb_json_path.exists():
-			with open(emb_json_path, "r") as f:
-				emb_data = json.loads(f.read())
 
-			for k, slug_name in emb_data.items():
-				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / slug_name)
+		for k, filename in catalog.get_embeddings("token"):
+			if (emb_path / filename).exists():
+				contextual_embeddings[k] = ExternalMemoryVectorsRef(emb_path / filename)
+
 		return contextual_embeddings
 
-	def _save_embeddings(self, path):
+	def _save_embeddings(self, catalog, path):
 		if self._contextual_embeddings:
-			emb_data = dict()
-
 			emb_path = path / "embeddings"
 			emb_path.mkdir(exist_ok=True, parents=True)
 
 			for k, vectors in self._contextual_embeddings.items():
-				unique_name = uuid.uuid1().hex
+				unique_name = catalog.add_embedding("token", k)
 				assert not (emb_path / unique_name).exists()
-				emb_data[k] = unique_name
 				vectors.save(emb_path / unique_name)
-
-			with open(emb_path / "info.json", "w") as f:
-				f.write(json.dumps(emb_data))
 
 	def to_json(self):
 		return self._storage.metadata

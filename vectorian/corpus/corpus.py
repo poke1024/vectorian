@@ -125,9 +125,18 @@ class FlavorBuilder:
 			base_mask,
 			np.array([x and len(x.strip()) > 0 for x in texts], dtype=np.bool))
 
+		def coalesce(x):
+			if x is None:
+				return [None] * token_mask.shape[0]
+			else:
+				return x
+
+		pos_data = coalesce(table["pos"])
+		tag_data = coalesce(table["tag"])
+
 		data = {
-			'pos': [(x or "") for i, x in enumerate(table["pos"]) if token_mask[i]],
-			'tag': [(x or "") for i, x in enumerate(table["tag"]) if token_mask[i]],
+			'pos': [(x or "") for i, x in enumerate(pos_data) if token_mask[i]],
+			'tag': [(x or "") for i, x in enumerate(tag_data) if token_mask[i]],
 			'str': [x for i, x in enumerate(texts) if token_mask[i]]
 		}
 
@@ -182,6 +191,53 @@ class FlavorBuilder:
 				self._add(unique_id, doc, text.get(), table, base_mask)
 
 
+class EmbeddingsCatalog:
+	def __init__(self, path):
+		self._conn = sqlite3.connect(path)
+
+		self._conn.execute("""
+			create table if not exists catalog (
+				level varchar,
+				key varchar,
+				filename varchar unique,
+				PRIMARY KEY (level, key)
+			)""")
+
+	def get_embeddings(self, level):
+		cur = self._conn.cursor()
+		try:
+			cur.execute("""
+				select key, filename from catalog where level=?
+				""", (level,))
+			rows = cur.fetchall()
+		finally:
+			cur.close()
+
+		return rows
+
+	def add_embedding(self, level, key):
+		cur = self._conn.cursor()
+		try:
+			cur.execute("""
+				select filename from catalog where level=? and key=?
+				""", (level, key,))
+			unique_id = cur.fetchone()
+		finally:
+			cur.close()
+
+		if unique_id is not None:
+			return unique_id
+
+		unique_id = uuid.uuid1().hex
+
+		with self._conn:
+			self._conn.execute("""
+				insert into catalog(level, key, filename) values (?, ?, ?)
+				""", (level, key, unique_id))
+
+		return unique_id
+
+
 class Corpus:
 	def __init__(self, path, mutable=False):
 		path = Path(path)
@@ -209,13 +265,17 @@ class Corpus:
 				CREATE TABLE IF NOT EXISTS text(
 					unique_id TEXT PRIMARY KEY, content TEXT)''')
 
+		embedding_catalog = EmbeddingsCatalog(path / "embeddings.db")
+		self._catalog = embedding_catalog
+
 		def load_doc(unique_id):
 			p = self._documents_path / unique_id
 			doc = Document.load_from_corpus(
 				unique_id,
 				p,
 				self._corpus_sql,
-				self._documents_group[unique_id])
+				self._documents_group[unique_id],
+				embedding_catalog)
 			#doc.metadata["origin"] = p
 			return unique_id, doc
 
@@ -294,7 +354,8 @@ class Corpus:
 				unique_id,
 				self._documents_path / unique_id,
 				self._corpus_sql,
-				self._documents_group.create_group(unique_id))
+				self._documents_group.create_group(unique_id),
+				self._catalog)
 		finally:
 			self._corpus_h5.flush()
 

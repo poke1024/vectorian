@@ -5,5 +5,5 @@ if gensim_version() >= 4:
 
 from .token.keyed import GensimVectors, Word2VecVectors, PretrainedGloVe, StackedEmbedding
 from .token.fasttext import CompressedFastTextVectors, PretrainedFastText
-from .token.contextual import SpacyEmbedding, SpacyTransformerEmbedding
-from .span import AggregatedTokenEmbedding, TextEncoderEmbedding
+from .token.contextual import SpacyTokenEmbedding, SpacyTransformerEmbedding
+from .span import AggregatedTokenEmbedding, SpacySpanEmbedding

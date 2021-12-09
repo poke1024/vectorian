@@ -1,8 +1,8 @@
 import numpy as np
 import vectorian.core as core
-from cached_property import cached_property
 from .token import TokenEmbedding
 from ..transform import PCACompression
+from ..pipeline import decompose_nlp
 
 
 class ContextualEmbedding(TokenEmbedding):
@@ -32,7 +32,7 @@ class ContextualEmbedding(TokenEmbedding):
 		raise NotImplementedError()
 
 
-class AbstractSpacyEmbedding(ContextualEmbedding):
+class AbstractSpacyTokenEmbedding(ContextualEmbedding):
 	def __init__(self, nlp, transform=None):
 		super().__init__(transform)
 		self._nlp = nlp
@@ -41,42 +41,29 @@ class AbstractSpacyEmbedding(ContextualEmbedding):
 	def nlp(self):
 		return self._nlp
 
-	@cached_property
-	def name(self):
-		meta = self._nlp.meta
-		return '/'.join([
-			meta['url'], meta['lang'], meta['name'], meta['version']
-		] + ([] if self._transform is None else [self._transform.name]))
 
-
-class SpacyEmbedding(AbstractSpacyEmbedding):
-	def __init__(self, nlp, dimension, cache=None, **kwargs):
+class SpacyTokenEmbedding(AbstractSpacyTokenEmbedding):
+	def __init__(self, nlp, **kwargs):
 		super().__init__(nlp, **kwargs)
-		self._dimension = dimension
-		self._cache = cache
+		self._stats = decompose_nlp(nlp)
 
 	@property
 	def dimension(self):
-		return self._dimension
+		return self._stats.dimension
+
+	@property
+	def name(self):
+		return self._stats.name
 
 	def pca(self, n_dims):
-		return SpacyEmbedding(self._nlp, PCACompression(n_dims))
+		return SpacyTokenEmbedding(
+			self._nlp, n_dims, transform=PCACompression(n_dims))
 
 	def encode(self, doc):
-		if self._cache is not None:
-			array = self._cache.get(doc.text)
-			if array is not None:
-				return array
-
-		array = np.array([token.vector for token in self._nlp(doc.text)])
-
-		if self._cache is not None:
-			self._cache.put(doc.text, array)
-
-		return array
+		return np.array([token.vector for token in self._nlp(doc.text)])
 
 
-class SpacyTransformerEmbedding(AbstractSpacyEmbedding):
+class SpacyTransformerEmbedding(AbstractSpacyTokenEmbedding):
 	@property
 	def dimension(self):
 		if self._transform is not None:
@@ -120,4 +107,3 @@ class SpacyTransformerEmbedding(AbstractSpacyEmbedding):
 		assert len(doc) == trf_vectors.shape[0]
 
 		return trf_vectors
-

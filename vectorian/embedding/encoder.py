@@ -2,6 +2,8 @@ import numpy as np
 import json
 import h5py
 import cachetools
+import sqlite3
+import uuid
 
 from pathlib import Path
 from .vectors import Vectors
@@ -27,6 +29,9 @@ def prepare_docs(docs, nlp):
 
 
 class SpanEncoder:
+	def __init__(self, partition):
+		self._partition = partition
+
 	def vector_size(self, session):
 		raise NotImplementedError()
 
@@ -34,22 +39,25 @@ class SpanEncoder:
 	def embedding(self):
 		raise NotImplementedError()
 
-	def encode(self, docs, partition, pbar=False):
+	def encode(self, docs, pbar=False):
 		raise NotImplementedError()
 
 
 class InMemorySpanEncoder(SpanEncoder):
-	def __init__(self, span_embedding):
-		self._span_embedding = span_embedding
+	def __init__(self, partition, span_embedding):
+		super().__init__(partition)
+		self._embedding = span_embedding
 
 	def vector_size(self, session):
-		return self._span_embedding.vector_size(session)
+		return self._embedding.vector_size(session)
 
 	@property
 	def embedding(self):  # i.e. token embedding
-		return self._span_embedding.embedding
+		return self._embedding.embedding
 
-	def encode(self, docs, partition, pbar=False):
+	def encode(self, docs, pbar=False):
+		partition = self._partition
+
 		n_spans = [doc.n_spans(partition) for doc in docs]
 		i_spans = np.cumsum([0] + n_spans)
 
@@ -66,20 +74,39 @@ class InMemorySpanEncoder(SpanEncoder):
 					yield doc, spans
 					pbar_instance.update(len(spans))
 
-		for i, v in enumerate(self._span_embedding.encode(partition.session, gen_spans())):
+		for i, v in enumerate(self._embedding.encode(partition.session, gen_spans())):
 			out[i_spans[i]:i_spans[i + 1], :] = v
 
 		return Vectors(out)
 
 	def to_cached(self, cache_size=150):
-		return CachedSpanEncoder(self._encoder, cache_size)
+		return CachedSpanEncoder(self._partition, self._embedding, cache_size)
 
 
 class CachedSpanEncoder(SpanEncoder):
-	def __init__(self, session, span_embedding, cache_size=150):
-		self._corpus = session.corpus
-		self._encoder = InMemorySpanEncoder(span_embedding)
+	def __init__(self, partition, span_embedding, cache_size=150):
+		super().__init__(partition)
+
+		self._corpus = partition.session.corpus
+		self._encoder = InMemorySpanEncoder(partition, span_embedding)
+		self._embedding = span_embedding
 		self._cache = cachetools.LRUCache(cache_size)
+		self._uuid = self._gen_uuid()
+
+	def _gen_uuid(self):
+		conf_key = json.dumps({
+			'embedding': self._embedding.unique_id,
+			'partition': self._partition.cache_key
+		})
+
+
+		return unique_id
+
+	def _emb_cache_path(self, doc):
+		p = self._corpus.get_doc_path(doc) / "span_embeddings" / (self._uuid + ".h5")
+		if not p.exists():
+			return None
+
 
 	def save(self, path):
 		path = Path(path)
@@ -121,7 +148,23 @@ class CachedSpanEncoder(SpanEncoder):
 	def embedding(self):
 		return self._encoder.embedding
 
-	def encode(self, docs, partition, pbar=False):
+	def _mk_cache_key(self, doc):
+		if doc.corpus is None:
+			return None
+		uid = doc.corpus_id
+		if uid is None:
+			return None
+		return uid
+
+	def _store(self, doc, v_doc):
+		cache_key = self._mk_cache_key(doc)
+		if cache_key is not None:
+			self._cache[cache_key] = v_doc
+			Vectors(v_doc).save(emb_path / unique_id)
+
+	def encode(self, docs, pbar=False):
+		partition = self._partition
+
 		n_spans = [doc.n_spans(partition) for doc in docs]
 		i_spans = np.cumsum([0] + n_spans)
 
@@ -135,15 +178,6 @@ class CachedSpanEncoder(SpanEncoder):
 		for doc in docs:
 			if doc.corpus not in (None, self._corpus):
 				raise RuntimeError(f"doc {doc} has corpus {doc.corpus}, expected either None or {self._corpus}")
-
-
-		def mk_cache_key(doc):
-			if doc.corpus is None:
-				return None
-			uid = doc.corpus_id
-			if uid is None:
-				return None
-			return (uid,) + partition.cache_key
 
 		for i, doc in enumerate(docs):
 			cached = self._cache.get(mk_cache_key(doc))
@@ -163,11 +197,7 @@ class CachedSpanEncoder(SpanEncoder):
 				v_doc = v[i_spans_new[j]:i_spans_new[j + 1], :]
 				out[i_spans[i]:i_spans[i + 1], :] = v_doc
 
-				cache_key = mk_cache_key(new[i])
-				if cache_key is not None:
-					self._cache[cache_key] = v_doc
-					#self._corpus.get_doc_path(new[i]) / "span_emb"
-					# store_to_cache(cache_key, v_doc)
+				self._store(new[i], v_doc)
 
 		return Vectors(out)
 

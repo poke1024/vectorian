@@ -586,7 +586,7 @@ class AbstractSpanEncoderIndex(Index):
 		super().__init__(partition, span_sim)
 
 		from vectorian.embedding.encoder import CachedSpanEncoder
-		self._encoder = CachedSpanEncoder(partition.session, embedding)
+		self._encoder = CachedSpanEncoder(partition, embedding)
 
 		self._partition = partition
 		self._span_sim = span_sim
@@ -686,7 +686,7 @@ class SpanEncoderIndex(AbstractSpanEncoderIndex):
 			corpus_vec = Vectors(vectors)
 		else:
 			corpus_vec = self._encoder.encode(
-				self._session.documents, partition, pbar=True)
+				self._session.documents, pbar=True)
 
 		self._corpus_vec = corpus_vec
 
@@ -696,7 +696,7 @@ class SpanEncoderIndex(AbstractSpanEncoderIndex):
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder.encode(
-			prepare_docs([query], nlp=self._nlp), self._partition)
+			prepare_docs([query], nlp=self._nlp))
 
 		if query_vec.unmodified.shape[0] != 1:
 			raise RuntimeError(
@@ -740,7 +740,7 @@ class FaissCosineIndex(AbstractSpanEncoderIndex):
 			corpus_vec = vectors
 		else:
 			corpus_vec = self._encoder.encode(
-				self._session.documents, partition, pbar=True)
+				self._session.documents, pbar=True)
 			corpus_vec = corpus_vec.normalized
 
 		corpus_vec = corpus_vec.astype(np.float32)
@@ -781,7 +781,7 @@ class FaissCosineIndex(AbstractSpanEncoderIndex):
 
 	def _find(self, query, progress=None):
 		query_vec = self._encoder.encode(
-			prepare_docs([query], nlp=self._nlp), self._partition)
+			prepare_docs([query], nlp=self._nlp))
 		query_vec = query_vec.normalized
 		query_vec = query_vec.astype(np.float32)
 

@@ -1,4 +1,5 @@
 import numpy as np
+from .pipeline import decompose_nlp
 
 
 class SpanEmbedding:
@@ -9,7 +10,11 @@ class SpanEmbedding:
 		raise NotImplementedError()
 
 	@property
-	def embedding(self):  # i.e. token embedding
+	def token_embedding(self):
+		raise NotImplementedError()
+
+	@property
+	def name(self):
 		raise NotImplementedError()
 
 	def encode(self, session, doc_spans):
@@ -27,17 +32,34 @@ class AggregatedTokenEmbedding(SpanEmbedding):
 	# * Zhelezniak et al., "DON’T SETTLE FOR AVERAGE, GO FOR THE MAX:
 	# FUZZY SETS AND MAX-POOLED WORD VECTORS", 2019.
 
-	def __init__(self, embedding, agg=np.mean):
+	_default_functions = {
+		np.mean: "mean",
+		np.min: "min",
+		np.max: "max"
+	}
+
+	def __init__(self, embedding, agg=np.mean, agg_name=None):
 		super().__init__()
+
+		if agg_name is None:
+			agg_name = AggregatedTokenEmbedding._default_functions.get(agg)
+			if agg_name is None:
+				raise ValueError(f"cannot obtain automatic name for {agg}")
+
 		self._embedding = embedding
 		self._agg = agg
+		self._agg_name = agg_name
 
 		if embedding.is_contextual and embedding.transform is not None:
 			raise NotImplementedError("cannot use transformed contextual embedding")
 
 	@property
-	def embedding(self):
+	def token_embedding(self):
 		return self._embedding
+
+	@property
+	def name(self):
+		return f"aggregated-{self._agg_name}-" + self._embedding.name
 
 	def vector_size(self, session):
 		return session.to_embedding_instance(self._embedding).dimension
@@ -84,7 +106,7 @@ class FullTextSpanEmbedding(SpanEmbedding):
 		raise NotImplementedError()
 
 	@property
-	def embedding(self):
+	def token_embedding(self):
 		return None  # i.e. no token embedding
 
 	def encode(self, session, doc_spans):
@@ -93,14 +115,36 @@ class FullTextSpanEmbedding(SpanEmbedding):
 			yield self._encode_text([span.text for span in spans])
 
 
-class TextEncoderEmbedding(FullTextSpanEmbedding):
-	def __init__(self, encode, vector_size=768, **kwargs):
+class SpacySpanEmbedding(FullTextSpanEmbedding):
+	def __init__(self, nlp, **kwargs):
+		super().__init__(**kwargs)
+		self._nlp = nlp
+		self._stats = decompose_nlp(nlp)
+
+	def vector_size(self, session):
+		return self._stats.dimension
+
+	@property
+	def name(self):
+		return self._stats.name
+
+	def _encode_text(self, texts):
+		return [self._nlp(t).vector for t in texts]
+
+
+class LambdaSpanEmbedding(FullTextSpanEmbedding):
+	def __init__(self, encode, name, vector_size=768, **kwargs):
 		super().__init__(**kwargs)
 		self._encode = encode
 		self._vector_size = vector_size
+		self._name = name
 
 	def vector_size(self, session):
 		return self._vector_size
 
 	def _encode_text(self, texts):
 		return self._encode(texts)
+
+	@property
+	def name(self):
+		return self._name

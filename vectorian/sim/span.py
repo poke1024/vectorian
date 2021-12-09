@@ -86,12 +86,6 @@ class EmbeddedSpanSim(SpanSim):
 			return SpanEncoderIndex(
 				partition, self._embedding, self, vector_sim=self._vector_sim, **kwargs)
 
-	'''
-	def load_index(self, session, path, **kwargs):
-		return SpanEncoderIndex.load(
-			session, self, self._encoder, path, vector_sim=self._vector_sim, **kwargs)
-	'''
-
 	def to_args(self, index):
 		return None
 

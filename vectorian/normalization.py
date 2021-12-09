@@ -63,9 +63,10 @@ class Rewrite:
 	def transform_table(self, dset):
 		for attr, rewrites in self._rules.items():
 			values = dset[attr]
-			for src, dst in rewrites.items():
-				values[values == src] = dst
-			dset[attr] = values
+			if values is not None:
+				for src, dst in rewrites.items():
+					values[values == src] = dst
+				dset[attr] = values
 
 	def transform_token(self, t):
 		t_new = dict()
