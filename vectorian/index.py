@@ -432,9 +432,9 @@ class PyMatch(Match):
 
 
 class Index:
-	def __init__(self, partition, metric):
+	def __init__(self, partition, sim):
 		self._partition = partition
-		self._metric = metric
+		self._sim = sim
 
 		if not partition.contiguous:
 			logging.warning("the used partition is non-contiguous, you will miss parts of the content.")
@@ -448,13 +448,13 @@ class Index:
 		return self._partition.session
 
 	@property
-	def metric(self):
-		return self._metric
+	def sim(self):
+		return self._sim
 
 	def describe(self):
 		data = {
 			'partition': self._partition.to_args(),
-			'metric': self._metric.to_args(self)
+			'metric': self._sim.to_args(self)
 		}
 		print(yaml.dump(data))
 
@@ -469,10 +469,10 @@ class Index:
 			options["debug"] = debug
 		options["partition"] = self._partition.to_args()
 
-		if self._metric is not None:
-			metric_args = self._metric.to_args(self)
-			if metric_args:
-				options["metric"] = metric_args
+		if self._sim is not None:
+			sim_args = self._sim.to_args(self)
+			if sim_args:
+				options["metric"] = sim_args
 
 		return Query(self, self._partition.session.vocab, text, options)
 

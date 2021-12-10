@@ -40,7 +40,7 @@ class OptimizedSpanSim(SpanSim):
 		self._options = kwargs
 
 	@property
-	def token_similarity(self):
+	def token_sim(self):
 		return self._token_sim
 
 	@property
