@@ -31,11 +31,18 @@ class FineTuneableWidget:
 			layout={'width': '25em'},
 			style=ROOT_LEVEL_STYLE if self._level == 0 else {})
 
+		if kwargs['value'] not in kwargs['options']:
+			raise ValueError(f"default value {kwargs['value']} not in {kwargs['options']}")
+
 		layout = self.layout
 		if layout is not None:
 			kwargs['layout'] = layout
 
-		self._type = widgets.Dropdown(**kwargs)
+		try:
+			self._type = widgets.Dropdown(**kwargs)
+		except:
+			logging.error(f"something went wrong with dropdown {kwargs}")
+			raise
 
 		self._iquery = iquery
 
@@ -161,7 +168,7 @@ class EmbeddingMixerWidget:
 		self._iquery = iquery
 
 		names = []
-		for x in sorted(iquery.session.embeddings.keys()):
+		for x in sorted(iquery.session.encoders.keys()):
 			names.append(x)
 
 		items = []
@@ -189,7 +196,7 @@ class EmbeddingWidget:
 		self._iquery = iquery
 
 		options = []
-		for x, _ in iquery.ordered_embedding:
+		for x, _ in iquery.ordered_encoders:
 			options.append(x)
 
 		self._embedding = widgets.Dropdown(
@@ -213,7 +220,7 @@ class EmbeddingWidget:
 		return self._vbox
 
 	def make(self):
-		return self._iquery.session.embeddings[self._embedding.value].factory
+		return self._iquery.session.encoders[self._embedding.value].embedding
 
 	def describe(self):
 		return f"**{self._embedding.value}**"
@@ -323,7 +330,7 @@ class TokenSimilarityMetricWidget:
 		self._num_operands = 1
 
 		if similarity is not None:
-			emb_i = [x for x, _ in iquery.ordered_embedding].index(
+			emb_i = [x for x, _ in iquery.ordered_encoders].index(
 				similarity['embedding'].name)
 			self._update_operand_widgets(default_embedding=emb_i)
 		else:
@@ -339,7 +346,7 @@ class TokenSimilarityMetricWidget:
 		option = self._option_info(changed.new)
 
 		if option['multiple']:
-			n = len(self._iquery.session.embeddings)
+			n = len(self._iquery.session.encoders)
 		else:
 			n = 1
 
@@ -351,7 +358,7 @@ class TokenSimilarityMetricWidget:
 
 	def _update_operand_widgets(self, default_embedding=None):
 		option = self._option_info(self._operator.value)
-		max_i = len(self._iquery.session.embeddings) - 1
+		max_i = len(self._iquery.session.encoders) - 1
 
 		self._operands = []
 		if default_embedding is None:
@@ -859,7 +866,7 @@ class PartitionEmbeddingWidget:
 
 	def make(self):
 		return vectorian.metrics.EmbeddedSpanSim(
-			self._encoders[self._widget.value].to_cached())
+			self._encoders[self._widget.value].embedding)
 
 	def describe(self):
 		return f"partition embeddings using {self._widget.value}."
@@ -875,7 +882,7 @@ class PartitionMetricWidget(FineTuneableWidget):
 	_types = [
 		('Alignment', AlignmentWidget),
 		('Tag-Weighted Alignment', TagWeightedAlignmentWidget),
-		('Partition TokenEmbedding', PartitionEmbeddingWidget)
+		('Partition Embedding', PartitionEmbeddingWidget)
 	]
 
 	_default = 'Alignment'
@@ -1137,5 +1144,5 @@ class InteractiveQuery:
 		return self._widget.widget
 
 	@property
-	def ordered_embedding(self):
-		return sorted(list(self._session.embeddings.items()), key=lambda x: x[0])
+	def ordered_encoders(self):
+		return sorted(list(self._session.encoders.items()), key=lambda x: x[0])
