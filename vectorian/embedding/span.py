@@ -9,7 +9,6 @@ from .encoder import EmbeddingEncoder
 
 
 class _Impl:
-	@property
 	def dimension(self, session):
 		raise NotImplementedError()
 
@@ -59,24 +58,24 @@ class AggregatedTokenImpl(_Impl):
 		return f"aggregated-{self._agg_name}-" + self._embedding.name
 
 	def dimension(self, session):
-		return session.to_embedding_instance(self._embedding).dimension
+		return session.to_encoder(self._embedding).dimension
 
 	def encode(self, session, doc_spans):
-		embedding = session.to_embedding_instance(self._embedding)
+		encoder = session.to_encoder(self._embedding)
 
 		for doc, spans in doc_spans:
-			out = np.empty((len(spans), self.vector_size(session)), dtype=np.float32)
+			out = np.empty((len(spans), self.dimension(session)), dtype=np.float32)
 			out.fill(np.nan)
 
-			if embedding.is_static:
+			if encoder.is_static:
 				for i, span in enumerate(spans):
 					text = [token.text for token in span]
-					emb_vec = embedding.get_embeddings(text)
+					emb_vec = encoder.encode_tokens(text)
 					v = emb_vec.unmodified
 					if v.shape[0] > 0:
 						out[i, :] = self._agg(v, axis=0)
 
-			elif embedding.is_contextual:
+			elif encoder.is_contextual:
 				vec_ref = doc.contextual_embeddings[self._embedding.name]
 				with vec_ref.open() as emb_vec:
 					emb_vec_data = emb_vec.unmodified

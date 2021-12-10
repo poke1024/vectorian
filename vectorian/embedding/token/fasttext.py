@@ -67,7 +67,7 @@ class PretrainedFastText(StaticEmbedding):
 		def dimension(self):
 			return self._ft.get_dimension()
 
-		def get_embeddings(self, tokens):
+		def encode_tokens(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in enumerate(extraction_tqdm(tokens, self.name)):
 				data[i, :] = self._ft.get_word_vector(t)

@@ -34,6 +34,9 @@ class StaticEmbeddingEncoder(EmbeddingEncoder):
 	def is_static(self):
 		return True
 
+	def encode_tokens(self, tokens):
+		raise NotImplementedError()
+
 
 class CachedWordEmbedding(StaticEmbedding):
 	pbar_on_open = False
@@ -97,7 +100,7 @@ class CachedWordEmbedding(StaticEmbedding):
 		def dimension(self):
 			return self._vectors.shape[1]
 
-		def get_embeddings(self, tokens):
+		def encode_tokens(self, tokens):
 			indices = np.array([self._token2id.get(t, -1) for t in tokens], dtype=np.int32)
 			oov = indices < 0
 			data = self._vectors[np.maximum(indices, 0)].copy()
@@ -297,7 +300,7 @@ class KeyedVectors(StaticEmbedding):
 		def dimension(self):
 			return self._wv.vector_size
 
-		def get_embeddings(self, tokens):
+		def encode_tokens(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in enumerate(extraction_tqdm(tokens, self.name)):
 				data[i, :] = self._wv.word_vec(t)
@@ -367,7 +370,7 @@ class StackedEmbedding(StaticEmbedding):
 		def dimension(self):
 			return sum(e.dimension for e in self._embeddings)
 
-		def get_embeddings(self, tokens):
+		def encode_tokens(self, tokens):
 			data = np.empty((len(tokens), self.dimension), dtype=np.float32)
 			for i, t in enumerate(extraction_tqdm(tokens, self.name)):
 				data[i, :] = self.word_vec(t)

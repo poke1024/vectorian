@@ -416,6 +416,10 @@ public:
 	inline std::shared_ptr<PyAlignOptions> clone() const {
 		return std::make_shared<PyAlignOptions>(m_options);
 	}
+
+	inline bool remove_dup() const {
+	    return true;
+	}
 };
 
 template<typename Options, typename SliceFactory>

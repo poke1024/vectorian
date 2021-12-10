@@ -53,7 +53,7 @@ class FineTuneableWidget:
 		try:
 			self._fine_tune = self._types[i][1](self._iquery, **options)
 		except:
-			logging.error("error while creating " + self._types[i][1])
+			logging.error(f"error while creating {self._types[i][1]}")
 			raise
 
 	def on_changed(self, change):
