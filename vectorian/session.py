@@ -312,10 +312,10 @@ class Session:
 				if not isinstance(b, Token):
 					raise ValueError(f"expected a Token, got {b}")
 
-				with a.doc.contextual_embeddings[embedding.name].open() as vec:
+				with a.doc.contextual_embeddings[encoder.name].open() as vec:
 					va = Vectors([vec.unmodified[a.index]])
 
-				with b.doc.contextual_embeddings[embedding.name].open() as vec:
+				with b.doc.contextual_embeddings[encoder.name].open() as vec:
 					vb = Vectors([vec.unmodified[b.index]])
 			else:
 				raise ValueError()
