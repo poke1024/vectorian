@@ -506,7 +506,7 @@ class Document:
 
 	def prepare(self, corpus, flavor_cache, session):
 		try:
-			names = [v.factory.name for v in session.embeddings.values() if v.factory.is_contextual]
+			names = [encoder.name for encoder in session.encoders.values() if encoder.is_contextual]
 			contextual_embeddings = dict((k, self._contextual_embeddings[k]) for k in names)
 
 			return PreparedDocument(

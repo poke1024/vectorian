@@ -145,10 +145,6 @@ class Partition:
 		return Slice(self._level, self._window_step * slice_id, self._window_size)
 
 
-SessionEmbedding = collections.namedtuple(
-	"SessionEmbedding", ["factory", "instance"])
-
-
 def _default_normalization(corpus: Corpus, normalization:Normalization = None):
 	if normalization is None:
 		c_norms = corpus.normalizations
@@ -185,13 +181,11 @@ class Session:
 						unique_id = corpus.get_unique_id(doc)
 						raise RuntimeError(f"doc {unique_id} misses contextual embedding {embedding.name}")
 
-		self._embedding_instances = collections.OrderedDict()
+		self._embedding_encoders = collections.OrderedDict()
 		for embedding in self._token_embeddings:
-			instance = embedding.create_instance(self)
-			self._embedding_instances[instance.name] = SessionEmbedding(
-				factory=embedding,
-				instance=instance)
-			self._embedding_manager.add_embedding(instance)
+			encoder = embedding.create_encoder(self)
+			self._embedding_encoders[encoder.name] = encoder
+			self._embedding_manager.add_embedding(encoder)
 
 		self._vocab = core.Vocabulary(self._embedding_manager)
 
@@ -234,11 +228,11 @@ class Session:
 		return [x.compiled for x in self.documents]
 
 	@property
-	def embeddings(self):
-		return self._embedding_instances
+	def encoders(self):
+		return self._embedding_encoders
 
-	def to_embedding_instance(self, embedding):
-		return self._embedding_instances[embedding.name].instance
+	def to_encoder(self, embedding):
+		return self._embedding_encoders[embedding.name]
 
 	def cache_contextual_embeddings(self):
 		for doc in tqdm(self.documents, desc="Loading Vectors"):
@@ -269,12 +263,12 @@ class Session:
 	def word_vec(self, embedding, token_or_tokens):
 		from vectorian.corpus.document import Token
 
-		embedding_instance = self.to_embedding_instance(embedding)
-		if embedding_instance.is_static:
+		if embedding.is_static:
+			encoder = self.to_encoder(embedding)
 			def get(token):
 				if isinstance(token, Token):
 					token = token.text
-				return embedding_instance.word_vec(token)
+				return encoder.word_vec(token)
 		elif embedding.is_contextual:
 			def get(token):
 				if not isinstance(token, Token):
@@ -301,18 +295,18 @@ class Session:
 			token_sim(x, out)
 
 		else:
-			embedding = self.to_embedding_instance(
+			encoder = self.to_encoder(
 				token_sim.embedding)
-			if embedding.is_static:
+			if encoder.is_static:
 				if isinstance(a, Token):
 					a = a.text
 				if isinstance(b, Token):
 					b = b.text
 
-				va = Vectors([embedding.word_vec(a)])
-				vb = Vectors([embedding.word_vec(b)])
+				va = Vectors([encoder.word_vec(a)])
+				vb = Vectors([encoder.word_vec(b)])
 
-			elif embedding.is_contextual:
+			elif encoder.is_contextual:
 				if not isinstance(a, Token):
 					raise ValueError(f"expected a Token, got {a}")
 				if not isinstance(b, Token):

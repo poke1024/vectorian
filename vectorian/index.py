@@ -18,7 +18,7 @@ from pathlib import Path
 
 from vectorian.corpus.document import TokenTable, InternalMemoryText
 from vectorian.embedding.vectors import Vectors, ProxyVectorsRef
-from vectorian.embedding.encoder import prepare_docs
+from vectorian.embedding.span import prepare_docs
 from vectorian.tqdm import tqdm
 
 
@@ -64,10 +64,11 @@ class PreparedQuery:
 		# by analyzing query
 
 		contextual_embeddings = collections.defaultdict(list)
-		for v in self._query.index.session.embeddings.values():
-			e = v.factory
-			if e.is_contextual:
-				contextual_embeddings[e.name].append(e.encode(doc))
+		for encoder in self._query.index.session.encoders.values():
+			if encoder.is_contextual:
+				v = encoder.encode([doc])
+				assert v.shape[0] == 1
+				contextual_embeddings[encoder.name].append(v[0])
 
 		contextual_embeddings = dict(
 			(k, np.vstack(v)) for k, v in contextual_embeddings.items())
@@ -585,8 +586,7 @@ class AbstractSpanEncoderIndex(Index):
 	def __init__(self, partition, embedding, span_sim, nlp):
 		super().__init__(partition, span_sim)
 
-		from vectorian.embedding.encoder import CachedSpanEncoder
-		self._encoder = CachedSpanEncoder(partition, embedding)
+		self._encoder = embedding.create_encoder(partition)
 
 		self._partition = partition
 		self._span_sim = span_sim
@@ -685,8 +685,8 @@ class SpanEncoderIndex(AbstractSpanEncoderIndex):
 		if vectors is not None:
 			corpus_vec = Vectors(vectors)
 		else:
-			corpus_vec = self._encoder.encode(
-				self._session.documents, pbar=True)
+			corpus_vec = Vectors(self._encoder.encode(
+				self._session.documents, pbar=True))
 
 		self._corpus_vec = corpus_vec
 
@@ -695,8 +695,8 @@ class SpanEncoderIndex(AbstractSpanEncoderIndex):
 		raise self._corpus_vec
 
 	def _find(self, query, progress=None):
-		query_vec = self._encoder.encode(
-			prepare_docs([query], nlp=self._nlp))
+		query_vec = Vectors(self._encoder.encode(
+			prepare_docs([query], nlp=self._nlp)))
 
 		if query_vec.unmodified.shape[0] != 1:
 			raise RuntimeError(
@@ -739,8 +739,8 @@ class FaissCosineIndex(AbstractSpanEncoderIndex):
 		if vectors is not None:
 			corpus_vec = vectors
 		else:
-			corpus_vec = self._encoder.encode(
-				self._session.documents, pbar=True)
+			corpus_vec = Vectors(self._encoder.encode(
+				self._session.documents, pbar=True))
 			corpus_vec = corpus_vec.normalized
 
 		corpus_vec = corpus_vec.astype(np.float32)
@@ -780,8 +780,8 @@ class FaissCosineIndex(AbstractSpanEncoderIndex):
 		raise Vectors(self._corpus_vec)
 
 	def _find(self, query, progress=None):
-		query_vec = self._encoder.encode(
-			prepare_docs([query], nlp=self._nlp))
+		query_vec = Vectors(self._encoder.encode(
+			prepare_docs([query], nlp=self._nlp)))
 		query_vec = query_vec.normalized
 		query_vec = query_vec.astype(np.float32)
 

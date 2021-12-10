@@ -137,7 +137,7 @@ class Importer:
 				# which partition configuration (e.g. sentences) they will run on.
 				# therefore only at time of index creation can we compute the span
 				# embeddings.
-				raise TypeError(f"SpanEmbedding {embedding} is not allowed here")
+				raise TypeError(f"{embedding} is not allowed here")
 			elif not isinstance(embedding, ContextualEmbedding):
 				raise TypeError(f"expected ContextualEmbedding, got {embedding}")
 
@@ -174,6 +174,8 @@ class Importer:
 
 		text_len = 0
 
+		encoders = [e.create_encoder(None) for e in self._embeddings]
+
 		for location, doc in tqdm(
 				zip(locations, pipe),
 				total=len(locations),
@@ -199,10 +201,13 @@ class Importer:
 			texts.append(doc_json['text'])
 			text_len += len(doc_json['text'])
 
-			for e in self._embeddings:
-				v = e.encode(doc)
-				if len(v.shape) != 2:
-					raise ValueError(f'expected (a, b), got {v.shape}')
+			for e in encoders:
+				v = e.encode([doc])
+				if len(v.shape) != 3:
+					raise ValueError(f'expected shape (a, b, c), got {v.shape}')
+				if v.shape[0] != 1:
+					raise ValueError(f"expected one vector, got {v.shape[0]}")
+				v = v[0]
 				if v.shape[0] != len(doc):
 					raise ValueError(f'expected ({len(doc)}, ...), got {v.shape}')
 				if v.shape[1] == 0:

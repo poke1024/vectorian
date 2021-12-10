@@ -7,7 +7,7 @@ class TokenEmbedding:
 	def is_contextual(self):
 		return False
 
-	def create_instance(self):
+	def create_encoder(self):
 		raise NotImplementedError()
 
 	@property
@@ -30,6 +30,6 @@ class TokenEmbedding:
 		return OptimizedSpanSim(token_sim, optimizer)
 
 	def to_sentence_embedding(self, agg):
-		from vectorian.embedding.span import AggregatedTokenEmbedding
+		from vectorian.embedding.span import SentenceEmbedding, AggregatedTokenImpl
 
-		return AggregatedTokenEmbedding(self, agg)
+		return SentenceEmbedding(AggregatedTokenImpl(self, agg))

@@ -7,7 +7,7 @@ import contextlib
 import vectorian.core as core
 from pathlib import Path
 from vectorian.tqdm import tqdm
-from .keyed import StaticEmbedding, StaticEmbeddingInstance, KeyedVectors
+from .keyed import StaticEmbedding, StaticEmbeddingEncoder, KeyedVectors
 from ..utils import make_cache_path, extraction_tqdm
 from ..vectors import Vectors
 
@@ -19,8 +19,8 @@ class CompressedFastTextVectors(StaticEmbedding):
 		self._name = Path(path).stem
 		self._wv = compress_fasttext.models.CompressedFastTextKeyedVectors.load(str(path))
 
-	def create_instance(self, session):
-		return KeyedVectors.Instance(self._name, self._wv)
+	def create_encoder(self, session):
+		return KeyedVectors.Encoder(self, self._name, self._wv)
 
 	@property
 	def name(self):
@@ -46,10 +46,15 @@ class ProgressParser(io.StringIO):
 
 
 class PretrainedFastText(StaticEmbedding):
-	class Instance(StaticEmbeddingInstance):
-		def __init__(self, name, ft):
+	class Encoder(StaticEmbeddingEncoder):
+		def __init__(self, embedding, name, ft):
+			self._embedding = embedding
 			self._name = name
 			self._ft = ft
+
+		@property
+		def embedding(self):
+			return self._embedding
 
 		@property
 		def name(self):
@@ -104,8 +109,9 @@ class PretrainedFastText(StaticEmbedding):
 
 		self._ft = ft
 
-	def create_instance(self, session):
-		return PretrainedFastText.Instance(self.name, self._ft)
+	def create_encoder(self, session):
+		return PretrainedFastText.Encoder(
+			self, self.name, self._ft)
 
 	@property
 	def name(self):

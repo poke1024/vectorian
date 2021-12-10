@@ -13,6 +13,7 @@ from .token import TokenEmbedding
 from ..vectors import Vectors
 from ..utils import make_cache_path, normalize_word2vec, extraction_tqdm, gensim_version
 from ..transform import PCACompression
+from ..encoder import EmbeddingEncoder
 
 
 class StaticEmbedding(TokenEmbedding):
@@ -20,7 +21,7 @@ class StaticEmbedding(TokenEmbedding):
 	def is_static(self):
 		return True
 
-	def create_instance(self, session):
+	def create_encoder(self, session):
 		raise NotImplementedError()
 
 	@property
@@ -28,7 +29,7 @@ class StaticEmbedding(TokenEmbedding):
 		raise NotImplementedError()
 
 
-class StaticEmbeddingInstance:
+class StaticEmbeddingEncoder(EmbeddingEncoder):
 	@property
 	def is_static(self):
 		return True
@@ -66,11 +67,16 @@ class CachedWordEmbedding(StaticEmbedding):
 				self._conn.execute("insert into cache(key, path) values (?, ?)", (
 					key, str(path.relative_to(self._cache_path))))
 
-	class Instance(StaticEmbeddingInstance):
-		def __init__(self, name, tokens, vectors):
+	class Encoder(StaticEmbeddingEncoder):
+		def __init__(self, embedding, name, tokens, vectors):
+			self._embedding = embedding
 			self._name = name
 			self._token2id = dict((t, i) for i, t in enumerate(tokens))
 			self._vectors = vectors
+
+		@property
+		def embedding(self):
+			return self._embedding
 
 		@property
 		def memory_usage(self):
@@ -131,7 +137,7 @@ class CachedWordEmbedding(StaticEmbedding):
 		kwargs['transforms'] = kwargs['transforms'] + [PCACompression(n_dims)]
 		return self.__class__(**kwargs)
 
-	def create_instance(self, session):
+	def create_encoder(self, session):
 		normalizers = session.normalizers
 		normalizer = normalizers['text'].to_callable()
 		key = json.dumps({
@@ -181,7 +187,8 @@ class CachedWordEmbedding(StaticEmbedding):
 
 				self._cache.put(key, dat_path)
 
-			loaded = CachedWordEmbedding.Instance(name, tokens, vectors_mmap)
+			loaded = CachedWordEmbedding.Encoder(
+				self, name, tokens, vectors_mmap)
 			self._loaded[key] = loaded
 
 		return loaded
@@ -254,11 +261,11 @@ class Word2VecVectors(GensimVectors):
 
 
 class OneHotEncoding(StaticEmbedding):
-	class Instance(StaticEmbeddingInstance):
+	class Encoder(StaticEmbeddingEncoder):
 		pass
 
-	def create_instance(self, session):
-		return OneHotEncoding.Instance()
+	def create_encoder(self, session):
+		return OneHotEncoding.Encoder()
 
 	@property
 	def name(self):
@@ -269,10 +276,15 @@ class KeyedVectors(StaticEmbedding):
 	# using this class directly circumvents Vectorian's token
 	# normalization. use with care.
 
-	class Instance(StaticEmbeddingInstance):
-		def __init__(self, name, wv):
+	class Encoder(StaticEmbeddingEncoder):
+		def __init__(self, embedding, name, wv):
+			self._embedding = embedding
 			self._name = name
 			self._wv = wv
+
+		@property
+		def embedding(self):
+			return self._embedding
 
 		@property
 		def name(self):
@@ -298,8 +310,8 @@ class KeyedVectors(StaticEmbedding):
 		self._name = name
 		self._wv = wv
 
-	def create_instance(self, session):
-		return KeyedVectors.Instance(self._name, self._wv)
+	def create_encoder(self, session):
+		return KeyedVectors.Encoder(self, self._name, self._wv)
 
 	@property
 	def name(self):
@@ -334,10 +346,15 @@ class PretrainedGloVe(CachedWordEmbedding):
 
 
 class StackedEmbedding(StaticEmbedding):
-	class Instance(StaticEmbeddingInstance):
-		def __init__(self, name, embeddings):
+	class Encoder(StaticEmbeddingEncoder):
+		def __init__(self, embedding, name, embeddings):
+			self._embedding = embedding
 			self._name = name
 			self._embeddings = embeddings
+
+		@property
+		def embedding(self):
+			return self._embedding
 
 		@property
 		def name(self):
@@ -369,9 +386,9 @@ class StackedEmbedding(StaticEmbedding):
 		self._embeddings = embeddings
 		self._name = name
 
-	def create_instance(self, session):
-		return StackedEmbedding.Instance(
-			self.name, [e.create_instance(session) for e in self._embeddings])
+	def create_encoder(self, session):
+		return StackedEmbedding.Encoder(
+			self, self.name, [e.create_encoder(session) for e in self._embeddings])
 
 	@property
 	def name(self):

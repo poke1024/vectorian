@@ -4,6 +4,7 @@ import vectorian.core as core
 from .token import TokenEmbedding
 from ..transform import PCACompression
 from ..pipeline import decompose_nlp
+from ..encoder import EmbeddingEncoder
 
 
 class _Impl:
@@ -15,7 +16,7 @@ class _Impl:
 	def name(self):
 		raise NotImplementedError()
 
-	def encode(self, doc):
+	def encode(self, docs):
 		raise NotImplementedError()
 
 
@@ -41,8 +42,9 @@ class _VectorImpl(_SpacyImpl):
 	def name(self):
 		return self._stats.name
 
-	def encode(self, doc):
-		return np.array([token.vector for token in self._nlp(doc.text)])
+	def encode(self, docs):
+		return np.array([
+			[token.vector for token in self._nlp(doc.text)] for doc in docs])
 
 
 class _TfmImpl(_SpacyImpl):
@@ -53,7 +55,7 @@ class _TfmImpl(_SpacyImpl):
 		tfm = self._nlp.pipeline[self._nlp.pipe_names.index("transformer")][1]
 		return tfm.model.get_dim("nO")
 
-	def encode(self, doc):
+	def _encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
 		# https://explosion.ai/blog/spacy-transformers
 		# https://github.com/explosion/spaCy/issues/6403
@@ -84,6 +86,37 @@ class _TfmImpl(_SpacyImpl):
 
 		return trf_vectors
 
+	def encode(self, docs):
+		return np.array([self._encode(doc) for doc in docs])
+
+
+class ContextualEmbeddingEncoder(EmbeddingEncoder):
+	def __init__(self, impl, embedding):
+		self._impl = impl
+		self._embedding = embedding
+
+	@property
+	def is_contextual(self):
+		return True
+
+	@property
+	def name(self):
+		return self._embedding.name
+
+	@property
+	def embedding(self):
+		return self._embedding
+
+	@property
+	def dimension(self):
+		return self._embedding.dimension
+
+	def encode(self, docs):
+		return self._impl.encode(docs)
+
+	def to_core(self):
+		return core.ContextualEmbedding(self.name)
+
 
 class ContextualEmbedding(TokenEmbedding):
 	def __init__(self, arg, transform=None):
@@ -111,15 +144,8 @@ class ContextualEmbedding(TokenEmbedding):
 	def is_contextual(self):
 		return True
 
-	def encode(self, doc):
-		return self._impl.encode(doc)
-
-	def create_instance(self, session):
-		# ContextualEmbeddings are their own instance
-		return self
-
-	def to_core(self):
-		return core.ContextualEmbedding(self.name)
+	def create_encoder(self, session):
+		return ContextualEmbeddingEncoder(self._impl, self)
 
 	@property
 	def name(self):
