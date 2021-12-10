@@ -274,7 +274,7 @@ class CachedSpanEmbeddingEncoder(EmbeddingEncoder):
 		data = self._cache.get(cache_key)
 		if data is None:
 			p = self._emb_path(doc)
-			if p.exists():
+			if p.with_suffix(".h5").exists():
 				data = ExternalMemoryVectors.load(p).unmodified
 				self._cache[cache_key] = data
 		return data
