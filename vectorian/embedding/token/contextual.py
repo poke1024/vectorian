@@ -1,40 +1,26 @@
 import numpy as np
+import spacy
 import vectorian.core as core
 from .token import TokenEmbedding
 from ..transform import PCACompression
 from ..pipeline import decompose_nlp
 
 
-class ContextualEmbedding(TokenEmbedding):
-	def __init__(self, transform=None):
-		self._transform = transform
-
+class _Impl:
 	@property
-	def transform(self):
-		return self._transform
-
-	@property
-	def is_contextual(self):
-		return True
-
-	def encode(self, doc):
+	def dimension(self):
 		raise NotImplementedError()
-
-	def create_instance(self, session):
-		# ContextualEmbeddings are their own instance
-		return self
-
-	def to_core(self):
-		return core.ContextualEmbedding(self.name)
 
 	@property
 	def name(self):
 		raise NotImplementedError()
 
+	def encode(self, doc):
+		raise NotImplementedError()
 
-class AbstractSpacyTokenEmbedding(ContextualEmbedding):
-	def __init__(self, nlp, transform=None):
-		super().__init__(transform)
+
+class _SpacyImpl(_Impl):
+	def __init__(self, nlp):
 		self._nlp = nlp
 
 	@property
@@ -42,10 +28,10 @@ class AbstractSpacyTokenEmbedding(ContextualEmbedding):
 		return self._nlp
 
 
-class SpacyTokenEmbedding(AbstractSpacyTokenEmbedding):
-	def __init__(self, nlp, **kwargs):
-		super().__init__(nlp, **kwargs)
-		self._stats = decompose_nlp(nlp)
+class _VectorImpl(_SpacyImpl):
+	def __init__(self, nlp, stats):
+		super().__init__(nlp)
+		self._stats = stats
 
 	@property
 	def dimension(self):
@@ -55,27 +41,17 @@ class SpacyTokenEmbedding(AbstractSpacyTokenEmbedding):
 	def name(self):
 		return self._stats.name
 
-	def pca(self, n_dims):
-		return SpacyTokenEmbedding(
-			self._nlp, n_dims, transform=PCACompression(n_dims))
-
 	def encode(self, doc):
 		return np.array([token.vector for token in self._nlp(doc.text)])
 
 
-class SpacyTransformerEmbedding(AbstractSpacyTokenEmbedding):
+class _TfmImpl(_SpacyImpl):
 	@property
 	def dimension(self):
-		if self._transform is not None:
-			return self._transform.dimension
-		else:
-			# https://spacy.io/usage/processing-pipelines
-			# https://thinc.ai/docs/api-model
-			tfm = self._nlp.pipeline[self._nlp.pipe_names.index("transformer")][1]
-			return tfm.model.get_dim("nO")
-
-	def pca(self, n_dims):
-		return SpacyTransformerEmbedding(self._nlp, PCACompression(n_dims))
+		# https://spacy.io/usage/processing-pipelines
+		# https://thinc.ai/docs/api-model
+		tfm = self._nlp.pipeline[self._nlp.pipe_names.index("transformer")][1]
+		return tfm.model.get_dim("nO")
 
 	def encode(self, doc):
 		# https://spacy.io/usage/embeddings-transformers#transformers
@@ -107,3 +83,55 @@ class SpacyTransformerEmbedding(AbstractSpacyTokenEmbedding):
 		assert len(doc) == trf_vectors.shape[0]
 
 		return trf_vectors
+
+
+class ContextualEmbedding(TokenEmbedding):
+	def __init__(self, arg, transform=None):
+		if isinstance(arg, _Impl):
+			self._impl = arg
+		elif isinstance(arg, spacy.Language):
+			stats = decompose_nlp(arg)
+			if stats is not None:
+				self._impl = _VectorImpl(arg, stats)
+			elif "transformer" in arg.pipe_names:
+				self._impl = _TfmImpl(arg)
+			else:
+				raise ValueError(
+					f"no suitable pipeline component for generating vectors in {arg}")
+		else:
+			raise TypeError(arg)
+
+		self._transform = transform
+
+	@property
+	def transform(self):
+		return self._transform
+
+	@property
+	def is_contextual(self):
+		return True
+
+	def encode(self, doc):
+		return self._impl.encode(doc)
+
+	def create_instance(self, session):
+		# ContextualEmbeddings are their own instance
+		return self
+
+	def to_core(self):
+		return core.ContextualEmbedding(self.name)
+
+	@property
+	def name(self):
+		return self._impl.name
+
+	@property
+	def dimension(self):
+		if self._transform is not None:
+			return self._transform.dimension
+		else:
+			return self._impl.dimension
+
+	def pca(self, n_dims):
+		return ContextualEmbedding(
+			self._impl, transform=PCACompression(n_dims))

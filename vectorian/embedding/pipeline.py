@@ -74,4 +74,4 @@ def decompose_nlp(nlp):
 		data = f(nlp)
 		if data is not None:
 			return data
-	raise RuntimeError(f"failed to decompose {nlp.pipeline}")
+	return None

@@ -120,6 +120,8 @@ class SpacySpanEmbedding(PureSpanEmbedding):
 		super().__init__(**kwargs)
 		self._nlp = nlp
 		self._stats = decompose_nlp(nlp)
+		if self._stats is None:
+			raise RuntimeError(f"failed to decompose {nlp.pipeline}")
 
 	def vector_size(self, session):
 		return self._stats.dimension
