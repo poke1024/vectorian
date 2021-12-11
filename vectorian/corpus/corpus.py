@@ -312,6 +312,10 @@ class Corpus:
 		self._corpus_h5.close()
 		self._conn.close()
 
+	def iterdir(self):
+		for k, v in self._documents_group.items():
+			yield json.loads(v.attrs["metadata"])
+
 	@property
 	def embedding_catalog(self):
 		return self._catalog
