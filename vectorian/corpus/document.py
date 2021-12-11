@@ -6,6 +6,7 @@ import contextlib
 import h5py
 import uuid
 import logging
+import hashlib
 
 from functools import lru_cache
 from pathlib import Path
@@ -364,6 +365,10 @@ class ExternalMemoryDocumentStorage(DocumentStorage):
 			yield _spans_from_h5(hf)
 
 
+def _text_hash(text):
+	return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
 class Document:
 	def __init__(self, storage, contextual_embeddings=None):
 		self._storage = storage
@@ -395,6 +400,20 @@ class Document:
 		contextual_embeddings = Document._load_embeddings(embedding_catalog, path)
 		return Document(ExternalMemoryDocumentStorage(path), contextual_embeddings)
 
+	def find_duplicates(self, doc_sql):
+		with self._storage.text() as text:
+			cur = doc_sql.cursor()
+			try:
+				text_data = text.get()
+				text_hash = _text_hash(text_data)
+				cur.execute('''
+					SELECT unique_id FROM text WHERE content_hash=? AND content=?
+					''', (text_hash, text_data))
+				rows = cur.fetchall()
+			finally:
+				cur.close()
+		return [x[0] for x in rows]
+
 	def save_to_corpus(self, unique_id, doc_path, doc_sql, doc_group, embedding_catalog):
 		doc_group.attrs["metadata"] = json.dumps(self._storage.metadata)
 
@@ -416,9 +435,11 @@ class Document:
 					f.write(text.get())
 			else:
 				with doc_sql:
+					text_data = text.get()
+					text_hash = _text_hash(text_data)
 					doc_sql.execute('''
-						INSERT INTO text(unique_id, content) VALUES (?, ?)
-						''', (unique_id, text.get()))
+						INSERT INTO text(unique_id, content, content_hash) VALUES (?, ?, ?)
+						''', (unique_id, text_data, text_hash))
 
 		self._save_embeddings(embedding_catalog, doc_path)
 

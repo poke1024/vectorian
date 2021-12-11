@@ -263,11 +263,17 @@ class Corpus:
 		#self._flavors_group = self._corpus_h5.require_group("flavors")
 
 		self._corpus_sql = sqlite3.connect(path / "corpus.db")
+		self._mutable = mutable
 
 		with self._corpus_sql:
 			self._corpus_sql.execute('''
 				CREATE TABLE IF NOT EXISTS text(
-					unique_id TEXT PRIMARY KEY, content TEXT)''')
+					unique_id TEXT PRIMARY KEY,
+					content TEXT,
+					content_hash TEXT)''')
+			self._corpus_sql.execute('''
+				CREATE INDEX IF NOT EXISTS text_hash ON text(content_hash);
+			''')
 
 		data = threading.local()
 
@@ -370,7 +376,15 @@ class Corpus:
 		self._unique_id_to_index[unique_id] = len(self._ordered_docs)
 		self._ordered_docs.append(doc)
 
-	def add_doc(self, doc):
+	def add_doc(self, doc, ignore_dup=True):
+		if not self._mutable:
+			raise RuntimeError("corpus is not mutable")
+
+		if ignore_dup:
+			dup = doc.find_duplicates(self._corpus_sql)
+			if len(dup) > 0:
+				return False
+
 		unique_id = str(uuid.uuid4())
 		if unique_id in self._documents_group or unique_id in self._docs:
 			raise ValueError("failed to create uuid for doc")
@@ -386,6 +400,7 @@ class Corpus:
 			self._corpus_h5.flush()
 
 		self._add_doc(unique_id, doc)
+		return True
 
 	@property
 	def path(self):
