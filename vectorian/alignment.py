@@ -14,6 +14,13 @@ class Optimizer:
 		raise NotImplementedError()
 
 
+def coalesce_default_gap(gap):
+	if gap is None:
+		return ConstantGapCost(0)
+	else:
+		return gap
+
+
 class Alignment(Optimizer):
 	"""
 	A strategy to align two sequences - i.e. matching one sequence against the
@@ -68,7 +75,8 @@ class GlobalAlignment(Alignment):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]] = None):
+		gap = coalesce_default_gap(gap)
 		self._gap = gap
 		if isinstance(gap, Dict):
 			if not all(k in ("s", "t") for k in gap.keys()):
@@ -100,7 +108,8 @@ class SemiGlobalAlignment(Alignment):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]] = None):
+		gap = coalesce_default_gap(gap)
 		self._gap = gap
 		if isinstance(gap, Dict):
 			if not all(k in ("s", "t") for k in gap.keys()):
@@ -155,7 +164,8 @@ class LocalAlignment(Alignment):
 	Chapman and Hall/CRC. https://doi.org/10.1201/9781420036275
 	"""
 
-	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]]):
+	def __init__(self, gap: Union[GapCost, Dict[str, GapCost]] = None):
+		gap = coalesce_default_gap(gap)
 		self._gap = gap
 		if isinstance(gap, Dict):
 			if not all(k in ("s", "t") for k in gap.keys()):
