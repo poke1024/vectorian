@@ -318,6 +318,10 @@ class Corpus:
 		self._corpus_h5.close()
 		self._conn.close()
 
+	@property
+	def mutable(self):
+		return self._mutable
+
 	def iterdir(self):
 		for k, v in self._documents_group.items():
 			yield json.loads(v.attrs["metadata"])
