@@ -335,7 +335,7 @@ class SpanEmbedding:
 			raise TypeError(arg)
 		self._cached = cached
 
-	def create_encoder(self, partition, ):
+	def create_encoder(self, partition):
 		if self._cached:
 			klass = CachedSpanEmbeddingEncoder
 		else:
