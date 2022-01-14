@@ -346,6 +346,13 @@ class SpanEmbedding:
 		from vectorian.sim.span import EmbeddedSpanSim
 		return EmbeddedSpanSim(self, vector_sim)
 
+	@staticmethod
+	def from_lambda(encode, vector_size=768, name=None):
+		if name is None:
+			name = encode.__name__
+		return SpanEmbedding(_LambdaImpl(
+			encode, name, vector_size=vector_size))
+
 
 class SentenceEmbedding(SpanEmbedding):
 	pass
