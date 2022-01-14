@@ -24,7 +24,6 @@ class _Impl:
 		raise NotImplementedError()
 
 
-
 class AggregatedTokenImpl(_Impl):
 	# aggregated token embeddings are used in many publications, e.g.:
 	# * Mikolov et al., "Distributed representations of words and
