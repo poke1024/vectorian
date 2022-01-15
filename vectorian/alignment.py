@@ -203,7 +203,7 @@ class WordMoversDistance(OptimalTransport):
 	"""
 
 	@staticmethod
-	def wmd(variant='bow', **kwargs):
+	def wmd(variant='nbow', **kwargs):
 		"""
 		Create a variant of WMD. To compute the WMD for two documents/sentences, the
 		runtime is super cubic in the number of different tokens involved.
@@ -218,7 +218,7 @@ class WordMoversDistance(OptimalTransport):
 			raise ValueError(variant)
 
 	@staticmethod
-	def rwmd(variant, **kwargs):
+	def rwmd(variant='nbow', **kwargs):
 		"""
 		Create a variant of Relaxed WMD (RWMD).
 
