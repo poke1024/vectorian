@@ -11,7 +11,8 @@ from pathlib import Path
 from vectorian.tqdm import tqdm
 from .token import TokenEmbedding
 from ..vectors import Vectors
-from ..utils import make_cache_path, normalize_word2vec, extraction_tqdm, gensim_version
+from ..utils import make_cache_path, normalize_word2vec, extraction_tqdm,\
+	gensim_version, download, load_glove_txt
 from ..transform import PCACompression
 from ..encoder import EmbeddingEncoder
 
