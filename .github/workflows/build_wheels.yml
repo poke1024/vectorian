@@ -24,6 +24,8 @@ jobs:
         exclude:
           - os: macos-latest
             python: 38
+          - os: macos-latest
+            python: 37
 
     steps:
       - uses: actions/checkout@v2
