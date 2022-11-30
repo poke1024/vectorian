@@ -14,7 +14,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, macos-latest]  # , windows-latest
-        python: [38, 39]
+        python: [37, 38, 39, 310]
         manylinux_image: [manylinux2014]
         include:
           - os: ubuntu-latest
